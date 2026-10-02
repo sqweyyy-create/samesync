@@ -4,16 +4,498 @@
     {
       "id": "c.music.post_punk",
       "domain": "music",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "name": { "ru": "Пост-панк", "en": "Post-punk" }
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Пост-панк",
+        "en": "Post-punk"
+      }
+    },
+    {
+      "id": "c.music.ru_rap",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Русский рэп",
+        "en": "Russian rap"
+      }
+    },
+    {
+      "id": "c.music.ru_indie",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Русский инди",
+        "en": "Russian indie"
+      }
+    },
+    {
+      "id": "c.music.ru_pop",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Русский поп",
+        "en": "Russian pop"
+      }
+    },
+    {
+      "id": "c.music.pop",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Поп",
+        "en": "Pop"
+      }
+    },
+    {
+      "id": "c.music.hip_hop",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Хип-хоп",
+        "en": "Hip-hop"
+      }
+    },
+    {
+      "id": "c.music.rock",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Рок",
+        "en": "Rock"
+      }
+    },
+    {
+      "id": "c.music.kpop",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "K-pop",
+        "en": "K-pop"
+      }
+    },
+    {
+      "id": "c.music.electronic",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Электроника",
+        "en": "Electronic"
+      }
+    },
+    {
+      "id": "c.music.phonk",
+      "domain": "music",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Фонк",
+        "en": "Phonk"
+      }
     },
     {
       "id": "c.games.indie",
       "domain": "games",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "name": { "ru": "Инди-игры", "en": "Indie games" }
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Инди-игры",
+        "en": "Indie games"
+      }
+    },
+    {
+      "id": "c.games.shooters",
+      "domain": "games",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Шутеры",
+        "en": "Shooters"
+      }
+    },
+    {
+      "id": "c.games.moba",
+      "domain": "games",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "MOBA",
+        "en": "MOBA"
+      }
+    },
+    {
+      "id": "c.games.sandbox",
+      "domain": "games",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Песочницы",
+        "en": "Sandbox games"
+      }
+    },
+    {
+      "id": "c.games.rpg",
+      "domain": "games",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "RPG и сюжетные игры",
+        "en": "RPGs and story games"
+      }
+    },
+    {
+      "id": "c.games.horror",
+      "domain": "games",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Хоррор-игры",
+        "en": "Horror games"
+      }
+    },
+    {
+      "id": "c.games.tabletop",
+      "domain": "games",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Настольные игры",
+        "en": "Tabletop games"
+      }
+    },
+    {
+      "id": "c.shows.anime",
+      "domain": "shows",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Аниме",
+        "en": "Anime"
+      }
+    },
+    {
+      "id": "c.shows.series",
+      "domain": "shows",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Сериалы",
+        "en": "TV series"
+      }
+    },
+    {
+      "id": "c.shows.animated",
+      "domain": "shows",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Мультсериалы",
+        "en": "Animated series"
+      }
+    },
+    {
+      "id": "c.shows.youtube",
+      "domain": "shows",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "YouTube",
+        "en": "YouTube"
+      }
+    },
+    {
+      "id": "c.movies.blockbusters",
+      "domain": "movies",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Блокбастеры и франшизы",
+        "en": "Blockbusters and franchises"
+      }
+    },
+    {
+      "id": "c.movies.animation",
+      "domain": "movies",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Анимация",
+        "en": "Animation"
+      }
+    },
+    {
+      "id": "c.movies.horror",
+      "domain": "movies",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Фильмы ужасов",
+        "en": "Horror movies"
+      }
+    },
+    {
+      "id": "c.movies.auteur",
+      "domain": "movies",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Авторское кино",
+        "en": "Auteur cinema"
+      }
+    },
+    {
+      "id": "c.books.fantasy",
+      "domain": "books",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Фэнтези",
+        "en": "Fantasy"
+      }
+    },
+    {
+      "id": "c.books.manga",
+      "domain": "books",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Манга",
+        "en": "Manga"
+      }
+    },
+    {
+      "id": "c.books.classics",
+      "domain": "books",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Классика",
+        "en": "Classics"
+      }
+    },
+    {
+      "id": "c.books.modern",
+      "domain": "books",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Современные книги",
+        "en": "Modern books"
+      }
+    },
+    {
+      "id": "c.memes.memes",
+      "domain": "memes",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Мемы",
+        "en": "Memes"
+      }
+    },
+    {
+      "id": "c.memes.online_culture",
+      "domain": "memes",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Онлайн-культура",
+        "en": "Online culture"
+      }
     }
   ],
   "items": [
@@ -21,33 +503,3088 @@
       "id": "i.music.molchat_doma",
       "categoryId": "c.music.post_punk",
       "popularity": "known",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "name": { "ru": "Молчат Дома", "en": "Molchat Doma" }
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Молчат Дома",
+        "en": "Molchat Doma"
+      }
     },
     {
       "id": "i.music.joy_division",
       "categoryId": "c.music.post_punk",
       "popularity": "mainstream",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "name": { "ru": "Joy Division", "en": "Joy Division" }
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Joy Division",
+        "en": "Joy Division"
+      }
+    },
+    {
+      "id": "i.music.buerak",
+      "categoryId": "c.music.post_punk",
+      "popularity": "niche",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Буерак"
+      }
+    },
+    {
+      "id": "i.music.elektroforez",
+      "categoryId": "c.music.post_punk",
+      "popularity": "niche",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Электрофорез"
+      }
+    },
+    {
+      "id": "i.music.the_cure",
+      "categoryId": "c.music.post_punk",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "The Cure",
+        "en": "The Cure"
+      }
+    },
+    {
+      "id": "i.music.ploho",
+      "categoryId": "c.music.post_punk",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Плохо",
+        "en": "Ploho"
+      }
+    },
+    {
+      "id": "i.music.scriptonite",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Скриптонит"
+      }
+    },
+    {
+      "id": "i.music.pharaoh",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Pharaoh"
+      }
+    },
+    {
+      "id": "i.music.kizaru",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Kizaru"
+      }
+    },
+    {
+      "id": "i.music.big_baby_tape",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Big Baby Tape"
+      }
+    },
+    {
+      "id": "i.music.mayot",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "MAYOT"
+      }
+    },
+    {
+      "id": "i.music.platina",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Платина"
+      }
+    },
+    {
+      "id": "i.music.og_buda",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "OG Buda"
+      }
+    },
+    {
+      "id": "i.music.boulevard_depo",
+      "categoryId": "c.music.ru_rap",
+      "popularity": "niche",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Boulevard Depo"
+      }
+    },
+    {
+      "id": "i.music.daite_tank",
+      "categoryId": "c.music.ru_indie",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Дайте танк (!)"
+      }
+    },
+    {
+      "id": "i.music.kis_kis",
+      "categoryId": "c.music.ru_indie",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Кис-кис"
+      }
+    },
+    {
+      "id": "i.music.sirotkin",
+      "categoryId": "c.music.ru_indie",
+      "popularity": "niche",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Сироткин"
+      }
+    },
+    {
+      "id": "i.music.aigel",
+      "categoryId": "c.music.ru_indie",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "АИГЕЛ",
+        "en": "AIGEL"
+      }
+    },
+    {
+      "id": "i.music.hadn_dadn",
+      "categoryId": "c.music.ru_indie",
+      "popularity": "niche",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Хадн дадн"
+      }
+    },
+    {
+      "id": "i.music.zivert",
+      "categoryId": "c.music.ru_pop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Zivert"
+      }
+    },
+    {
+      "id": "i.music.mary_krimbrery",
+      "categoryId": "c.music.ru_pop",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Мари Краймбрери"
+      }
+    },
+    {
+      "id": "i.music.klava_koka",
+      "categoryId": "c.music.ru_pop",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Клава Кока"
+      }
+    },
+    {
+      "id": "i.music.tima_belorusskih",
+      "categoryId": "c.music.ru_pop",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Тима Белорусских"
+      }
+    },
+    {
+      "id": "i.music.jony",
+      "categoryId": "c.music.ru_pop",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Jony"
+      }
+    },
+    {
+      "id": "i.music.egor_kreed",
+      "categoryId": "c.music.ru_pop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Егор Крид"
+      }
+    },
+    {
+      "id": "i.music.taylor_swift",
+      "categoryId": "c.music.pop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Taylor Swift",
+        "en": "Taylor Swift"
+      }
+    },
+    {
+      "id": "i.music.billie_eilish",
+      "categoryId": "c.music.pop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Billie Eilish",
+        "en": "Billie Eilish"
+      }
+    },
+    {
+      "id": "i.music.the_weeknd",
+      "categoryId": "c.music.pop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "The Weeknd",
+        "en": "The Weeknd"
+      }
+    },
+    {
+      "id": "i.music.dua_lipa",
+      "categoryId": "c.music.pop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Dua Lipa",
+        "en": "Dua Lipa"
+      }
+    },
+    {
+      "id": "i.music.olivia_rodrigo",
+      "categoryId": "c.music.pop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Olivia Rodrigo",
+        "en": "Olivia Rodrigo"
+      }
+    },
+    {
+      "id": "i.music.sabrina_carpenter",
+      "categoryId": "c.music.pop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Sabrina Carpenter",
+        "en": "Sabrina Carpenter"
+      }
+    },
+    {
+      "id": "i.music.lana_del_rey",
+      "categoryId": "c.music.pop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Lana Del Rey",
+        "en": "Lana Del Rey"
+      }
+    },
+    {
+      "id": "i.music.charli_xcx",
+      "categoryId": "c.music.pop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Charli XCX",
+        "en": "Charli XCX"
+      }
+    },
+    {
+      "id": "i.music.kendrick_lamar",
+      "categoryId": "c.music.hip_hop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Kendrick Lamar",
+        "en": "Kendrick Lamar"
+      }
+    },
+    {
+      "id": "i.music.travis_scott",
+      "categoryId": "c.music.hip_hop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Travis Scott",
+        "en": "Travis Scott"
+      }
+    },
+    {
+      "id": "i.music.tyler_the_creator",
+      "categoryId": "c.music.hip_hop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Tyler, the Creator",
+        "en": "Tyler, the Creator"
+      }
+    },
+    {
+      "id": "i.music.playboi_carti",
+      "categoryId": "c.music.hip_hop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Playboi Carti",
+        "en": "Playboi Carti"
+      }
+    },
+    {
+      "id": "i.music.frank_ocean",
+      "categoryId": "c.music.hip_hop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Frank Ocean",
+        "en": "Frank Ocean"
+      }
+    },
+    {
+      "id": "i.music.arctic_monkeys",
+      "categoryId": "c.music.rock",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Arctic Monkeys",
+        "en": "Arctic Monkeys"
+      }
+    },
+    {
+      "id": "i.music.linkin_park",
+      "categoryId": "c.music.rock",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Linkin Park",
+        "en": "Linkin Park"
+      }
+    },
+    {
+      "id": "i.music.nirvana",
+      "categoryId": "c.music.rock",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Nirvana",
+        "en": "Nirvana"
+      }
+    },
+    {
+      "id": "i.music.radiohead",
+      "categoryId": "c.music.rock",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Radiohead",
+        "en": "Radiohead"
+      }
+    },
+    {
+      "id": "i.music.twenty_one_pilots",
+      "categoryId": "c.music.rock",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Twenty One Pilots",
+        "en": "Twenty One Pilots"
+      }
+    },
+    {
+      "id": "i.music.korol_i_shut",
+      "categoryId": "c.music.rock",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Король и Шут"
+      }
+    },
+    {
+      "id": "i.music.kino",
+      "categoryId": "c.music.rock",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Кино"
+      }
+    },
+    {
+      "id": "i.music.splin",
+      "categoryId": "c.music.rock",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Сплин"
+      }
+    },
+    {
+      "id": "i.music.bts",
+      "categoryId": "c.music.kpop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "BTS",
+        "en": "BTS"
+      }
+    },
+    {
+      "id": "i.music.blackpink",
+      "categoryId": "c.music.kpop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "BLACKPINK",
+        "en": "BLACKPINK"
+      }
+    },
+    {
+      "id": "i.music.stray_kids",
+      "categoryId": "c.music.kpop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Stray Kids",
+        "en": "Stray Kids"
+      }
+    },
+    {
+      "id": "i.music.newjeans",
+      "categoryId": "c.music.kpop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "NewJeans",
+        "en": "NewJeans"
+      }
+    },
+    {
+      "id": "i.music.aespa",
+      "categoryId": "c.music.kpop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "aespa",
+        "en": "aespa"
+      }
+    },
+    {
+      "id": "i.music.daft_punk",
+      "categoryId": "c.music.electronic",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Daft Punk",
+        "en": "Daft Punk"
+      }
+    },
+    {
+      "id": "i.music.skrillex",
+      "categoryId": "c.music.electronic",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Skrillex",
+        "en": "Skrillex"
+      }
+    },
+    {
+      "id": "i.music.fred_again",
+      "categoryId": "c.music.electronic",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Fred again..",
+        "en": "Fred again.."
+      }
+    },
+    {
+      "id": "i.music.aphex_twin",
+      "categoryId": "c.music.electronic",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Aphex Twin",
+        "en": "Aphex Twin"
+      }
+    },
+    {
+      "id": "i.music.boards_of_canada",
+      "categoryId": "c.music.electronic",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Boards of Canada",
+        "en": "Boards of Canada"
+      }
+    },
+    {
+      "id": "i.music.kordhell",
+      "categoryId": "c.music.phonk",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Kordhell",
+        "en": "Kordhell"
+      }
+    },
+    {
+      "id": "i.music.dvrst",
+      "categoryId": "c.music.phonk",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "DVRST",
+        "en": "DVRST"
+      }
+    },
+    {
+      "id": "i.music.interworld",
+      "categoryId": "c.music.phonk",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "INTERWORLD",
+        "en": "INTERWORLD"
+      }
     },
     {
       "id": "i.games.hollow_knight",
       "categoryId": "c.games.indie",
       "popularity": "known",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "name": { "ru": "Hollow Knight", "en": "Hollow Knight" }
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Hollow Knight",
+        "en": "Hollow Knight"
+      }
     },
     {
       "id": "i.games.celeste",
       "categoryId": "c.games.indie",
       "popularity": "known",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "name": { "ru": "Celeste", "en": "Celeste" }
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Celeste",
+        "en": "Celeste"
+      }
+    },
+    {
+      "id": "i.games.undertale",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Undertale",
+        "en": "Undertale"
+      }
+    },
+    {
+      "id": "i.games.stardew_valley",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Stardew Valley",
+        "en": "Stardew Valley"
+      }
+    },
+    {
+      "id": "i.games.hades",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Hades",
+        "en": "Hades"
+      }
+    },
+    {
+      "id": "i.games.terraria",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Terraria",
+        "en": "Terraria"
+      }
+    },
+    {
+      "id": "i.games.disco_elysium",
+      "categoryId": "c.games.indie",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Disco Elysium",
+        "en": "Disco Elysium"
+      }
+    },
+    {
+      "id": "i.games.omori",
+      "categoryId": "c.games.indie",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Omori",
+        "en": "Omori"
+      }
+    },
+    {
+      "id": "i.games.outer_wilds",
+      "categoryId": "c.games.indie",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Outer Wilds",
+        "en": "Outer Wilds"
+      }
+    },
+    {
+      "id": "i.games.balatro",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Balatro",
+        "en": "Balatro"
+      }
+    },
+    {
+      "id": "i.games.counter_strike_2",
+      "categoryId": "c.games.shooters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Counter-Strike 2",
+        "en": "Counter-Strike 2"
+      }
+    },
+    {
+      "id": "i.games.valorant",
+      "categoryId": "c.games.shooters",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Valorant",
+        "en": "Valorant"
+      }
+    },
+    {
+      "id": "i.games.apex_legends",
+      "categoryId": "c.games.shooters",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Apex Legends",
+        "en": "Apex Legends"
+      }
+    },
+    {
+      "id": "i.games.fortnite",
+      "categoryId": "c.games.shooters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Fortnite",
+        "en": "Fortnite"
+      }
+    },
+    {
+      "id": "i.games.call_of_duty",
+      "categoryId": "c.games.shooters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Call of Duty",
+        "en": "Call of Duty"
+      }
+    },
+    {
+      "id": "i.games.standoff_2",
+      "categoryId": "c.games.shooters",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Standoff 2"
+      }
+    },
+    {
+      "id": "i.games.dota_2",
+      "categoryId": "c.games.moba",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Dota 2",
+        "en": "Dota 2"
+      }
+    },
+    {
+      "id": "i.games.league_of_legends",
+      "categoryId": "c.games.moba",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "League of Legends",
+        "en": "League of Legends"
+      }
+    },
+    {
+      "id": "i.games.mobile_legends",
+      "categoryId": "c.games.moba",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Mobile Legends",
+        "en": "Mobile Legends"
+      }
+    },
+    {
+      "id": "i.games.minecraft",
+      "categoryId": "c.games.sandbox",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Minecraft",
+        "en": "Minecraft"
+      }
+    },
+    {
+      "id": "i.games.roblox",
+      "categoryId": "c.games.sandbox",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Roblox",
+        "en": "Roblox"
+      }
+    },
+    {
+      "id": "i.games.gta_v",
+      "categoryId": "c.games.sandbox",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "GTA V",
+        "en": "GTA V"
+      }
+    },
+    {
+      "id": "i.games.garrys_mod",
+      "categoryId": "c.games.sandbox",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Garry's Mod",
+        "en": "Garry's Mod"
+      }
+    },
+    {
+      "id": "i.games.witcher_3",
+      "categoryId": "c.games.rpg",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Ведьмак 3",
+        "en": "The Witcher 3"
+      }
+    },
+    {
+      "id": "i.games.elden_ring",
+      "categoryId": "c.games.rpg",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Elden Ring",
+        "en": "Elden Ring"
+      }
+    },
+    {
+      "id": "i.games.baldurs_gate_3",
+      "categoryId": "c.games.rpg",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Baldur's Gate 3",
+        "en": "Baldur's Gate 3"
+      }
+    },
+    {
+      "id": "i.games.genshin_impact",
+      "categoryId": "c.games.rpg",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Genshin Impact",
+        "en": "Genshin Impact"
+      }
+    },
+    {
+      "id": "i.games.honkai_star_rail",
+      "categoryId": "c.games.rpg",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Honkai: Star Rail",
+        "en": "Honkai: Star Rail"
+      }
+    },
+    {
+      "id": "i.games.cyberpunk_2077",
+      "categoryId": "c.games.rpg",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Cyberpunk 2077",
+        "en": "Cyberpunk 2077"
+      }
+    },
+    {
+      "id": "i.games.red_dead_redemption_2",
+      "categoryId": "c.games.rpg",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Red Dead Redemption 2",
+        "en": "Red Dead Redemption 2"
+      }
+    },
+    {
+      "id": "i.games.persona_5",
+      "categoryId": "c.games.rpg",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Persona 5",
+        "en": "Persona 5"
+      }
+    },
+    {
+      "id": "i.games.skyrim",
+      "categoryId": "c.games.rpg",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Skyrim",
+        "en": "Skyrim"
+      }
+    },
+    {
+      "id": "i.games.fnaf",
+      "categoryId": "c.games.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Five Nights at Freddy's",
+        "en": "Five Nights at Freddy's"
+      }
+    },
+    {
+      "id": "i.games.lethal_company",
+      "categoryId": "c.games.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Lethal Company",
+        "en": "Lethal Company"
+      }
+    },
+    {
+      "id": "i.games.phasmophobia",
+      "categoryId": "c.games.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Phasmophobia",
+        "en": "Phasmophobia"
+      }
+    },
+    {
+      "id": "i.games.silent_hill_2",
+      "categoryId": "c.games.horror",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Silent Hill 2",
+        "en": "Silent Hill 2"
+      }
+    },
+    {
+      "id": "i.games.resident_evil_4",
+      "categoryId": "c.games.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Resident Evil 4",
+        "en": "Resident Evil 4"
+      }
+    },
+    {
+      "id": "i.games.mafia_party_game",
+      "categoryId": "c.games.tabletop",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Мафия",
+        "en": "Mafia"
+      }
+    },
+    {
+      "id": "i.games.dnd",
+      "categoryId": "c.games.tabletop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Dungeons & Dragons",
+        "en": "Dungeons & Dragons"
+      }
+    },
+    {
+      "id": "i.games.codenames",
+      "categoryId": "c.games.tabletop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Кодовые имена",
+        "en": "Codenames"
+      }
+    },
+    {
+      "id": "i.games.exploding_kittens",
+      "categoryId": "c.games.tabletop",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Взрывные котята",
+        "en": "Exploding Kittens"
+      }
+    },
+    {
+      "id": "i.shows.attack_on_titan",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Атака титанов",
+        "en": "Attack on Titan"
+      }
+    },
+    {
+      "id": "i.shows.jujutsu_kaisen",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Магическая битва",
+        "en": "Jujutsu Kaisen"
+      }
+    },
+    {
+      "id": "i.shows.naruto",
+      "categoryId": "c.shows.anime",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Наруто",
+        "en": "Naruto"
+      }
+    },
+    {
+      "id": "i.shows.one_piece",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Ван-Пис",
+        "en": "One Piece"
+      }
+    },
+    {
+      "id": "i.shows.chainsaw_man",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Человек-бензопила",
+        "en": "Chainsaw Man"
+      }
+    },
+    {
+      "id": "i.shows.demon_slayer",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Клинок, рассекающий демонов",
+        "en": "Demon Slayer"
+      }
+    },
+    {
+      "id": "i.shows.death_note",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Тетрадь смерти",
+        "en": "Death Note"
+      }
+    },
+    {
+      "id": "i.shows.frieren",
+      "categoryId": "c.shows.anime",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Фрирен",
+        "en": "Frieren"
+      }
+    },
+    {
+      "id": "i.shows.spy_x_family",
+      "categoryId": "c.shows.anime",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Семья шпиона",
+        "en": "Spy x Family"
+      }
+    },
+    {
+      "id": "i.shows.evangelion",
+      "categoryId": "c.shows.anime",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Евангелион",
+        "en": "Neon Genesis Evangelion"
+      }
+    },
+    {
+      "id": "i.shows.stranger_things",
+      "categoryId": "c.shows.series",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Очень странные дела",
+        "en": "Stranger Things"
+      }
+    },
+    {
+      "id": "i.shows.wednesday",
+      "categoryId": "c.shows.series",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Уэнсдэй",
+        "en": "Wednesday"
+      }
+    },
+    {
+      "id": "i.shows.the_bear",
+      "categoryId": "c.shows.series",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Медведь",
+        "en": "The Bear"
+      }
+    },
+    {
+      "id": "i.shows.breaking_bad",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Во все тяжкие",
+        "en": "Breaking Bad"
+      }
+    },
+    {
+      "id": "i.shows.euphoria",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Эйфория",
+        "en": "Euphoria"
+      }
+    },
+    {
+      "id": "i.shows.arcane",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Аркейн",
+        "en": "Arcane"
+      }
+    },
+    {
+      "id": "i.shows.the_last_of_us",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Одни из нас",
+        "en": "The Last of Us"
+      }
+    },
+    {
+      "id": "i.shows.slovo_patsana",
+      "categoryId": "c.shows.series",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Слово пацана"
+      }
+    },
+    {
+      "id": "i.shows.sherlock",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Шерлок",
+        "en": "Sherlock"
+      }
+    },
+    {
+      "id": "i.shows.game_of_thrones",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Игра престолов",
+        "en": "Game of Thrones"
+      }
+    },
+    {
+      "id": "i.shows.severance",
+      "categoryId": "c.shows.series",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Разделение",
+        "en": "Severance"
+      }
+    },
+    {
+      "id": "i.shows.the_boys",
+      "categoryId": "c.shows.series",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Пацаны",
+        "en": "The Boys"
+      }
+    },
+    {
+      "id": "i.shows.rick_and_morty",
+      "categoryId": "c.shows.animated",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Рик и Морти",
+        "en": "Rick and Morty"
+      }
+    },
+    {
+      "id": "i.shows.gravity_falls",
+      "categoryId": "c.shows.animated",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Гравити Фолз",
+        "en": "Gravity Falls"
+      }
+    },
+    {
+      "id": "i.shows.adventure_time",
+      "categoryId": "c.shows.animated",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Время приключений",
+        "en": "Adventure Time"
+      }
+    },
+    {
+      "id": "i.shows.bojack_horseman",
+      "categoryId": "c.shows.animated",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Конь БоДжек",
+        "en": "BoJack Horseman"
+      }
+    },
+    {
+      "id": "i.shows.avatar_last_airbender",
+      "categoryId": "c.shows.animated",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Аватар: Легенда об Аанге",
+        "en": "Avatar: The Last Airbender"
+      }
+    },
+    {
+      "id": "i.shows.smeshariki",
+      "categoryId": "c.shows.animated",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Смешарики"
+      }
+    },
+    {
+      "id": "i.shows.mrbeast",
+      "categoryId": "c.shows.youtube",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "MrBeast",
+        "en": "MrBeast"
+      }
+    },
+    {
+      "id": "i.shows.pewdiepie",
+      "categoryId": "c.shows.youtube",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "PewDiePie",
+        "en": "PewDiePie"
+      }
+    },
+    {
+      "id": "i.shows.markiplier",
+      "categoryId": "c.shows.youtube",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Markiplier",
+        "en": "Markiplier"
+      }
+    },
+    {
+      "id": "i.shows.hot_ones",
+      "categoryId": "c.shows.youtube",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Hot Ones",
+        "en": "Hot Ones"
+      }
+    },
+    {
+      "id": "i.shows.kuplinov",
+      "categoryId": "c.shows.youtube",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Куплинов"
+      }
+    },
+    {
+      "id": "i.shows.vlad_a4",
+      "categoryId": "c.shows.youtube",
+      "popularity": "mainstream",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Влад А4"
+      }
+    },
+    {
+      "id": "i.movies.marvel",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Marvel",
+        "en": "Marvel"
+      }
+    },
+    {
+      "id": "i.movies.star_wars",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Звёздные войны",
+        "en": "Star Wars"
+      }
+    },
+    {
+      "id": "i.movies.harry_potter",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Гарри Поттер (фильмы)",
+        "en": "Harry Potter (movies)"
+      }
+    },
+    {
+      "id": "i.movies.dune",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Дюна",
+        "en": "Dune"
+      }
+    },
+    {
+      "id": "i.movies.spider_verse",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Человек-паук: Через вселенные",
+        "en": "Spider-Man: Into the Spider-Verse"
+      }
+    },
+    {
+      "id": "i.movies.interstellar",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Интерстеллар",
+        "en": "Interstellar"
+      }
+    },
+    {
+      "id": "i.movies.barbie",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Барби",
+        "en": "Barbie"
+      }
+    },
+    {
+      "id": "i.movies.lord_of_the_rings",
+      "categoryId": "c.movies.blockbusters",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Властелин колец",
+        "en": "The Lord of the Rings"
+      }
+    },
+    {
+      "id": "i.movies.studio_ghibli",
+      "categoryId": "c.movies.animation",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Студия Ghibli",
+        "en": "Studio Ghibli"
+      }
+    },
+    {
+      "id": "i.movies.shrek",
+      "categoryId": "c.movies.animation",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Шрек",
+        "en": "Shrek"
+      }
+    },
+    {
+      "id": "i.movies.coraline",
+      "categoryId": "c.movies.animation",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Коралина в Стране Кошмаров",
+        "en": "Coraline"
+      }
+    },
+    {
+      "id": "i.movies.kung_fu_panda",
+      "categoryId": "c.movies.animation",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Кунг-фу Панда",
+        "en": "Kung Fu Panda"
+      }
+    },
+    {
+      "id": "i.movies.hereditary",
+      "categoryId": "c.movies.horror",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Реинкарнация",
+        "en": "Hereditary"
+      }
+    },
+    {
+      "id": "i.movies.it",
+      "categoryId": "c.movies.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Оно",
+        "en": "It"
+      }
+    },
+    {
+      "id": "i.movies.the_conjuring",
+      "categoryId": "c.movies.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Заклятие",
+        "en": "The Conjuring"
+      }
+    },
+    {
+      "id": "i.movies.get_out",
+      "categoryId": "c.movies.horror",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Прочь",
+        "en": "Get Out"
+      }
+    },
+    {
+      "id": "i.movies.tarantino",
+      "categoryId": "c.movies.auteur",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Квентин Тарантино",
+        "en": "Quentin Tarantino"
+      }
+    },
+    {
+      "id": "i.movies.wes_anderson",
+      "categoryId": "c.movies.auteur",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Уэс Андерсон",
+        "en": "Wes Anderson"
+      }
+    },
+    {
+      "id": "i.movies.christopher_nolan",
+      "categoryId": "c.movies.auteur",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Кристофер Нолан",
+        "en": "Christopher Nolan"
+      }
+    },
+    {
+      "id": "i.movies.balabanov",
+      "categoryId": "c.movies.auteur",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Алексей Балабанов"
+      }
+    },
+    {
+      "id": "i.movies.everything_everywhere",
+      "categoryId": "c.movies.auteur",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Всё везде и сразу",
+        "en": "Everything Everywhere All at Once"
+      }
+    },
+    {
+      "id": "i.books.harry_potter",
+      "categoryId": "c.books.fantasy",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Гарри Поттер (книги)",
+        "en": "Harry Potter (books)"
+      }
+    },
+    {
+      "id": "i.books.the_witcher",
+      "categoryId": "c.books.fantasy",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Ведьмак (книги)",
+        "en": "The Witcher (books)"
+      }
+    },
+    {
+      "id": "i.books.song_of_ice_and_fire",
+      "categoryId": "c.books.fantasy",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Песнь льда и пламени",
+        "en": "A Song of Ice and Fire"
+      }
+    },
+    {
+      "id": "i.books.percy_jackson",
+      "categoryId": "c.books.fantasy",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Перси Джексон",
+        "en": "Percy Jackson"
+      }
+    },
+    {
+      "id": "i.books.berserk",
+      "categoryId": "c.books.manga",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Берсерк",
+        "en": "Berserk"
+      }
+    },
+    {
+      "id": "i.books.one_punch_man",
+      "categoryId": "c.books.manga",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Ванпанчмен",
+        "en": "One-Punch Man"
+      }
+    },
+    {
+      "id": "i.books.vagabond",
+      "categoryId": "c.books.manga",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "name": {
+        "ru": "Бродяга",
+        "en": "Vagabond"
+      }
+    },
+    {
+      "id": "i.books.dostoevsky",
+      "categoryId": "c.books.classics",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Достоевский",
+        "en": "Fyodor Dostoevsky"
+      }
+    },
+    {
+      "id": "i.books.master_and_margarita",
+      "categoryId": "c.books.classics",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Мастер и Маргарита",
+        "en": "The Master and Margarita"
+      }
+    },
+    {
+      "id": "i.books.orwell_1984",
+      "categoryId": "c.books.classics",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "1984",
+        "en": "1984"
+      }
+    },
+    {
+      "id": "i.books.remarque",
+      "categoryId": "c.books.classics",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Ремарк",
+        "en": "Erich Maria Remarque"
+      }
+    },
+    {
+      "id": "i.books.little_prince",
+      "categoryId": "c.books.classics",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Маленький принц",
+        "en": "The Little Prince"
+      }
+    },
+    {
+      "id": "i.books.stephen_king",
+      "categoryId": "c.books.modern",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Стивен Кинг",
+        "en": "Stephen King"
+      }
+    },
+    {
+      "id": "i.books.murakami",
+      "categoryId": "c.books.modern",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Харуки Мураками",
+        "en": "Haruki Murakami"
+      }
+    },
+    {
+      "id": "i.books.sapiens",
+      "categoryId": "c.books.modern",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Sapiens",
+        "en": "Sapiens"
+      }
+    },
+    {
+      "id": "i.books.flowers_for_algernon",
+      "categoryId": "c.books.modern",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Цветы для Элджернона",
+        "en": "Flowers for Algernon"
+      }
+    },
+    {
+      "id": "i.memes.skibidi_toilet",
+      "categoryId": "c.memes.memes",
+      "popularity": "mainstream",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Скибиди туалет",
+        "en": "Skibidi Toilet"
+      }
+    },
+    {
+      "id": "i.memes.italian_brainrot",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Итальянский брейнрот",
+        "en": "Italian brainrot"
+      }
+    },
+    {
+      "id": "i.memes.doge",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Доге",
+        "en": "Doge"
+      }
+    },
+    {
+      "id": "i.memes.wojak",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Воджак",
+        "en": "Wojak"
+      }
+    },
+    {
+      "id": "i.memes.zhdun",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Ждун"
+      }
+    },
+    {
+      "id": "i.memes.capybara",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Капибары",
+        "en": "Capybaras"
+      }
+    },
+    {
+      "id": "i.memes.rickroll",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Рикролл",
+        "en": "Rickroll"
+      }
+    },
+    {
+      "id": "i.memes.nyan_cat",
+      "categoryId": "c.memes.memes",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Nyan Cat",
+        "en": "Nyan Cat"
+      }
+    },
+    {
+      "id": "i.memes.big_floppa",
+      "categoryId": "c.memes.memes",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Шлёпа",
+        "en": "Big Floppa"
+      }
+    },
+    {
+      "id": "i.memes.asmr",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "ASMR",
+        "en": "ASMR"
+      }
+    },
+    {
+      "id": "i.memes.pinterest_aesthetics",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Эстетика Pinterest",
+        "en": "Pinterest aesthetics"
+      }
+    },
+    {
+      "id": "i.memes.speedrunning",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Спидраны",
+        "en": "Speedrunning"
+      }
+    },
+    {
+      "id": "i.memes.cosplay",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Косплей",
+        "en": "Cosplay"
+      }
+    },
+    {
+      "id": "i.memes.fanfiction",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Фанфики",
+        "en": "Fan fiction"
+      }
+    },
+    {
+      "id": "i.memes.lofi",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "known",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Лоу-фай",
+        "en": "Lo-fi"
+      }
+    },
+    {
+      "id": "i.memes.vtubers",
+      "categoryId": "c.memes.online_culture",
+      "popularity": "niche",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "name": {
+        "ru": "Витуберы",
+        "en": "VTubers"
+      }
     }
   ]
 }

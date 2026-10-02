@@ -3,17 +3,38 @@
   "questions": [
     {
       "id": "q.pineapple_pizza",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "modes": ["friends", "dating"],
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
       "priorAgree": 0.5,
-      "text": { "ru": "Ананасы на пицце — это нормально", "en": "Pineapple on pizza is fine" }
+      "text": {
+        "ru": "Ананасы на пицце — это нормально",
+        "en": "Pineapple on pizza is fine"
+      }
     },
     {
       "id": "q.long_voice_messages",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "modes": ["friends", "dating"],
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
       "priorAgree": 0.6,
       "text": {
         "ru": "Голосовые длиннее минуты — преступление",
@@ -22,13 +43,1062 @@
     },
     {
       "id": "q.remakes_worse",
-      "locales": ["ru", "en"],
-      "audiences": ["u18", "adult"],
-      "modes": ["friends", "dating"],
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
       "priorAgree": 0.7,
       "text": {
         "ru": "Ремейки почти всегда хуже оригинала",
         "en": "Remakes are almost always worse than the original"
+      }
+    },
+    {
+      "id": "q.slow_replies_ok",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Ответить через три часа — это нормально",
+        "en": "Replying three hours later is totally fine"
+      }
+    },
+    {
+      "id": "q.calls_without_warning",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.65,
+      "text": {
+        "ru": "Звонить без предупреждения — это слишком",
+        "en": "Calling without texting first is too much"
+      }
+    },
+    {
+      "id": "q.night_thinking",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Ночью думается лучше, чем утром",
+        "en": "Your brain works better at night than in the morning"
+      }
+    },
+    {
+      "id": "q.breakfast_overrated",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Завтрак — самый переоценённый приём пищи",
+        "en": "Breakfast is the most overrated meal"
+      }
+    },
+    {
+      "id": "q.cats_over_dogs",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Кошки лучше собак",
+        "en": "Cats are better than dogs"
+      }
+    },
+    {
+      "id": "q.winter_over_summer",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.3,
+      "text": {
+        "ru": "Зима лучше лета",
+        "en": "Winter is better than summer"
+      }
+    },
+    {
+      "id": "q.rain_best_weather",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Дождь за окном — лучшая погода",
+        "en": "Rain outside is the best weather"
+      }
+    },
+    {
+      "id": "q.spoilers_ok",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.3,
+      "text": {
+        "ru": "Спойлеры ничего не портят",
+        "en": "Spoilers don't ruin anything"
+      }
+    },
+    {
+      "id": "q.rewatch_comfort",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Пересматривать любимый сериал лучше, чем начинать новый",
+        "en": "Rewatching a favorite show beats starting a new one"
+      }
+    },
+    {
+      "id": "q.book_better",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.7,
+      "text": {
+        "ru": "Книга почти всегда лучше экранизации",
+        "en": "The book is almost always better than the movie"
+      }
+    },
+    {
+      "id": "q.original_with_subs",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Фильмы лучше смотреть в оригинале с субтитрами",
+        "en": "Movies are better in the original language with subtitles"
+      }
+    },
+    {
+      "id": "q.anime_is_art",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Аниме — это искусство, а не просто мультики",
+        "en": "Anime is real art, not just cartoons"
+      }
+    },
+    {
+      "id": "q.albums_no_shuffle",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.35,
+      "text": {
+        "ru": "Альбом надо слушать целиком, а не вперемешку",
+        "en": "Albums should be played start to finish, not on shuffle"
+      }
+    },
+    {
+      "id": "q.old_music_better",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Раньше музыка была лучше",
+        "en": "Music used to be better"
+      }
+    },
+    {
+      "id": "q.live_over_studio",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Живое выступление важнее студийной записи",
+        "en": "Live performance matters more than the studio version"
+      }
+    },
+    {
+      "id": "q.headphones_always",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Без наушников на улицу не выйти",
+        "en": "Leaving the house without headphones is impossible"
+      }
+    },
+    {
+      "id": "q.single_player_better",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Одиночные игры лучше онлайновых",
+        "en": "Single-player games beat online games"
+      }
+    },
+    {
+      "id": "q.mobile_games_real",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Мобильные игры — тоже настоящие игры",
+        "en": "Mobile games are real games too"
+      }
+    },
+    {
+      "id": "q.easy_mode_ok",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.65,
+      "text": {
+        "ru": "Играть на лёгком уровне не стыдно",
+        "en": "Playing on easy mode is nothing to be ashamed of"
+      }
+    },
+    {
+      "id": "q.absurd_humor",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Лучший юмор — абсурдный",
+        "en": "Absurd humor is the best humor"
+      }
+    },
+    {
+      "id": "q.stickers_over_emoji",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Стикеры выразительнее эмодзи",
+        "en": "Stickers say more than emoji"
+      }
+    },
+    {
+      "id": "q.light_mode_monsters",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Светлая тема в телефоне — для монстров",
+        "en": "Light mode is for monsters"
+      }
+    },
+    {
+      "id": "q.phone_on_table",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Телефон на столе во время встречи — это неуважение",
+        "en": "A phone on the table during a hangout is disrespectful"
+      }
+    },
+    {
+      "id": "q.short_videos_waste",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Короткие видео — пустая трата времени",
+        "en": "Short videos are a waste of time"
+      }
+    },
+    {
+      "id": "q.social_media_detox",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Каждому стоит хотя бы раз удалить соцсети на месяц",
+        "en": "Everyone should quit social media for a month at least once"
+      }
+    },
+    {
+      "id": "q.weekend_at_home",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Идеальные выходные — дома, а не на тусовке",
+        "en": "The perfect weekend is at home, not at a party"
+      }
+    },
+    {
+      "id": "q.spontaneous_plans",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Спонтанные планы лучше запланированных",
+        "en": "Spontaneous plans beat planned ones"
+      }
+    },
+    {
+      "id": "q.small_talk_pointless",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Разговоры ни о чём — пустая трата времени",
+        "en": "Small talk is pointless"
+      }
+    },
+    {
+      "id": "q.online_friends_real",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.7,
+      "text": {
+        "ru": "Друзья из интернета — такие же настоящие друзья",
+        "en": "Internet friends are real friends"
+      }
+    },
+    {
+      "id": "q.texting_over_calls",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.65,
+      "text": {
+        "ru": "Переписка лучше звонков",
+        "en": "Texting beats calling"
+      }
+    },
+    {
+      "id": "q.big_city_better",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Жить в большом городе лучше, чем за городом",
+        "en": "Big city life beats living in the countryside"
+      }
+    },
+    {
+      "id": "q.solo_travel",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Путешествовать в одиночку — лучший опыт",
+        "en": "Traveling solo is the best experience"
+      }
+    },
+    {
+      "id": "q.mountains_over_sea",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Горы лучше моря",
+        "en": "Mountains are better than the beach"
+      }
+    },
+    {
+      "id": "q.fast_food_comfort",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Фастфуд — лучшая еда после тяжёлого дня",
+        "en": "Fast food is the best food after a rough day"
+      }
+    },
+    {
+      "id": "q.spicier_better",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Чем острее, тем вкуснее",
+        "en": "The spicier, the better"
+      }
+    },
+    {
+      "id": "q.milk_before_cereal",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.15,
+      "text": {
+        "ru": "Молоко надо наливать раньше хлопьев",
+        "en": "Milk goes in before the cereal"
+      }
+    },
+    {
+      "id": "q.tea_over_coffee",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Чай лучше кофе",
+        "en": "Tea is better than coffee"
+      }
+    },
+    {
+      "id": "q.cooking_relaxing",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Готовить — это отдых, а не обязанность",
+        "en": "Cooking is relaxing, not a chore"
+      }
+    },
+    {
+      "id": "q.school_useless",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Большая часть школьной программы в жизни не пригодится",
+        "en": "Most of what school teaches is useless in real life"
+      }
+    },
+    {
+      "id": "q.youtube_teaches",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "На YouTube можно научиться большему, чем на уроках",
+        "en": "You can learn more on YouTube than in class"
+      }
+    },
+    {
+      "id": "q.ai_study_ok",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Нейросети — нормальный помощник в учёбе",
+        "en": "Using AI to help with studying is fine"
+      }
+    },
+    {
+      "id": "q.money_happiness",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Деньги всё-таки покупают счастье",
+        "en": "Money does buy happiness"
+      }
+    },
+    {
+      "id": "q.dream_job_over_salary",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Любимая работа лучше высокой зарплаты",
+        "en": "A job you love beats a high salary"
+      }
+    },
+    {
+      "id": "q.comfort_over_style",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Удобство в одежде важнее стиля",
+        "en": "Comfort matters more than style in clothes"
+      }
+    },
+    {
+      "id": "q.horoscopes_fun",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Гороскопы — это хотя бы весело",
+        "en": "Horoscopes are at least fun"
+      }
+    },
+    {
+      "id": "q.alien_life",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.75,
+      "text": {
+        "ru": "Где-то во Вселенной точно есть жизнь",
+        "en": "There's definitely life somewhere else in the universe"
+      }
+    },
+    {
+      "id": "q.past_over_future",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Путешествие в прошлое интереснее, чем в будущее",
+        "en": "Traveling to the past is more interesting than to the future"
+      }
+    },
+    {
+      "id": "q.teleportation_best",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Телепортация — лучшая суперсила",
+        "en": "Teleportation is the best superpower"
+      }
+    },
+    {
+      "id": "q.messy_room_ok",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Беспорядок в комнате — это нормально, если всё находится",
+        "en": "A messy room is fine as long as you can find everything"
+      }
+    },
+    {
+      "id": "q.birthdays_overrated",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.35,
+      "text": {
+        "ru": "День рождения — переоценённый праздник",
+        "en": "Birthdays are overrated"
+      }
+    },
+    {
+      "id": "q.new_year_best",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Новый год — лучший праздник в году",
+        "en": "New Year's is the best holiday of the year"
+      }
+    },
+    {
+      "id": "q.money_best_gift",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "u18",
+        "adult"
+      ],
+      "modes": [
+        "friends",
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Лучший подарок — деньги",
+        "en": "Money is the best gift"
       }
     }
   ]

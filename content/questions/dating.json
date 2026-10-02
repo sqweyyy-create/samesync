@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "questions": [
+    {
+      "id": "q.dating.split_first_date",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "На первом свидании счёт лучше делить пополам",
+        "en": "Splitting the bill on a first date is the way to go"
+      }
+    },
+    {
+      "id": "q.dating.who_texts_first",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.7,
+      "text": {
+        "ru": "Неважно, кто напишет первым",
+        "en": "It doesn't matter who texts first"
+      }
+    },
+    {
+      "id": "q.dating.little_jealousy",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.5,
+      "text": {
+        "ru": "Немного ревности в отношениях — это нормально",
+        "en": "A little jealousy in a relationship is normal"
+      }
+    },
+    {
+      "id": "q.dating.no_shared_passwords",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Партнёрам не нужно знать пароли друг друга",
+        "en": "Partners don't need each other's passwords"
+      }
+    },
+    {
+      "id": "q.dating.friends_with_ex",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "С бывшими можно оставаться друзьями",
+        "en": "You can stay friends with an ex"
+      }
+    },
+    {
+      "id": "q.dating.love_at_first_sight",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Любовь с первого взгляда существует",
+        "en": "Love at first sight is real"
+      }
+    },
+    {
+      "id": "q.dating.long_distance",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.55,
+      "text": {
+        "ru": "Отношения на расстоянии могут работать",
+        "en": "Long-distance relationships can work"
+      }
+    },
+    {
+      "id": "q.dating.no_shared_hobbies",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.4,
+      "text": {
+        "ru": "Паре не обязательно иметь общие увлечения",
+        "en": "A couple doesn't need shared hobbies"
+      }
+    },
+    {
+      "id": "q.dating.pda_cute",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Нежности на публике — это мило, а не кринж",
+        "en": "Public displays of affection are cute, not cringe"
+      }
+    },
+    {
+      "id": "q.dating.not_on_social",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.7,
+      "text": {
+        "ru": "Отношения не обязательно показывать в соцсетях",
+        "en": "Relationships don't need to be shown on social media"
+      }
+    },
+    {
+      "id": "q.dating.move_in_six_months",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.45,
+      "text": {
+        "ru": "Съехаться через полгода — нормально",
+        "en": "Moving in together after six months is reasonable"
+      }
+    },
+    {
+      "id": "q.dating.alone_time",
+      "locales": [
+        "ru",
+        "en"
+      ],
+      "audiences": [
+        "adult"
+      ],
+      "modes": [
+        "dating"
+      ],
+      "priorAgree": 0.85,
+      "text": {
+        "ru": "Даже в отношениях нужно время только для себя",
+        "en": "Even in a relationship you need time alone"
+      }
+    }
+  ]
+}

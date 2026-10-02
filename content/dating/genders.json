@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "genders": [
+    {
+      "id": "g.man",
+      "self": { "ru": "Мужчина", "en": "Man" },
+      "seeking": { "ru": "Мужчин", "en": "Men" }
+    },
+    {
+      "id": "g.woman",
+      "self": { "ru": "Женщина", "en": "Woman" },
+      "seeking": { "ru": "Женщин", "en": "Women" }
+    }
+  ]
+}
