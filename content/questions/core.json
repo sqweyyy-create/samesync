@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "questions": [
+    {
+      "id": "q.pineapple_pizza",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "modes": ["friends", "dating"],
+      "priorAgree": 0.5,
+      "text": { "ru": "Ананасы на пицце — это нормально", "en": "Pineapple on pizza is fine" }
+    },
+    {
+      "id": "q.long_voice_messages",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "modes": ["friends", "dating"],
+      "priorAgree": 0.6,
+      "text": {
+        "ru": "Голосовые длиннее минуты — преступление",
+        "en": "Voice messages over a minute long are a crime"
+      }
+    },
+    {
+      "id": "q.remakes_worse",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "modes": ["friends", "dating"],
+      "priorAgree": 0.7,
+      "text": {
+        "ru": "Ремейки почти всегда хуже оригинала",
+        "en": "Remakes are almost always worse than the original"
+      }
+    }
+  ]
+}

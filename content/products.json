@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "products": [
+    {
+      "id": "test.extra_match",
+      "stars": 1,
+      "enabled": false,
+      "bandsAllowed": ["adult"],
+      "grants": [{ "kind": "extra_match", "amount": 1 }],
+      "title": { "ru": "Ещё одно знакомство", "en": "One more match" },
+      "description": {
+        "ru": "Тестовый товар для проверки оплаты",
+        "en": "Placeholder product for testing payments"
+      }
+    }
+  ]
+}

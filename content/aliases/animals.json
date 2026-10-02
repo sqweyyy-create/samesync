@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "aliases": [
+    { "id": "a.otter", "emoji": "🦦", "text": { "ru": "Выдра", "en": "Otter" } },
+    { "id": "a.fox", "emoji": "🦊", "text": { "ru": "Лиса", "en": "Fox" } },
+    { "id": "a.owl", "emoji": "🦉", "text": { "ru": "Сова", "en": "Owl" } }
+  ]
+}

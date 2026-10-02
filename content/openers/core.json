@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "openers": [
+    {
+      "id": "o.pineapple_pizza.agree",
+      "questionId": "q.pineapple_pizza",
+      "side": "agree",
+      "text": {
+        "ru": "Я за ананасы на пицце. Что с ними не так?",
+        "en": "I'm pro-pineapple on pizza. What's wrong with it?"
+      }
+    },
+    {
+      "id": "o.pineapple_pizza.disagree",
+      "questionId": "q.pineapple_pizza",
+      "side": "disagree",
+      "text": {
+        "ru": "Ананасам на пицце не место. Чем они тебе нравятся?",
+        "en": "Pineapple doesn't belong on pizza. What do you like about it?"
+      }
+    }
+  ]
+}

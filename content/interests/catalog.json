@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    {
+      "id": "c.music.post_punk",
+      "domain": "music",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "name": { "ru": "Пост-панк", "en": "Post-punk" }
+    },
+    {
+      "id": "c.games.indie",
+      "domain": "games",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "name": { "ru": "Инди-игры", "en": "Indie games" }
+    }
+  ],
+  "items": [
+    {
+      "id": "i.music.molchat_doma",
+      "categoryId": "c.music.post_punk",
+      "popularity": "known",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "name": { "ru": "Молчат Дома", "en": "Molchat Doma" }
+    },
+    {
+      "id": "i.music.joy_division",
+      "categoryId": "c.music.post_punk",
+      "popularity": "mainstream",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "name": { "ru": "Joy Division", "en": "Joy Division" }
+    },
+    {
+      "id": "i.games.hollow_knight",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "name": { "ru": "Hollow Knight", "en": "Hollow Knight" }
+    },
+    {
+      "id": "i.games.celeste",
+      "categoryId": "c.games.indie",
+      "popularity": "known",
+      "locales": ["ru", "en"],
+      "audiences": ["u18", "adult"],
+      "name": { "ru": "Celeste", "en": "Celeste" }
+    }
+  ]
+}

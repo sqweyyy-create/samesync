@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "openers": [
+    {
+      "id": "o.no_question.agree",
+      "questionId": "q.does_not_exist",
+      "side": "agree",
+      "text": { "ru": "Почему?", "en": "Why?" }
+    }
+  ]
+}

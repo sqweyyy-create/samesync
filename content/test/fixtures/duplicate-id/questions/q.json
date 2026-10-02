@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "questions": [
+    {
+      "id": "q.twice",
+      "locales": ["ru", "en"],
+      "audiences": ["adult"],
+      "modes": ["friends"],
+      "priorAgree": 0.5,
+      "text": { "ru": "Раз", "en": "One" }
+    },
+    {
+      "id": "q.twice",
+      "locales": ["ru", "en"],
+      "audiences": ["adult"],
+      "modes": ["friends"],
+      "priorAgree": 0.5,
+      "text": { "ru": "Два", "en": "Two" }
+    }
+  ]
+}
