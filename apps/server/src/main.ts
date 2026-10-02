@@ -1,17 +1,21 @@
 /**
  * Composition root: ONE process running the bot, the HTTP API and the scheduler (PLAN.md §2).
- * Phase 0: long polling only; webhook mode and static Mini App serving arrive with deployment.
+ * Long polling only; webhook mode and static Mini App serving arrive with deployment (Phase 6).
  */
 import { serve } from '@hono/node-server';
+import { contentChecksum, loadValidContent } from '@samesync/content';
 import { createBot } from './bot/bot';
 import { systemClock } from './clock';
 import { ConfigError, loadConfig, type Config } from './config';
+import { assertContentSeeded } from './content/seed';
+import { createContentStore, type ContentStore } from './content/store';
 import { createDb, createPool } from './db/client';
+import { createProfileRepository } from './db/repositories/profile';
 import { createUsersRepository } from './db/repositories/users';
 import { createHttpApp } from './http/app';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
-import { createSessionService } from './services/session';
+import { createProfileService } from './services/profile';
 
 let config: Config;
 try {
@@ -23,18 +27,37 @@ try {
 }
 
 const logger = createLogger(config.logLevel);
+
+// The content files must be valid before anything starts (they're also checked in CI).
+let content: ContentStore;
+try {
+  const bundle = await loadValidContent(config.contentDir);
+  content = createContentStore(bundle, contentChecksum(bundle));
+} catch (error) {
+  logger.fatal({ err: error }, 'content is invalid, refusing to start');
+  process.exit(1);
+}
+
 const pool = createPool(config.databaseUrl);
 const clock = systemClock;
+const db = createDb(pool);
+const users = createUsersRepository(db);
 
-const session = createSessionService({ users: createUsersRepository(createDb(pool)), clock });
+const profile = createProfileService({
+  users,
+  profile: createProfileRepository(db),
+  content,
+  clock,
+  u18PoolEnabled: config.u18PoolEnabled,
+});
 const app = createHttpApp({
   botToken: config.botToken,
   initData: config.initData,
   clock,
   logger,
-  session,
+  profile,
 });
-const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger });
+const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger, users });
 const scheduler = createScheduler({ logger, jobs: [] });
 
 let shuttingDown = false;
@@ -53,11 +76,12 @@ async function shutdown(exitCode: number): Promise<void> {
   process.exit(exitCode);
 }
 
-// Fail fast: database reachable and bot token valid before we accept traffic.
+// Fail fast: database reachable, content seeded, and bot token valid before we accept traffic.
 try {
   await pool.query('select 1');
+  await assertContentSeeded(pool, content.release, content.checksum);
 } catch (error) {
-  logger.fatal({ err: error }, 'database is not reachable');
+  logger.fatal({ err: error }, 'database is not ready (unreachable or content not seeded)');
   process.exit(1);
 }
 

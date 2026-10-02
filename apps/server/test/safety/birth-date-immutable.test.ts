@@ -3,6 +3,8 @@
  * with a reason and an audit row, can change it. These tests attack the DB directly.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomInt } from 'node:crypto';
+import { buildTestApp } from '../support/app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import { birthDateYearsAgo, insertUser } from '../support/users';
 
@@ -175,5 +177,20 @@ describe('admin_set_birth_date()', () => {
       id,
     ]);
     expect(rowCount).toBe(0);
+  });
+});
+
+describe('through the API', () => {
+  it('a second submission gets 409 and leaves the first date in place', async () => {
+    const t = await buildTestApp(testDb);
+    const as = t.as({ id: randomInt(1, 2 ** 40), first_name: 'Test', language_code: 'ru' });
+    expect((await as.post('/api/onboarding/locale', { locale: 'ru' })).status).toBe(200);
+    const first = birthDateYearsAgo(20, 10);
+    expect((await as.post('/api/onboarding/birth-date', { birthDate: first })).status).toBe(200);
+    const again = await as.post('/api/onboarding/birth-date', { birthDate: birthDateYearsAgo(30) });
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({ error: 'conflict' });
+    const me = (await (await as.get('/api/me')).json()) as { birthDate: string };
+    expect(me.birthDate).toBe(first);
   });
 });

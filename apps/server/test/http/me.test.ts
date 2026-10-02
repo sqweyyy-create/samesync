@@ -1,8 +1,10 @@
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createProfileRepository } from '../../src/db/repositories/profile';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { createHttpApp } from '../../src/http/app';
-import { createSessionService } from '../../src/services/session';
+import { createProfileService } from '../../src/services/profile';
+import { realContent } from '../support/app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import {
   ANYA,
@@ -28,7 +30,13 @@ describe('GET /api/me', () => {
       initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
       clock,
       logger: memoryLogger().logger,
-      session: createSessionService({ users: createUsersRepository(testDb.db), clock }),
+      profile: createProfileService({
+        users: createUsersRepository(testDb.db),
+        profile: createProfileRepository(testDb.db),
+        content: await realContent(),
+        clock,
+        u18PoolEnabled: false,
+      }),
     });
   });
   afterAll(() => testDb.drop());
@@ -49,8 +57,14 @@ describe('GET /api/me', () => {
     const response = await me(initDataFor(ANYA));
     expect(response.status).toBe(200);
     const body = (await response.json()) as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(['firstName', 'locale', 'publicId']);
-    expect(body).toMatchObject({ firstName: 'Аня', locale: 'ru' });
+    expect(body).toMatchObject({
+      firstName: 'Аня',
+      locale: 'ru',
+      status: 'onboarding',
+      step: 'locale',
+      birthDate: null,
+      band: null,
+    });
     expect(body['publicId']).toMatch(/^[0-9A-HJKMNP-TV-Z]{10}$/);
     // Never echoes the username or the Telegram ID.
     expect(JSON.stringify(body)).not.toContain('anya_secret');

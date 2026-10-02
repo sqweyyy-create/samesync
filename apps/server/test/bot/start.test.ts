@@ -1,3 +1,4 @@
+import type { Locale } from '@samesync/shared';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import type { Bot } from 'grammy';
 import type { Update } from 'grammy/types';
@@ -10,14 +11,22 @@ interface ApiCall {
   payload: Record<string, unknown>;
 }
 
-/** Runs the real bot against fake updates and records every outgoing Bot API call. */
-function harness(): { bot: Bot<BotContext>; calls: ApiCall[] } {
+/**
+ * Runs the real bot against fake updates and records every outgoing Bot API call. `stored` holds
+ * the locale of users who already have a row (Q13). Username capture against a real DB is in
+ * test/safety/username-capture.test.ts.
+ */
+function harness(stored: Record<number, Locale> = {}): { bot: Bot<BotContext>; calls: ApiCall[] } {
   const calls: ApiCall[] = [];
   const bot = createBot({
     token: TEST_BOT_TOKEN,
     miniAppUrl: TEST_MINIAPP_URL,
     logger: memoryLogger().logger,
     botInfo: TEST_BOT_INFO,
+    users: {
+      localeOf: (telegramId) => Promise.resolve(stored[telegramId] ?? null),
+      storeUsernameIfAdult: () => Promise.resolve(),
+    },
   });
   bot.api.config.use((_prev, method, payload) => {
     calls.push({ method, payload });
@@ -108,6 +117,18 @@ describe('bot /start and /help', () => {
       method: 'sendMessage',
       payload: { text: translatorFor('ru').t('bot.help') },
     });
+  });
+
+  it("uses a known user's stored locale, not the Telegram client language (Q13)", async () => {
+    h = harness({ 42: 'en', 43: 'ru' });
+    await h.bot.handleUpdate(command('/start', { id: 42, first_name: 'Аня', language_code: 'ru' }));
+    await h.bot.handleUpdate(command('/start', { id: 43, first_name: 'Sam', language_code: 'en' }));
+    expect(h.calls[0]?.payload['text']).toBe(
+      translatorFor('en').t('bot.start.greeting', { name: 'Аня' }),
+    );
+    expect(h.calls[1]?.payload['text']).toBe(
+      translatorFor('ru').t('bot.start.greeting', { name: 'Sam' }),
+    );
   });
 
   it('ignores commands in group chats', async () => {

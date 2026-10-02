@@ -69,7 +69,15 @@ export default defineConfig(
       'vitest/no-disabled-tests': 'error',
       'vitest/expect-expect': [
         'error',
-        { assertFunctionNames: ['expect', 'expectDenied', 'expectParity', 'fc.assert'] },
+        {
+          assertFunctionNames: [
+            'expect',
+            'expectDenied',
+            'expectError',
+            'expectParity',
+            'fc.assert',
+          ],
+        },
       ],
     },
   },

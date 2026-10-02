@@ -4,12 +4,14 @@
  */
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createUsersRepository } from '../../src/db/repositories/users';
-import { createHttpApp } from '../../src/http/app';
 import { validateInitData, type InitDataOptions } from '../../src/http/auth/init-data';
 import { signInitData } from '../../src/http/auth/init-data-signer';
 import { initDataAuth, type AuthVariables } from '../../src/http/auth/middleware';
-import { createSessionService } from '../../src/services/session';
+import { createProfileRepository } from '../../src/db/repositories/profile';
+import { createUsersRepository } from '../../src/db/repositories/users';
+import { createHttpApp } from '../../src/http/app';
+import { createProfileService } from '../../src/services/profile';
+import { realContent } from '../support/app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import {
   ANYA,
@@ -154,7 +156,13 @@ describe('HTTP authentication', () => {
       initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
       clock,
       logger: log.logger,
-      session: createSessionService({ users: createUsersRepository(testDb.db), clock }),
+      profile: createProfileService({
+        users: createUsersRepository(testDb.db),
+        profile: createProfileRepository(testDb.db),
+        content: await realContent(),
+        clock,
+        u18PoolEnabled: false,
+      }),
     });
   });
   afterAll(() => testDb.drop());

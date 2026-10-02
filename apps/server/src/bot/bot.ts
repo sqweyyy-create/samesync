@@ -3,6 +3,7 @@ import type { Translator } from '@samesync/shared/i18n';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import { Bot, InlineKeyboard, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
+import type { UsersRepository } from '../db/repositories/users';
 import type { Logger } from '../logger';
 
 export type BotContext = Context & { t: Translator['t'] };
@@ -11,6 +12,7 @@ export interface BotDeps {
   token: string;
   miniAppUrl: string;
   logger: Logger;
+  users: Pick<UsersRepository, 'localeOf' | 'storeUsernameIfAdult'>;
   /** Skips the getMe call; used by tests. */
   botInfo?: UserFromGetMe;
 }
@@ -18,9 +20,16 @@ export interface BotDeps {
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.token, deps.botInfo ? { botInfo: deps.botInfo } : {});
 
-  // Phase 0: locale comes from the Telegram client. Later phases use the stored user locale.
+  // Q13: a known user's stored locale wins; Telegram's language_code only preselects it for
+  // people who never opened the Mini App. Usernames are stored for live adults only (the
+  // repository checks the age in SQL), so nothing is stored for u18 users.
   bot.use(async (ctx, next) => {
-    ctx.t = translatorFor(resolveLocale(ctx.from?.language_code)).t;
+    const from = ctx.from;
+    const stored = from ? await deps.users.localeOf(from.id) : null;
+    ctx.t = translatorFor(stored ?? resolveLocale(from?.language_code)).t;
+    if (from && ctx.chat?.type === 'private') {
+      await deps.users.storeUsernameIfAdult(from.id, from.username ?? null);
+    }
     await next();
   });
 
