@@ -1,0 +1,84 @@
+/**
+ * Ages and age bands (CLAUDE.md safety invariants). The SQL twin is `vc_age_years()`; a property
+ * test checks that both agree (apps/server/test/safety/age-sql-parity.test.ts).
+ *
+ * Rules (PLAN.md Q15, decided): ages use UTC calendar dates, and a Feb 29 birthday falls on Mar 1
+ * in non-leap years, which is what Postgres `age()` does.
+ */
+import type { Band } from './domain';
+
+export const MIN_AGE = 14;
+export const ADULT_AGE = 18;
+/** Older than this is treated as a typo, not a real birth date. */
+export const MAX_AGE = 120;
+
+export interface CalendarDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function daysInMonth(year: number, month: number): number {
+  return [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 0;
+}
+
+/** Parses a real calendar date in `YYYY-MM-DD` form; anything else (2026-02-30) is null. */
+export function parseIsoDate(value: string): CalendarDate | null {
+  const match = ISO_DATE.exec(value);
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return null;
+  return { year, month, day };
+}
+
+/** Today's date in UTC as `YYYY-MM-DD`. */
+export function utcDate(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+function compare(a: CalendarDate, b: CalendarDate): number {
+  return a.year - b.year || a.month - b.month || a.day - b.day;
+}
+
+function mustParse(value: string): CalendarDate {
+  const date = parseIsoDate(value);
+  if (!date) throw new Error(`not a valid YYYY-MM-DD date: ${value}`);
+  return date;
+}
+
+/** Completed years between `birthDate` and `onDate` (both `YYYY-MM-DD`). */
+export function ageOn(birthDate: string, onDate: string): number {
+  const birth = mustParse(birthDate);
+  const on = mustParse(onDate);
+  let { month, day } = birth;
+  if (month === 2 && day === 29 && !isLeapYear(on.year)) {
+    month = 3;
+    day = 1;
+  }
+  const hadBirthday = on.month > month || (on.month === month && on.day >= day);
+  return on.year - birth.year - (hadBirthday ? 0 : 1);
+}
+
+/** `u18` for 14–17, `adult` for 18+, null below 14 (no profile, no matching). */
+export function bandFor(age: number): Band | null {
+  if (age >= ADULT_AGE) return 'adult';
+  if (age >= MIN_AGE) return 'u18';
+  return null;
+}
+
+export type BirthDateProblem = 'invalid' | 'future' | 'implausible';
+
+/** Why a submitted birth date can't be accepted, or null if it can. */
+export function birthDateProblem(birthDate: string, today: string): BirthDateProblem | null {
+  const birth = parseIsoDate(birthDate);
+  if (!birth) return 'invalid';
+  if (compare(birth, mustParse(today)) > 0) return 'future';
+  if (ageOn(birthDate, today) > MAX_AGE) return 'implausible';
+  return null;
+}
