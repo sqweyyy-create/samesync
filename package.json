@@ -17,7 +17,8 @@
     "typecheck": "tsc -p tsconfig.json && pnpm --recursive run typecheck",
     "test": "vitest run",
     "test:safety": "vitest run --project server-safety",
-    "content:check": "pnpm --filter @samesync/content run check"
+    "content:check": "pnpm --filter @samesync/content run check",
+    "content:lock": "pnpm --filter @samesync/content run lock"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

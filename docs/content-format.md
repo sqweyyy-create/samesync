@@ -2,9 +2,9 @@
 
 This is the reference for writing SameSync's content files: the "hot takes" users swipe on, and the interest catalog they pick from. You can author valid files from this page alone, without reading any code.
 
-- **Applies to:** schema version `1`, the format `pnpm content:check` accepts today. Checked against the repository on 2026-10-03.
-- **What Phase 1 needs:** sections 3 (takes) and 4 (interest catalog). Phase 1 also needs section 5 (dating options): its option list is decided (PLAN.md Q11), but its file format is still a proposal that the checker doesn't read until the section 8 change lands.
-- **Not final yet:** some fields Phase 1 needs aren't accepted by the checker yet. Section 8 lists them. Until those changes land, author exactly as the examples show; anything extra makes the check fail.
+- **Applies to:** schema version `1` as extended in Phase 1 (`revision`, `retiredIn`, `searchTerms`, dating options, `release.json`, `content.lock.json`). Checked against the repository on 2026-10-03.
+- **What onboarding (Phase 1) uses:** sections 3 (takes), 4 (interest catalog) and 5 (dating options), plus the release and lockfile workflow in section 7.
+- Fields added in Phase 1 are optional with defaults, so files written before Phase 1 stay valid.
 
 ## 1. Basics
 
@@ -16,22 +16,26 @@ Content lives in the `content/` folder of the repository.
 |---|---|---|
 | `content/questions/*.json` | Takes (agree/disagree statements) | Phase 1 |
 | `content/interests/*.json` | Interest categories and items | Phase 1 |
-| `content/dating/*.json` | Dating options ("You are" / "Looking for"). **Not read yet**, see section 5 | Phase 1 (after the schema change) |
+| `content/dating/*.json` | Dating options ("You are" / "Looking for") | Phase 1 |
 | `content/openers/*.json` | Pre-written first messages | Phase 3 |
 | `content/aliases/*.json` | Anonymous chat names | Phase 2 |
 | `content/products.json` | Telegram Stars products | Phase 6 |
+| `content/release.json` | The release version of the whole content set (section 7) | Phase 1, **required** |
+| `content/content.lock.json` | Generated: revision and text hash of every entry (section 7). Never edit it by hand | Phase 1, **required** |
 
 How files are found:
 
-- Every file ending in `.json` **directly inside** one of those folders is read, in alphabetical order of file name. `products.json` is a single file at the top of `content/`.
+- Every file ending in `.json` **directly inside** one of those folders is read, in alphabetical order of file name. `products.json`, `release.json` and `content.lock.json` are single files at the top of `content/`.
 - A folder may hold any number of files. Split them by theme, for example `questions/food.json` and `questions/internet.json`. IDs must be unique across *all* files.
 - File names aren't checked. Use lowercase letters, digits and `_`, for example `music_post_punk.json`.
-- ⚠ Anything else is **silently ignored**: subfolders (`questions/old/x.json`), other extensions (`.txt`, `.json5`) and misspelled folder names (`question/`). If your file doesn't show up in the `content:check` totals, check its location.
+- **Anything else is an error** (an allowlist): an unknown folder or file at the top of `content/` (`question/`, `README.md`), and a subfolder or non-`.json` file inside a content folder (`questions/old/`, `questions/notes.txt`).
+- Not reported: hidden files whose name starts with `.` (such as `.DS_Store`), and the entries that belong to the `content/` code package itself (`src/`, `test/`, `node_modules/`, `package.json`, `tsconfig.json`).
 
 ### JSON rules
 
 - UTF-8 **without a byte-order mark (BOM)**, standard JSON: no comments, no trailing commas. Some editors offer "UTF-8 with BOM"; a BOM makes the whole file "invalid JSON".
 - Every file is one JSON object containing `"schemaVersion": 1` plus its list(s), as shown in the examples.
+- Formatting (indentation, line breaks) is up to you: the repository's code formatter doesn't touch content files, and the checker only reads the values.
 - **Unknown keys are errors** everywhere: at the top of a file, on every entry and inside text objects. Field names are case-sensitive and exactly as written here, for example `priorAgree`, not `prior_agree`.
 
 ### Shared value types
@@ -66,11 +70,11 @@ Every entry has an `id`, for example `q.pineapple_pizza` or `i.music.molchat_dom
 |---|---|---|---|
 | Take | `q` | `q.pineapple_pizza` | `q.<slug>` or `q.<topic>.<slug>` |
 | Interest category | `c` | `c.music.post_punk` | `c.<domain>.<slug>` |
-| Interest item | `i` | `i.music.molchat_doma` | `i.<domain>.<slug>`, using its category's domain |
+| Interest item | `i` | `i.music.molchat_doma` | **Enforced:** `i.<domain>.<slug>`, where `<domain>` is its category's domain |
 | Opener | `o` | `o.pineapple_pizza.agree` | `o.<take slug>.<agree or disagree>` |
 | Chat alias | `a` | `a.otter` | `a.<slug>` |
 | Product | none (see above) | `test.extra_match` | `<group>.<name>` |
-| Dating option (section 5) | `g` | `g.man` | `g.<slug>` (proposed) |
+| Dating option (section 5) | `g` | `g.man` | `g.<slug>` |
 
 ### Rules
 
@@ -78,9 +82,23 @@ Every entry has an `id`, for example `q.pineapple_pizza` or `i.music.molchat_dom
 - **Permanent.** IDs are stored in the database: users' answers, their picked interests, their dating options. So once an ID has been published:
   - never rename it;
   - never reuse it for something else, even after the entry is removed;
-  - never change what it means. "Pineapple on pizza is fine" can't become "Pineapple on pizza is gross" under the same ID. Create a new ID instead; Phase 1 adds a way to retire the old one (section 8).
-- **Typo fixes** keep the ID. From Phase 1 they will also need a `revision` bump (section 8).
-- Treat IDs as permanent from the first commit, even though nothing is seeded into a database yet.
+  - never change what it means. "Pineapple on pizza is fine" can't become "Pineapple on pizza is gross" under the same ID. Create a new ID and **retire** the old one with `retiredIn` (section 7).
+- **Never delete an entry.** `content:check` fails if an ID that is in `content.lock.json` disappears. Retire it instead.
+- **Typo fixes** keep the ID but need a `revision` bump (section 7).
+
+### Fields every text entry can have
+
+Every entry that has text (takes, categories, items, dating options, openers, aliases, products) accepts:
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `revision` | integer ≥ 1 | no, default `1` | Increase it by 1 whenever you change any of the entry's texts (section 7) |
+
+Takes, categories, items and dating options also accept:
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `retiredIn` | string | no | The release version in which the entry was retired, e.g. `"2026.10.2"`. It must not be later than the version in `release.json`. Retired entries stay in the file, are hidden from new users, and nothing new may reference them |
 
 ## 3. Takes (`content/questions/*.json`)
 
@@ -101,29 +119,29 @@ File structure:
 | `id` | string | yes | Prefix `q.`; see section 2 |
 | `locales` | list of locales | yes | Which language pools see this take. Text is required for each of them |
 | `audiences` | list of audiences | yes | Which age bands see it. Anything including `"u18"` must suit 14–17-year-olds |
-| `modes` | list of modes | yes | Which decks it can appear in. A take meant for `u18` must include `"friends"` (u18 users never use dating; not checked yet) |
+| `modes` | list of modes | yes | Which decks it can appear in. If `audiences` includes `"u18"`, `modes` must include `"friends"` (u18 users never use dating) |
 | `priorAgree` | number | yes | The share of people you expect to **agree**, strictly between `0` and `1` (e.g. `0.5`; `0` and `1` are rejected). It must be a JSON number, not a string. Use `0.5` if unsure |
-| `text` | localized text | yes | The statement on the card, in every locale listed in `locales` |
+| `text` | localized text | yes | The statement on the card, in every locale listed in `locales`. At most **120 characters** per locale |
+| `revision`, `retiredIn` | | no | See section 2 |
 
 **What `priorAgree` is for.** Matching weighs rare overlaps above common ones. A minority opinion that two people share counts for more than one almost everybody holds. Until a pool has enough real answers, `priorAgree` stands in for the real agree share. A take nearly everyone agrees with (`0.9`) makes a weak match signal; a split take (`0.5`) makes a good one.
 
 **Writing good takes:**
 - One clear, opinionated statement, not a question.
-- Short enough for a phone card: aim for 90 characters or fewer (not enforced yet).
+- Short enough for a phone card: aim for 90 characters or fewer (120 is the hard limit).
 - Specific beats generic: "Голосовые длиннее минуты — преступление" works better than "Люблю общаться".
 - No hate, sexual content, or questions about health or politics that identify a person. Content for `u18` gets an extra review.
 
 **Deck sizes (Phase 1, decided in PLAN.md Q5).**
 - Each user sees **35 takes**, drawn for their age band and mode. They can skip some but must answer at least 25.
-- So the content must supply at least 35 takes for every one of these 6 combinations: `u18`+`friends`, `adult`+`friends` and `adult`+`dating`, each in `ru` and in `en`. One take can count toward several combinations.
-- `content:check` doesn't count this yet (section 8).
+- So the content must supply at least 35 active (not retired) takes for every one of these 6 combinations: `u18`+`friends`, `adult`+`friends` and `adult`+`dating`, each in `ru` and in `en`. One take can count toward several combinations.
+- `pnpm content:check --launch` counts this (section 8).
 
 **Leave these out for now:**
-- `revision`: Phase 1 adds it (section 8). Today it's rejected as an unknown key.
-- Stance texts: Phase 3 adds short phrasings of each side, used in match teasers ("…also thinks …"). Don't add them yet.
+- Stance texts: Phase 3 adds short phrasings of each side, used in match teasers ("…also thinks …"). Don't add them yet; today they're rejected as unknown keys.
 - Openers: they already exist as their own file type (section 6), but aren't needed before Phase 3.
 
-### Example: `content/questions/core.json`
+### Example: a takes file
 
 <!-- content-example: questions/core.json -->
 ```json
@@ -184,7 +202,8 @@ An item may refer to a category defined in another interests file.
 | `domain` | string | yes | One of `"music"`, `"games"`, `"shows"`, `"movies"`, `"books"`, `"memes"` |
 | `locales` | list of locales | yes | Language pools where the category exists. Name required for each |
 | `audiences` | list of audiences | yes | Age bands that can see it |
-| `name` | localized text | yes | Display name, for example a genre ("Пост-панк" / "Post-punk") |
+| `name` | localized text | yes | Display name, for example a genre ("Пост-панк" / "Post-punk"). At most **40 characters** |
+| `revision`, `retiredIn` | | no | See section 2. Items can't stay active in a retired category |
 
 Domains: `music` (artists, bands, genres), `games` (video and tabletop games), `shows` (TV series, anime, YouTube or streaming shows), `movies` (films, franchises), `books` (books, authors, comics, manga), `memes` (memes, internet culture). Adding a domain is a schema change, not a content change.
 
@@ -192,12 +211,14 @@ Domains: `music` (artists, bands, genres), `games` (video and tabletop games), `
 
 | Field | Type | Required | Allowed values and rules |
 |---|---|---|---|
-| `id` | string | yes | Prefix `i.`; recommended `i.<domain>.<slug>` using the category's domain (not checked) |
+| `id` | string | yes | `i.<domain>.<slug>`, where `<domain>` is the category's `domain` (checked) |
 | `categoryId` | string | yes | The `id` of an existing category, in any interests file |
 | `popularity` | string | yes | `"mainstream"`, `"known"` or `"niche"`, see below. The field is `popularity`, not `popularity_prior` |
 | `locales` | list of locales | yes | Must be a subset of the category's `locales`. Name required for each |
 | `audiences` | list of audiences | yes | Must be a subset of the category's `audiences` |
-| `name` | localized text | yes | Display name. For proper nouns it's fine to use the same spelling in both locales, or the Cyrillic form for `ru` |
+| `name` | localized text | yes | Display name. For proper nouns it's fine to use the same spelling in both locales, or the Cyrillic form for `ru`. At most **40 characters** |
+| `searchTerms` | object: locale → list of strings | no | Extra words the picker's search matches, never shown: other spellings, transliterations, nicknames (`{ "ru": ["молчат", "molchat"], "en": ["md"] }`). Only for locales in `locales`; up to 10 terms per locale, each at most 40 characters. The picker also matches the item's name and its category's name |
+| `revision`, `retiredIn` | | no | See section 2 |
 
 **`popularity` values.** Your best guess of how many people in a pool would pick the item. Matching uses it as the rarity prior until real picks exist (PLAN.md §5):
 
@@ -209,11 +230,9 @@ Domains: `music` (artists, bands, genres), `games` (video and tabletop games), `
 
 If unsure, use `known`. Overrating mainstream items as `niche` produces bad matches, so err towards `mainstream` for anything widely known.
 
-**Not supported yet:**
-- **Search aliases.** Alternative spellings or names for search ("молчат дома", "MD") are planned for Phase 1 as `searchTerms` (section 8). Today that key is rejected.
-- **Catalog size.** Phase 1 needs at least 150 items across at least 4 domains. The launch size is still open (PLAN.md Q6). `content:check` doesn't count this yet.
+**Catalog size.** Launch-shaped content needs at least 150 active items across at least 4 domains **in each locale** (`content:check --launch`, section 8). The final launch size is still open (PLAN.md Q6).
 
-### Example: `content/interests/catalog.json`
+### Example: an interests file
 
 <!-- content-example: interests/catalog.json -->
 ```json
@@ -242,7 +261,8 @@ If unsure, use `known`. Overrating mainstream items as `niche` produces bad matc
       "popularity": "known",
       "locales": ["ru", "en"],
       "audiences": ["u18", "adult"],
-      "name": { "ru": "Молчат Дома", "en": "Molchat Doma" }
+      "name": { "ru": "Молчат Дома", "en": "Molchat Doma" },
+      "searchTerms": { "ru": ["молчат", "molchat"] }
     },
     {
       "id": "i.music.joy_division",
@@ -272,27 +292,30 @@ If unsure, use `known`. Overrating mainstream items as `niche` produces bad matc
 }
 ```
 
-## 5. Dating options (`content/dating/genders.json`): decided, not yet read
-
-> ⚠ **Status:** the content of this list is a product-owner decision (PLAN.md Q11). The file format below is the proposal for Phase 1. **`content:check` does not read `content/dating/` yet; such a file is silently ignored.** Section 8, item 5 lists the schema change that makes it real.
+## 5. Dating options (`content/dating/*.json`)
 
 Dating mode (adults only) asks two things:
 - **"You are"**: exactly one option.
 - **"Looking for"**: one or more options.
 
-Two users can match only if each one's "You are" is in the other's "Looking for". The options live in content so the list can grow later without code changes. The questions themselves ("You are", "Looking for") are app UI text, not content.
+Two users can match only if each one's "You are" is in the other's "Looking for" (PLAN.md Q11). The options live in content so the list can grow later without code changes. The questions themselves ("You are", "Looking for") are app UI text, not content.
 
-Proposed fields for each option:
+File structure:
+
+```json
+{ "schemaVersion": 1, "genders": [ /* option objects */ ] }
+```
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
 | `id` | string | yes | Prefix `g.`; permanent, because it's stored in `users.gender` and `users.seeking` |
-| `self` | localized text | yes, all locales | Label in the "You are" list ("Мужчина" / "Man") |
-| `seeking` | localized text | yes, all locales | Label in the "Looking for" list. Russian uses the accusative plural that follows "Ищу": "мужчин", "женщин" |
+| `self` | localized text | yes, `ru` and `en` | Label in the "You are" list ("Мужчина" / "Man"). At most 40 characters |
+| `seeking` | localized text | yes, `ru` and `en` | Label in the "Looking for" list. Russian uses the accusative plural that follows "Ищу": "мужчин", "женщин". At most 40 characters |
+| `revision`, `retiredIn` | | no | See section 2 |
 
-The decided option list is: man / woman, looking for men / women.
+There must be at least two options that aren't retired. The decided list (Q11) is man / woman, looking for men / women:
 
-<!-- content-proposed: dating/genders.json -->
+<!-- content-example: dating/genders.json -->
 ```json
 {
   "schemaVersion": 1,
@@ -313,7 +336,7 @@ The decided option list is: man / woman, looking for men / women.
 
 ## 6. Other file types (not needed for Phase 1)
 
-These are already defined and checked, so files of these types must be valid today, but Phase 1 doesn't use them.
+These are already defined and checked, so files of these types must be valid today, but onboarding doesn't use them. Each entry also accepts `revision` (section 2).
 
 ### Openers (`content/openers/*.json`): Phase 3
 
@@ -409,12 +432,51 @@ Telegram Stars products. Paid features are undecided (PLAN.md Q27); the only ent
 }
 ```
 
-## 7. What `pnpm content:check` validates
+## 7. Releases, revisions and the lockfile
 
-Run it from the repository root. It needs Node 24 and pnpm 12 (see `CLAUDE.md`). It prints one summary line when everything is valid:
+### `content/release.json`
+
+Every content root declares one release version:
+
+<!-- content-example: release.json -->
+```json
+{
+  "schemaVersion": 1,
+  "version": "2026.10.1"
+}
+```
+
+- Format `YYYY.MM.N`: year, month (`01`–`12`), then a counter within the month, e.g. `2026.10.1`, `2026.10.2`, `2026.11.1`.
+- **Bump it whenever the content changes** before it is seeded into a database. `pnpm content:seed` refuses to seed changed content under a version that was already seeded, and refuses a version older than one already seeded.
+- `retiredIn` values must not be later than this version.
+
+### Changing a text: `revision` and `content.lock.json`
+
+`content.lock.json` is generated. For every entry with text it records the `revision` and a hash of all the entry's texts. Only texts count: changing `priorAgree`, `popularity`, `audiences` or `searchTerms` doesn't affect it. `pnpm content:check` compares the content with it.
+
+To fix a typo or reword a text:
+1. Edit the text **and** increase that entry's `revision` by 1 (add `"revision": 2` if the field isn't there yet).
+2. Run `pnpm content:lock`. It rewrites `content.lock.json` and commits nothing itself.
+3. Commit both files.
+
+`content:check` fails if:
+- a text changed but the `revision` didn't ("text changed without a revision bump");
+- a `revision` went down;
+- an ID that's in the lockfile disappeared (IDs are permanent: set `retiredIn` instead);
+- the lockfile is missing or out of date (run `pnpm content:lock`).
+
+`pnpm content:lock` refuses to write the lockfile while any of the first three problems exists, so it can't be used to hide them.
+
+### Retiring an entry
+
+Set `"retiredIn": "<current release version>"` on the entry and keep it in the file. Bump `release.json` if this release was already seeded. Users who already answered or picked it keep their data, but it's no longer offered.
+
+## 8. What `pnpm content:check` validates
+
+Run it from the repository root. It needs Node 24 and pnpm 12 (see `CLAUDE.md`). When everything is valid it prints one summary line (after pnpm's own command echo):
 
 ```
-content:check OK: 3 questions, 2 categories, 4 items, 2 openers, 3 aliases, 1 products
+content:check OK (release 2026.10.1): 67 questions, 31 categories, 187 items, 2 dating options, 2 openers, 3 aliases, 1 products
 ```
 
 Otherwise it exits with an error and prints one line per problem, named by file (for format errors) or by content ID (for cross-file errors):
@@ -428,55 +490,36 @@ content:check failed with 2 issue(s):
 A format error rejects **the whole file**: none of its entries are loaded. Anything that refers to them then fails too. For example, if `questions/core.json` is rejected, openers pointing at its takes report "references unknown question". Fix format errors first, then re-run.
 
 **It checks:**
-1. Each file is valid JSON.
-2. Each file matches its format: `schemaVersion` is `1`; every required field is present with the right type; values are from the allowed lists; lists are non-empty (where required) with no duplicates; IDs match the pattern for their kind; there are no unknown keys.
-3. No ID is used twice across all files and kinds.
-4. Every localized text has every required locale:
+1. Layout: only allowed folders and files (section 1).
+2. Each file is valid JSON.
+3. Each file matches its format: `schemaVersion` is `1`; every required field is present with the right type; values are from the allowed lists; lists are non-empty (where required) with no duplicates; IDs match the pattern for their kind; there are no unknown keys.
+4. `release.json` exists and has a valid version; no `retiredIn` is later than it.
+5. No ID is used twice across all files and kinds.
+6. Every localized text has every required locale:
    - takes, categories and items: each locale in their `locales`;
    - openers: each locale of their take;
-   - aliases and products: both `ru` and `en`.
-5. References resolve:
-   - every item's `categoryId` exists;
+   - dating options, aliases and products: both `ru` and `en`.
+7. References resolve:
+   - every item's `categoryId` exists and isn't retired (unless the item is retired too);
    - an item's `locales` and `audiences` are within its category's;
-   - every opener's `questionId` exists.
+   - every opener's `questionId` exists and isn't retired.
+8. Consistency:
+   - a take shown to `u18` includes `friends` mode;
+   - an item ID uses its category's domain;
+   - `searchTerms` only for the item's locales.
+9. Length limits, counted in characters (an emoji counts as one):
+   - take text ≤ 120;
+   - category, item and dating-option names ≤ 40;
+   - search terms ≤ 40.
+10. At least two dating options that aren't retired.
+11. The lockfile: no text change without a revision bump, no lowered revision, no removed ID, and the lockfile is up to date.
 
-**It does not check (yet):**
-- whether text is accurate, age-appropriate, well written or gender-neutral (that's editorial review);
-- deck and catalog sizes;
-- that `u18` takes include `friends`;
-- that an item's ID domain matches its category's domain;
-- text length;
-- files in the wrong place, which are ignored;
-- typo fixes without a revision bump (that's the Phase 1 lockfile).
+**`pnpm content:check --launch`** runs all of the above and also checks that the content is big enough to launch, counting only entries that aren't retired:
+- ≥ 35 takes for each deck: `u18`+`friends`, `adult`+`friends` and `adult`+`dating`, each in `ru` and `en`;
+- ≥ 150 items across ≥ 4 domains in each locale.
 
-## 8. Schema changes needed in Phase 1
+The small test fixtures only need to pass the normal check; the committed content must pass both.
 
-The current schema (version 1) is missing these for Phase 1. Each change should keep files written to this document valid, which is why new fields are proposed as optional with defaults. This document is updated in the same change.
+**It does not check:** whether text is accurate, age-appropriate, well written or gender-neutral. That's editorial review.
 
-1. **`revision`** (integer ≥ 1, optional, default `1`) on every entry that has text: takes, categories, items, openers, aliases, products and dating options. Together with `content/content.lock.json` (a hash of every text per ID), `content:check` will fail when a text changes without a `revision` bump (PLAN.md Phase 1). Today `revision` is rejected as an unknown key.
-2. **Release identity.** Seeding records a content release (`content_releases.version` and `checksum`, PLAN.md §4). The version should be **declared by authors**, for example in `content/release.json` as `{ "schemaVersion": 1, "version": "2026.10.1" }`. The seeder computes the checksum separately. A checksum can't serve as the version, because the files that carry retirement markers would be part of what it hashes.
-3. **Retirement.** A field `retiredIn` (a version declared in `release.json`, no later than the current one) on takes, categories, items and dating options. Seeded IDs are referenced by user data and must never be deleted. Retired entries stay in the files, are hidden from new users, and can't be referenced by new entries.
-4. **Search terms for items:** `searchTerms: { "ru": [...], "en": [...] }`, optional per locale, used by the interest picker's search. It's named `searchTerms` to avoid confusion with chat aliases.
-5. **Dating options (Q11):** read `content/dating/*.json` in the format of section 5. Check:
-   - IDs are unique with prefix `g.`;
-   - `self` and `seeking` exist in both locales;
-   - at least two options.
-
-   Users' stored `gender` / `seeking` values must reference these IDs.
-6. **Fail on unexpected content files.** `content/` is also a code package (`src/`, `test/`, `node_modules/`, `package.json`, `tsconfig.json`), so use an allowlist:
-   - the content folders (`questions/`, `interests/`, `openers/`, `aliases/`, `dating/`) and the known root files (`products.json`, `release.json`, `content.lock.json`) are content;
-   - inside a content folder, any subfolder or file that isn't `*.json` is an error;
-   - the package files are ignored.
-
-   That way a misplaced content file can't silently disappear.
-7. **Consistency checks:**
-   - a take whose `audiences` include `u18` must include `friends` in `modes`;
-   - optionally, an item ID's domain segment must equal its category's `domain`.
-8. **Coverage minimums for launch-shaped content:**
-   - ≥ 35 takes for each band × mode × locale combination (section 3);
-   - ≥ 150 items across ≥ 4 domains.
-
-   Make this a separate mode (e.g. `content:check --launch`) or a warning, because the small sample content must still pass the normal check.
-9. **Optional length limits:** for example take text ≤ 120 characters and item or category names ≤ 40, so they fit on cards and chips.
-
-Phase 3 (not Phase 1) will add stance texts on takes and require openers (or a generic fallback) for every take.
+Phase 3 will add stance texts on takes and require openers (or a generic fallback) for every take.
