@@ -157,3 +157,4 @@ pnpm enforces a minimum release age for new package versions. Don't add `minimum
 - If something is ambiguous, don't guess. Add it to PLAN.md "Open questions" (with a provisional default if work has to continue) and tell the user.
 - In a PR that touches auth, relay, filters, matching eligibility, DB triggers or `test/safety/`, say which invariant is affected and how it stays intact.
 - Keep this file and PLAN.md up to date when decisions change.
+- Do not spawn subagents, parallel reviewers or multi-agent reviews unless the user explicitly asks for it. Do one careful self-check instead. The user watches usage limits.
