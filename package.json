@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@12.8.1",
   "engines": {
-    "node": ">=24"
+    "node": "^24"
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @samesync/server --filter @samesync/miniapp run dev",
