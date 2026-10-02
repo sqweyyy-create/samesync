@@ -6,7 +6,7 @@ Last updated: 2026-10-03. Project context and the non-negotiable safety rules ar
 
 | Phase | Title | Status |
 |---|---|---|
-| 0 | Scaffold | not started |
+| 0 | Scaffold | done (2026-10-03) |
 | 1 | Onboarding | not started |
 | 2 | Matching engine | not started |
 | 3 | Game | not started |
@@ -267,13 +267,13 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 **Out of scope.** Any product feature, birth date, content seeding into the DB, deployment, payments.
 
 **Acceptance criteria**
-- [ ] On a fresh clone, the CLAUDE.md commands bring up the database, server and Mini App.
-- [ ] In Telegram, `/start` on the dev bot replies in ru for a ru client (en otherwise) with a button that opens the Mini App.
-- [ ] The Mini App shows the user's first name, taken from `/api/me` after server-side validation.
-- [ ] A request with no initData, forged initData, initData for another bot, or expired initData gets 401.
-- [ ] A `user_id` in the body or query is ignored.
-- [ ] Migrations apply to an empty database, and re-running them does nothing.
-- [ ] CI is green on main: lint, typecheck, tests, safety suite, content check, build.
+- [x] On a fresh clone, the CLAUDE.md commands bring up the database, server and Mini App.
+- [x] In Telegram, `/start` on the dev bot replies in ru for a ru client (en otherwise) with a button that opens the Mini App. *(ru verified in Telegram; en verified by `apps/server/test/bot/start.test.ts` only, see the locale observation in the notes below.)*
+- [x] The Mini App shows the user's first name, taken from `/api/me` after server-side validation.
+- [x] A request with no initData, forged initData, initData for another bot, or expired initData gets 401.
+- [x] A `user_id` in the body or query is ignored.
+- [x] Migrations apply to an empty database, and re-running them does nothing.
+- [x] CI is green on main: lint, typecheck, tests, safety suite, content check, build.
 
 **Tests that prove it**
 - `packages/shared/src/i18n/i18n.test.ts`: ru and en have identical keys and identical placeholders per key; every key has every plural category for its locale (ru: one/few/many/other; en: one/other); interpolation and plural selection work (1, 2, 5, 21 in ru).
@@ -308,6 +308,12 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - **Found during the browser check, then fixed:**
   - a JSON import attribute broke locale loading in the Vite dev server;
   - dev initData lacked `signature`.
+- **Locale observation on the real dev bot (2026-10-03), not resolved:**
+  - The product owner switched Telegram's own app language to English and fully restarted Telegram. `/start` still got a Russian reply, and the Mini App stayed Russian.
+  - In Phase 0 the bot uses the `language_code` of each update and the Mini App the one in its initData; neither reads the stored `users.locale` (`ru` for this user). So Telegram most likely kept sending `ru`. A code review re-ran the real code and found no path from `en` to Russian.
+  - The actual values were not captured: the product owner skipped the capture.
+  - Automated coverage: the bot's en path is in `apps/server/test/bot/start.test.ts`, and English rendering in `apps/miniapp/src/screens/Hello.test.tsx`. Resolving the Mini App's locale from initData isn't unit-tested; the code review exercised it with real initData.
+  - **For Phase 1:** don't rely on `language_code` to switch languages. The language screen must let users choose explicitly, and that choice (`users.locale`, Q13) drives the bot and the Mini App. Re-test the English path in Telegram once that lands.
 
 ---
 

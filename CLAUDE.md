@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** the Phase 0 scaffold is in place (no product features yet). [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phase 0 (scaffold) is done; Phase 1 (onboarding) is next. No product features yet. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
