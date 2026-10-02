@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readDevEnv } from './dev-env';
+import { readDevEnv } from './dev-env.ts';
 
 let dir: string | undefined;
 afterEach(() => {

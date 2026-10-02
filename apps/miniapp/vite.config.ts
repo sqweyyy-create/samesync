@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
-import { readDevEnv } from './dev-env';
+import { readDevEnv } from './dev-env.ts';
 
 const rootEnv = fileURLToPath(new URL('../../.env', import.meta.url));
 
