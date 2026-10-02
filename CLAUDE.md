@@ -50,6 +50,7 @@ apps/
 packages/
   shared/                 # zod API schemas, domain types, ageOn(), i18n runtime + locales/{ru,en}.json
 content/                  # questions/, interests/, openers, aliases, products.json, schemas; content.lock.json from Phase 1
+docs/                     # content-format.md (authoring reference for content/)
 ```
 
 ## Non-negotiable safety invariants
@@ -93,7 +94,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - User identity comes only from validated initData, never from a body or query.
   - There are no auth-bypass flags. For local dev, `pnpm dev:initdata` signs initData with the dev bot token.
   - `apps/server/src/http/auth/init-data-signer.ts` is for dev scripts and tests only; ESLint forbids importing it from runtime code.
-- **Time:** inject a `Clock`. No `new Date()` / `Date.now()` in domain or services. Age uses the UTC calendar date until Q15 is decided.
+- **Time:** inject a `Clock`. No `new Date()` / `Date.now()` in domain or services. Age uses the UTC calendar date; Feb 29 birthdays fall on Mar 1 in non-leap years (PLAN.md Q15, decided).
 - **IDs:** rows use uuid v7. Each user also has a short `public_id`, a support code that admins and the user can see. Never show a `telegram_id` to other users.
 - **i18n:**
   - No user-facing string literals anywhere: bot replies, UI, notifications, user-visible errors, invoice titles, admin replies.
@@ -101,7 +102,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - Plurals follow `Intl.PluralRules` categories.
   - **Russian copy that addresses the user must be gender-neutral**, because we don't know their gender.
   - Content (questions, interests, openers) carries its own ru/en text in `content/`.
-- **Content:** IDs are permanent. Never change what an ID means: retire it and add a new one. A typo fix needs a `revision` bump (enforced by `content.lock.json` from Phase 1). `pnpm content:check` must pass.
+- **Content:** the file format is specified in `docs/content-format.md`; update it in the same change as `content/src/schema.ts`. IDs are permanent. Never change what an ID means: retire it and add a new one. A typo fix needs a `revision` bump (enforced by `content.lock.json` from Phase 1). `pnpm content:check` must pass.
 - **Database:**
   - Drizzle schema lives in `apps/server/src/db/schema/`. Migrations are generated and committed.
   - Triggers, functions and CHECKs go in hand-written SQL migrations.

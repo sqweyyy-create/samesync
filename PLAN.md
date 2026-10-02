@@ -247,7 +247,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - `pnpm db:migrate`;
   - a test harness: migrate a template database once per run, then give each test file a fresh copy (`CREATE DATABASE … TEMPLATE`).
 - i18n:
-  - shared runtime, `ru.json` / `en.json`, locale resolution from `language_code` (provisional: `ru*` → ru, everything else → en, Q13);
+  - shared runtime, `ru.json` / `en.json`, locale resolution from `language_code` (`ru*` → ru, everything else → en, Q13);
   - the Mini App loads only the active locale (dynamic import).
 - Content:
   - zod schemas for questions, interests, openers, aliases and products;
@@ -324,30 +324,34 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - the write-once trigger on `birth_date`;
   - `admin_set_birth_date(user_id, new_date, admin_tg_id, reason)`: a SECURITY DEFINER function that requires a reason, writes `admin_actions`, and recomputes `age_band`. Phase 1 has no bot command for it; Phase 5 adds one.
   - the band/mode/username CHECKs.
-- `packages/shared`: `ageOn(birthDate, onDate)` and `bandFor(age)`. Provisional: UTC date, and Feb 29 birthdays fall on Mar 1 in non-leap years (Q15), which matches Postgres `age()`.
+- `packages/shared`: `ageOn(birthDate, onDate)` and `bandFor(age)`: UTC date, and Feb 29 birthdays fall on Mar 1 in non-leap years (Q15, decided), which matches Postgres `age()`.
 - Content lockfile (moved from Phase 0): `content.lock.json` stores a hash of every localized text per content ID; `pnpm content:check` fails if a text changes without a `revision` bump.
 - Content seeding: `pnpm content:seed` is an idempotent upsert that records a release and handles retirement. Initial content must at least let the band × mode decks each draw 35 takes in both locales, plus ≥ 150 interest items across ≥ 4 domains. Real launch content is a content task (Q6).
 - API:
   - `POST /api/onboarding/birth-date`: once only, returns the band or `ineligible`;
   - `POST /api/onboarding/locale`;
-  - `POST /api/onboarding/mode`: `u18` gets friends only; dating requires `gender` and `seeking`;
+  - `POST /api/onboarding/mode`: `u18` gets friends only; dating requires `gender` (one option ID) and `seeking` (one or more option IDs) from the content option list (Q11);
   - `GET /api/deck`: takes filtered by band, mode and locale;
   - `PUT /api/profile/answers`;
   - `GET /api/interests?domain=&q=`;
   - `PUT /api/profile/interests`;
-  - `POST /api/onboarding/complete`: checks the minimums (provisional: ≥ 25 non-skip answers, 5–30 interests, Q5/Q6).
+  - `POST /api/onboarding/complete`: checks the minimums (≥ 25 non-skip answers, 5–30 interests; Q5/Q6, decided).
 - Mini App screens:
   - language (preselected from `language_code`);
   - birth date: shows the computed age with a confirmation ("You're 16 — right? This can't be changed later");
   - ineligible screen for under-14s;
   - mode picker (adults only; `u18` skips it);
-  - dating details;
+  - dating details: "You are" (man / woman) and "Looking for" (men / women, multi-select), labels from content (Q11);
   - swipe deck: agree / disagree / skip, progress, undo last;
   - interest picker: domain tabs, search, chips, min/max counter;
   - done screen. If `allows_write_to_pm` is false, it calls `requestWriteAccess()` so the bot can send notifications.
-- Profile editing (answers and interests) from a settings screen. Changes affect future matches only (Q5). The birth date is shown read-only, with the support code and a hint to contact support.
+- Profile editing (answers and interests) from a settings screen. Changes affect future matches only (Q5).
+- Mode switching (Q10, decided): adults can switch between friends and dating in settings, one mode at a time. Switching to friends clears `gender` and `seeking` (the §4 CHECK requires it); switching to dating asks for them. Open matches stay open. `u18` users have no switch. The birth date is shown read-only, with the support code and a hint to contact support.
 - Under-14: store `birth_date` and set status `ineligible`, with no other profile data. The user can't retry with a different date (Q16).
+- Turning 14 (Q16, decided): when an `ineligible` user opens the Mini App and `ageOn(birth_date, today)` is ≥ 14, their status moves to `onboarding` and they continue. The birth date is still not editable.
 - `U18_POOL_ENABLED=false` → `u18` users finish onboarding as `waitlisted`.
+- Locale (Q13, decided): the language screen preselects from `language_code` and stores the choice in `users.locale`. From Phase 1 on, bot replies and the Mini App UI use the stored `users.locale`; Phase 0 followed the live `language_code` of each update and launch. A settings screen lets the user change it.
+- Content format: authors follow `docs/content-format.md`. Its "Schema changes needed in Phase 1" list is part of this phase's scope, and the doc is updated in the same change as the schemas.
 - Usernames are captured from initData and updates **for adults only**.
 - The Mini App reports the device's IANA timezone (`Intl`), stored in `users.timezone` and used for quiet hours (Q22).
 
@@ -367,7 +371,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/test/safety/age-sql-parity.test.ts`: a fast-check property test showing `ageOn` equals `vc_age_years` on ≥ 1,000 random (birth, on) pairs, including edge dates.
 - `apps/server/test/safety/birth-date-immutable.test.ts`: the API returns 409, SQL updates as the app role are rejected, the admin function works and writes an audit row, and the function fails without a reason.
 - `apps/server/test/safety/band-constraints.test.ts`: `u18` + dating is rejected; `u18` + username is rejected; a change to `u18` through the admin function nulls the username.
-- `apps/server/test/onboarding/flow.test.ts`: steps can't run out of order; the minimums are enforced; unknown or retired question IDs and items for the wrong locale or audience are rejected; re-submission is idempotent; `waitlisted` applies while the flag is off.
+- `apps/server/test/onboarding/flow.test.ts`: steps can't run out of order; the minimums are enforced; unknown or retired question IDs and items for the wrong locale or audience are rejected; re-submission is idempotent; `waitlisted` applies while the flag is off; an `ineligible` user can continue from their 14th birthday but still can't change the birth date (Q16); an adult can switch mode, and switching to friends clears gender and seeking without closing open matches (Q10); `u18` can't switch to dating.
 - `apps/server/test/content/seed.test.ts`: seeding is idempotent; retiring a question keeps existing answers; the lockfile catches silent text changes.
 - `content/test/check.test.ts` (extended): a fixture with changed text and no `revision` bump fails; the same change with a bump passes and updates the lockfile.
 - `apps/miniapp`: birth date form validation and confirmation; deck agree/disagree/skip/undo; no mode picker for `u18`; the write-access request runs when needed.
@@ -675,8 +679,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 | Gate | Requires |
 |---|---|
 | **G1 — Internal alpha** (team accounts, adult pool) | Phase 4 done |
-| **G2 — Public adult beta** | Phase 5 done; Terms of Service and privacy policy published; Q28 legal review done for the adult/dating features; admins named (Q30); "SameSync" trademark check passed (Q31) |
-| **G3 — Enable `u18` pool in production** | G2 plus: Q28 review of minors' data and consent; filter corpus at acceptance level; admin response time for `u18` reports defined and staffed; Q15–Q18 answered (Q14 is decided); a dry run in staging with test accounts |
+| **G2 — Public adult beta** | Phase 5 done; Terms of Service and privacy policy published; Q28 legal review done for the adult/dating features; admins named (Q30); "SameSync" trademark check passed (Q31); launch ru catalog size agreed and met (Q6) |
+| **G3 — Enable `u18` pool in production** | G2 plus: Q28 review of minors' data and consent; filter corpus at acceptance level; admin response time for `u18` reports defined and staffed; Q17, Q18 and Q21 answered (Q14–Q16 are decided); a dry run in staging with test accounts |
 | **G4 — Payments live** | Phase 6 done; Q26 and Q27 answered |
 
 **Launch scope.** The realistic public launch (G2) is the **adult pool only**. The `u18` pool is fully built and tested in Phases 1–5, but `U18_POOL_ENABLED` stays `false` in production until G3 is signed off. Until then, `u18` users who onboard are `waitlisted`.
@@ -690,20 +694,20 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q2. When does the 48h clock start, and what about later silence?** ✅ **Decided (2026-10-02, product owner):** the game has 48h from match creation; chat has 48h from `results_ready` if no message is sent; nothing expires after the first message; one reminder each.
 - **Q3. How many game questions?** "Several". *Provisional:* 5, including the closing split. *Needed by:* Phase 3.
 - **Q4. Is the opener template-based or LLM-generated, and can the user edit it?** "Pre-generated" is ambiguous, and no LLM is in the stack. An LLM would also send minors' data to a third party. *Provisional:* per-take templates in `content/`, editable before sending. *Needed by:* Phase 3.
-- **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? *Provisional:* 35 drawn per band × mode, skip allowed (≥ 25 non-skip answers required), editable later with effect on future matches only. *Needed by:* Phase 1.
-- **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? *Provisional:* catalog-only, 5–30 picks, a curated team-maintained catalog. *Needed by:* Phase 1 (rules), G2 (launch content).
+- **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? ✅ **Decided (2026-10-03, product owner):** 35 takes drawn per band × mode, skip allowed (≥ 25 non-skip answers required), answers editable later with effect on future matches only.
+- **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? ✅ **Decided (2026-10-03, product owner):** catalog-only (no free-text entries), 5–30 picks per user, a curated catalog maintained by the team (format: `docs/content-format.md`). **Still open:** how big the ru catalog must be at launch. *Needed by:* G2.
 - **Q7. Are photos in the product at all?** ✅ **Decided (2026-10-02, product owner):** no photos anywhere in the MVP.
 - **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? *Provisional:* configurable cron, twice daily per pool, times in Europe/Moscow for ru and UTC for en. *Needed by:* Phase 2.
 - **Q9. Rematch policy.** Can an expired pair ever be matched again? *Provisional:* never (UNIQUE pair). *Needed by:* Phase 2.
-- **Q10. Adult modes.** Can an adult be in friends and dating at once? What happens to open matches when they switch? *Provisional:* one mode at a time, switchable in settings; open matches stay. *Needed by:* Phase 1.
-- **Q11. Dating gender and preference model.** Which gender options, and is "seeking" multi-select? This also adds two fields to a "no long forms" onboarding; confirm that's acceptable. Needs legal review for target jurisdictions (see Q28). *Provisional:* a configurable list in `content/`, multi-select seeking, mutual compatibility required. *Needed by:* Phase 1.
+- **Q10. Adult modes.** Can an adult be in friends and dating at once? What happens to open matches when they switch? ✅ **Decided (2026-10-03, product owner):** one mode at a time, switchable in settings; open matches stay open when the mode changes.
+- **Q11. Dating gender and preference model.** Which gender options, and is "seeking" multi-select? ✅ **Decided (2026-10-03, product owner):** dating mode asks **"You are"** (man / woman, single choice) and **"Looking for"** (men / women, multi-select, at least one). A match requires mutual compatibility: each user's gender is in the other's "looking for". The option list lives in `content/` so it can be extended later; `users.gender` and `users.seeking` store option IDs (format: `docs/content-format.md`). The two extra fields are accepted as part of onboarding. Legal review of dating features is still covered by Q28.
 - **Q12. Age gaps in the adult pool.** The spec limits age gaps only for `u18`. Should an 18-year-old be matched with a 45-year-old, especially in dating? *Provisional:* dating gets a user-set age range defaulting to ±5 years; friends has no limit. Product decision needed. *Needed by:* Phase 2.
-- **Q13. Choosing and switching language.** Picked by the user or taken from `language_code`? Where do `uk`/`be`/`kk`… go? Does switching move pools and close open matches? Can bilingual users join both pools? *Provisional:* preselected from `language_code` (`ru` → ru, otherwise en), changeable in settings, affects future matches only, one pool per user. *Needed by:* Phase 1.
+- **Q13. Choosing and switching language.** Picked by the user or taken from `language_code`? Where do `uk`/`be`/`kk`… go? Does switching move pools and close open matches? Can bilingual users join both pools? ✅ **Decided (2026-10-03, product owner):** preselected from `language_code` (`ru` → ru, otherwise en), then stored in `users.locale`; changeable only in SameSync's settings; a change affects future matches only; one language pool per user. Consequence: after the first use, changing the Telegram client's language does **not** change SameSync's language. Phase 1 makes the bot and the Mini App read the stored locale (Phase 0 still follows the live `language_code`).
 
 **Age & safety**
 - **Q14. What does "±2 years" mean?** ✅ **Decided (2026-10-02, product owner):** birth dates at most 2 calendar years apart (the stricter reading; constant over time). The looser whole-year-age reading was rejected.
-- **Q15. Which timezone decides birthdays, and how are Feb 29 births handled?** *Provisional:* the UTC calendar date; Feb 29 → Mar 1 in non-leap years (matches Postgres `age()`). *Needed by:* Phase 1.
-- **Q16. Under-14 users.** Should their birth date be kept (so they can't retry with another) or nothing stored? Do they become eligible automatically at 14? *Provisional:* keep `birth_date` with status `ineligible` and nothing else; they become eligible on their 14th birthday. *Needed by:* Phase 1.
+- **Q15. Which timezone decides birthdays, and how are Feb 29 births handled?** ✅ **Decided (2026-10-03, product owner):** the UTC calendar date decides birthdays; people born on Feb 29 have their birthday on Mar 1 in non-leap years (matches Postgres `age()`).
+- **Q16. Under-14 users.** Should their birth date be kept (so they can't retry with another) or nothing stored? Do they become eligible automatically at 14? ✅ **Decided (2026-10-03, product owner):** keep `birth_date` with status `ineligible` and nothing else (so they can't retry with another date); they become eligible on their 14th birthday.
 - **Q17. Policy for birth-date corrections.** How do users ask (provisional `/support`), what proof is needed, and do adult → `u18` corrections (a grooming vector) need extra scrutiny, such as a second admin? *Needed by:* Phase 5.
 - **Q18. Auto-freeze settings.** The value of N, the window, a lower threshold for `u18`, and whether age-misrepresentation reports freeze sooner. *Provisional:* 3 distinct reporters in 30 days (adults), 2 (`u18`); age-misrepresentation reports alert admins immediately but count normally. *Needed by:* Phase 5.
 - **Q19. 18+ chat content.** The spec restricts media only for `u18`. Is adult chat text-only too? Should contacts be filtered in adult chat before a reveal? *Provisional:* text-only in both pools, no contact filter for adults. *Needed by:* Phase 4.
