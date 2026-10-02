@@ -64,5 +64,8 @@ jobs:
       - name: Content check
         run: pnpm content:check
 
+      - name: Content launch coverage
+        run: pnpm content:check --launch
+
       - name: Build
         run: pnpm build
