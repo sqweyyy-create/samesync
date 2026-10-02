@@ -112,11 +112,16 @@ export default defineConfig(
           selector: `:matches(JSXElement, JSXFragment) > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=${LETTERS}]`,
           message: I18N_MESSAGE,
         },
-        // Accessible names and visible attribute text.
-        {
-          selector: `JSXAttribute[name.name=/^(aria-label|aria-description|title|placeholder|alt)$/] Literal[value=${LETTERS}]`,
+        // Visible attribute text as a direct value: title="Text", title={'Text'}, hint={`Text`}.
+        // Keys passed to t() (title={t('some.key')}) are fine.
+        ...[
+          '> Literal',
+          '> JSXExpressionContainer > Literal',
+          '> JSXExpressionContainer > TemplateLiteral > TemplateElement',
+        ].map((path) => ({
+          selector: `JSXAttribute[name.name=/^(aria-label|aria-description|title|placeholder|alt|hint)$/] ${path}[${path.endsWith('TemplateElement') ? 'value.raw' : 'value'}=${LETTERS}]`,
           message: I18N_MESSAGE,
-        },
+        })),
       ],
     },
   },

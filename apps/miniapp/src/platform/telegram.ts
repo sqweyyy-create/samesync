@@ -4,16 +4,19 @@ import {
   isTMA,
   miniApp,
   mockTelegramEnv,
+  requestWriteAccess,
   retrieveRawInitData,
   themeParams,
 } from '@tma.js/sdk-react';
-import { languageCodeFromInitData, type Platform } from './types';
+import { allowsWriteToPmFromInitData, languageCodeFromInitData, type Platform } from './types';
 
 const OUTSIDE_TELEGRAM: Platform = {
   inTelegram: false,
   initDataRaw: () => undefined,
   languageCode: () => navigator.language,
   ready: () => undefined,
+  allowsWriteToPm: () => undefined,
+  requestWriteAccess: () => Promise.resolve(false),
 };
 
 /**
@@ -46,5 +49,14 @@ export function createTelegramPlatform(): Platform {
     initDataRaw: () => raw,
     languageCode: () => languageCodeFromInitData(raw),
     ready: () => void miniApp.ready.ifAvailable(),
+    allowsWriteToPm: () => allowsWriteToPmFromInitData(raw),
+    async requestWriteAccess() {
+      if (!requestWriteAccess.isAvailable()) return false;
+      try {
+        return (await requestWriteAccess()) === 'allowed';
+      } catch {
+        return false;
+      }
+    },
   };
 }

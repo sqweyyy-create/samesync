@@ -116,8 +116,20 @@ describe('createTranslator', () => {
   });
 
   it('translatorFor renders real catalog messages per locale', () => {
-    expect(translatorFor('ru').t('miniapp.hello.title', { name: 'Аня' })).toBe('Привет, Аня!');
-    expect(translatorFor('en').t('miniapp.hello.title', { name: 'Ann' })).toBe('Hi, Ann!');
+    expect(translatorFor('ru').t('bot.start.open_app')).toBe('Открыть SameSync');
+    expect(translatorFor('en').t('bot.start.open_app')).toBe('Open SameSync');
+    expect(translatorFor('ru').t('miniapp.birth_date.confirm', { count: 16 })).toBe(
+      'Тебе 16 лет — верно?',
+    );
+    expect(translatorFor('ru').t('miniapp.birth_date.confirm', { count: 21 })).toBe(
+      'Тебе 21 год — верно?',
+    );
+    expect(translatorFor('ru').t('miniapp.birth_date.confirm', { count: 14 })).toBe(
+      'Тебе 14 лет — верно?',
+    );
+    expect(translatorFor('ru').t('miniapp.birth_date.confirm', { count: 22 })).toBe(
+      'Тебе 22 года — верно?',
+    );
   });
 });
 

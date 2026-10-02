@@ -1,27 +1,28 @@
-import { resolveLocale } from '@samesync/shared';
+import { resolveLocale, utcDate } from '@samesync/shared';
 import { createTranslator } from '@samesync/shared/i18n';
 import { loadCatalog } from '@samesync/shared/i18n/load';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createApiClient } from './api/client';
+import { App } from './App';
 import { I18nProvider } from './i18n/I18nProvider';
 import { createTelegramPlatform } from './platform/telegram';
-import { Hello } from './screens/Hello';
 import './ui/base.css';
 
 const platform = createTelegramPlatform();
-const locale = resolveLocale(platform.languageCode());
-const translator = createTranslator(locale, await loadCatalog(locale));
+// Telegram's language only covers the first paint; the stored locale takes over (Q13).
+const initialLocale = resolveLocale(platform.languageCode());
+const translator = createTranslator(initialLocale, await loadCatalog(initialLocale));
 const api = createApiClient({ getInitData: () => platform.initDataRaw() });
 
-document.documentElement.lang = locale;
+document.documentElement.lang = initialLocale;
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('#root element missing from index.html');
 
 createRoot(rootElement).render(
   <StrictMode>
-    <I18nProvider translator={translator}>
-      <Hello api={api} inTelegram={platform.inTelegram} />
+    <I18nProvider translator={translator} loadCatalog={loadCatalog}>
+      <App api={api} platform={platform} today={utcDate(new Date())} />
     </I18nProvider>
   </StrictMode>,
 );

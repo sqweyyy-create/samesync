@@ -2,8 +2,6 @@
   "bot.start.greeting": "Hi, {name}! This is SameSync. People meet here through shared tastes and opinions, not photos.\n\nOpen the app to get started.",
   "bot.start.open_app": "Open SameSync",
   "bot.help": "SameSync matches people by shared interests and opinions.\n\n/start — open the app\n/help — this message",
-  "miniapp.hello.title": "Hi, {name}!",
-  "miniapp.hello.subtitle": "Your profile will show up here soon.",
   "miniapp.status.loading": "Loading…",
   "miniapp.error.unauthorized": "Couldn't verify your Telegram session. Reopen the app from the bot.",
   "miniapp.error.network": "Can't reach the server. Try again.",
