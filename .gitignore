@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
+.vite/
+
+# Secrets: only .env.example is committed
+.env
+.env.*
+!.env.example
