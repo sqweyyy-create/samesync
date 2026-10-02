@@ -1,6 +1,6 @@
 # SameSync — Implementation Plan
 
-Last updated: 2026-10-02. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
+Last updated: 2026-10-03. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
@@ -61,11 +61,15 @@ The product owner fixed the stack only partly. These choices are this plan's (ea
 | Area | Choice | Why |
 |---|---|---|
 | Monorepo | pnpm workspaces: `apps/server`, `apps/miniapp`, `packages/shared`, `content/` | One install, shared types, no build orchestrator needed |
-| Runtime | Node 24 LTS, ESM | Current LTS |
+| Runtime | Node 24 LTS, ESM (`.nvmrc`, CI) | Current LTS |
+| Language | TypeScript 6.0 (Phase 0) | TypeScript 7 exists, but typescript-eslint 8.x supports only `<6.1`; revisit when it does |
+| Package manager | pnpm 12 with its default minimum-release-age policy; only `esbuild` may run install scripts (`allowBuilds`) | Supply-chain hygiene: brand-new releases are pinned back, not excluded |
+| Lint / format | ESLint 10 (typescript-eslint type-checked, `@vitest/eslint-plugin`, `eslint-plugin-react-hooks`) + Prettier. No-literal-string for JSX via core `no-restricted-syntax` | `eslint-plugin-react` doesn't support ESLint 10 |
 | HTTP | Hono + `@hono/node-server` | Tiny and TS-first. grammY has a Hono webhook adapter, and Hono's typed RPC client adds almost nothing to the bundle |
 | ORM | Drizzle + drizzle-kit migrations | Typed and close to SQL, no engine binary, easy raw SQL for triggers and matching queries |
 | DB | PostgreSQL 17+ | Spec |
-| Validation | zod schemas in `packages/shared`, used by both apps | One source of truth at boundaries |
+| Validation | zod schemas in `packages/shared`, used by both apps; `zod/mini` for anything the Mini App bundles | One source of truth at boundaries, small bundle |
+| Server build | esbuild bundle (`apps/server/build.mjs`): workspace packages inlined, third-party deps external, migrations copied to `dist/` | Workspace packages ship TS source |
 | Tests | Vitest (unit, integration, component), Testing Library, fast-check | One runner. Property tests suit isolation invariants |
 | i18n | Small in-house `t()` on top of `Intl.PluralRules`, one set of JSON catalogs for bot and Mini App, key types inferred from `ru.json` | Keeps the bundle small, handles Russian plurals, gives type-safe keys with no codegen |
 | Jobs / queue | In-process scheduler, `pg_try_advisory_lock` per job, `outbox` table read with `FOR UPDATE SKIP LOCKED` | No Redis. Durable and idempotent, and still safe if a second instance is ever added |
@@ -280,6 +284,30 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/test/db/migrations.test.ts`: migrating from empty succeeds, re-running is a no-op, and `samesync_app` cannot `ALTER TABLE`.
 - `content/test/check.test.ts`: sample content passes; fixtures that fail schema validation, have a missing locale, a duplicate ID, or a dangling reference fail.
 - `apps/miniapp/src/screens/Hello.test.tsx`: renders the greeting through a mocked platform adapter and API.
+
+**Phase 0 implementation notes (2026-10-03).** Deviations from, and additions to, the scope above:
+- **Toolchain pins:**
+  - TypeScript 6.0, ESLint 10 without `eslint-plugin-react`, and pnpm 12 (see §2).
+  - `eslint` is pinned to `~10.11` and `pino` to `~10.3.1` because 10.12.0 and 10.4.0 were published inside pnpm's minimum-release-age window. Bump them once they age.
+  - Local verification ran on Node 26.8.1; CI and `.nvmrc` target Node 24.
+- **App role bootstrap:**
+  - Migration `0001_app_role` creates `samesync_app` NOLOGIN (no passwords in migrations) and grants SELECT/INSERT/UPDATE on `users` (no DELETE).
+  - The login is set by `infra/postgres/init/01-app-role.sh` locally and by the hosting provider in production (Phase 6).
+  - Tests run app code as `samesync_app` through the `-c role=samesync_app` startup option, so no test query runs with owner rights by accident.
+- **`users.status`** already uses the full status enum from §4. Only `onboarding` is used in Phase 0.
+- **Added fail-safe:** the server refuses to start with `U18_POOL_ENABLED=true` when `NODE_ENV=production` (CLAUDE.md invariant 12, gate G3). Removing that check is a deliberate code change once G3 is signed off.
+- **Added early:** `apps/server/test/logging/redaction.test.ts` (listed under Phase 6) and a scheduler unit test.
+  - The scheduler is a stub with no jobs. Advisory locks come with the first real job (Phase 2).
+- **initData `signature`:**
+  - Real Telegram initData always contains `signature` (Ed25519, for third-party validation), and the SDK refuses initData without it.
+  - The server validates only the HMAC `hash`, which covers `signature`.
+  - `pnpm dev:initdata` adds a random placeholder signature, covered by a regression test.
+- **Bot:** ignores everything outside private chats. A missing `language_code` falls back to en (Q13 rule).
+- **Not in Phase 0, as planned:** webhook mode and serving the built Mini App from the server (Phase 6, deployment).
+- **Dev tooling:** `.claude/launch.json` defines the Vite dev server for Claude Code's preview pane.
+- **Found during the browser check, then fixed:**
+  - a JSON import attribute broke locale loading in the Vite dev server;
+  - dev initData lacked `signature`.
 
 ---
 
@@ -707,8 +735,8 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q31. Name.** ✅ **Decided (2026-10-02):** the product is named **SameSync** and the production bot is **@samesync_bot** (it was "VibeCheck" before). **Still open:** a trademark check for "SameSync" in the target markets. *Needed by:* G2.
 
 **Technical**
-- **Q32. Which "official Telegram Mini Apps SDK"?** Telegram's own client library is the `telegram-web-app.js` script (`window.Telegram.WebApp`: no npm package, no tree-shaking). The React SDK most projects use is the community-maintained tma.js project, whose npm scope has moved between `@telegram-apps/*` and `@tma.js/*`. ✅ **Decided (2026-10-02, product owner):** `@tma.js/sdk-react`, wrapped in `apps/miniapp/src/platform/` so it can be swapped. Phase 0 verifies the current version and bundle cost.
-- **Q33. Bundle budget.** ✅ **Decided (2026-10-02, product owner):** ≤ 100 KB gzip for initial JS, enforced by a size-limit CI step from Phase 6.
+- **Q32. Which "official Telegram Mini Apps SDK"?** Telegram's own client library is the `telegram-web-app.js` script (`window.Telegram.WebApp`: no npm package, no tree-shaking). The React SDK most projects use is the community-maintained tma.js project, whose npm scope has moved between `@telegram-apps/*` and `@tma.js/*`. ✅ **Decided (2026-10-02, product owner):** `@tma.js/sdk-react`, wrapped in `apps/miniapp/src/platform/` so it can be swapped. **Verified in Phase 0 (2026-10-03):** `@tma.js/sdk-react@3.0.23` on `@tma.js/sdk@3.3.0`; neither it nor `@telegram-apps/sdk-react` is deprecated on npm, so the decision stands. The subset we use (`init`, `isTMA`, `retrieveRawInitData`, `themeParams`, `miniApp`) costs ≈ 23 KB gzip. `mockTelegramEnv` (dev browser mode) is stripped from production builds (verified by an A/B build).
+- **Q33. Bundle budget.** ✅ **Decided (2026-10-02, product owner):** ≤ 100 KB gzip for initial JS, enforced by a size-limit CI step from Phase 6. **Phase 0 measurement (2026-10-03):** initial JS is 88.5 KB gzip, of which React 19.3 + ReactDOM is ≈ 67 KB (not the ~45 KB this plan first assumed) and the SDK ≈ 23 KB. That leaves only ≈ 11.5 KB for all product UI in Phases 1–5. **Flag for the product owner:** the budget will likely be exceeded; options are raising it, code-splitting screens (initial JS only), or swapping React for Preact via `preact/compat`.
 
 ## 9. Main risks
 

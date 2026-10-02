@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** planning is done and there is no application code yet. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions and risks. Read its status table before you start any work.
+**Status:** the Phase 0 scaffold is in place (no product features yet). [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -24,7 +24,7 @@ Decided by the product owner:
 - i18n from day one (ru, en). Matching pools are also split by language.
 - The question bank and interest catalog live in versioned JSON files in `content/`, never hardcoded.
 
-Chosen in PLAN.md §2 (change one only by recording a decision there): pnpm workspaces, Node 24 LTS (ESM), Hono (HTTP), Drizzle ORM + drizzle-kit, PostgreSQL 17+, zod, Vitest + Testing Library + fast-check, pino, a small in-house i18n built on `Intl.PluralRules`, an in-process scheduler with Postgres advisory locks and an outbox table, and Docker for deploys.
+Chosen in PLAN.md §2 (change one only by recording a decision there): pnpm workspaces (pnpm 12), Node 24 LTS (ESM), TypeScript 6.0 (not 7: typescript-eslint doesn't support it yet), Hono (HTTP), Drizzle ORM + drizzle-kit, PostgreSQL 17+, zod (zod/mini in code the Mini App bundles), Vitest + Testing Library + fast-check, ESLint 10, pino, a small in-house i18n built on `Intl.PluralRules`, an in-process scheduler with Postgres advisory locks and an outbox table, an esbuild bundle for the server, and Docker for deploys.
 
 ## Repo layout (target, created in Phase 0)
 
@@ -92,6 +92,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - Every API call sends `Authorization: tma <raw initData>`. The server validates the HMAC and the `auth_date` age.
   - User identity comes only from validated initData, never from a body or query.
   - There are no auth-bypass flags. For local dev, `pnpm dev:initdata` signs initData with the dev bot token.
+  - `apps/server/src/http/auth/init-data-signer.ts` is for dev scripts and tests only; ESLint forbids importing it from runtime code.
 - **Time:** inject a `Clock`. No `new Date()` / `Date.now()` in domain or services. Age uses the UTC calendar date until Q15 is decided.
 - **IDs:** rows use uuid v7. Each user also has a short `public_id`, a support code that admins and the user can see. Never show a `telegram_id` to other users.
 - **i18n:**
@@ -106,6 +107,9 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - Triggers, functions and CHECKs go in hand-written SQL migrations.
   - Never edit an applied migration. Use expand/contract for breaking changes.
   - The app connects as `samesync_app`, a role that is not the table owner and can't alter or disable triggers.
+  - Migrations create `samesync_app` NOLOGIN and grant per table (least privilege, no DELETE unless needed). Passwords never go in migrations: the login is set by `infra/postgres/init` locally and by the hosting provider in production.
+  - Every new table needs explicit grants to `samesync_app` in its migration, plus a test that the app role can do exactly what it needs.
+  - Tests run app code as `samesync_app` (`appRolePool()` in `apps/server/test/support/db.ts`), never as the owner.
 - **Bot:**
   - Relayed text goes out as plain text with no `parse_mode`.
   - Proactive messages go through the outbox (throttled, retried, de-duplicated). Direct replies to a user's own command can be sent inline.
@@ -120,23 +124,29 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
 
 ## Run & test
 
-These commands are planned. Phase 0 creates them, so if one is missing, adding it is Phase 0 work.
+Prerequisites: Node 24 (`.nvmrc`), pnpm 12 (`npm i -g pnpm@12`), Docker. The Docker CLI may only have the standalone `docker-compose` binary; it works the same as `docker compose`.
 
 ```bash
 pnpm install
-cp .env.example .env            # BOT_TOKEN, DATABASE_URL, MINIAPP_URL, ADMIN_TELEGRAM_IDS, U18_POOL_ENABLED, ...
-docker compose up -d db         # local Postgres
-pnpm db:migrate
-pnpm content:seed
+cp .env.example .env            # then fill in BOT_TOKEN, MINIAPP_URL, passwords and the three DB URLs
+docker compose up -d db         # local Postgres 17; creates samesync_app from APP_DB_PASSWORD on first start
+pnpm db:migrate                 # as the owner role (MIGRATION_DATABASE_URL)
 pnpm dev                        # server (bot long-polling + API + jobs) and Vite dev server
-pnpm dev:initdata               # prints signed initData for opening the Mini App in a plain browser
+pnpm dev:initdata               # signed initData + a URL to open the Mini App in a plain browser
 pnpm lint && pnpm typecheck && pnpm test
 pnpm test:safety                # pool isolation and minor-safety suites only
 pnpm content:check
 pnpm build
+pnpm format                     # Prettier --write (pnpm lint runs --check)
 ```
 
-To test inside Telegram, create a separate dev bot in @BotFather. The Mini App URL must be HTTPS, so point it at a tunnel (e.g. cloudflared) to the Vite dev server. Production runs the bot through a webhook with a secret token, and the same process serves the built Mini App.
+`pnpm content:seed` arrives in Phase 1.
+
+Tests need Postgres: they read `TEST_DATABASE_URL` (owner connection to the `postgres` maintenance DB) from the environment or the root `.env`. They create and drop their own throwaway databases.
+
+To test inside Telegram, create a separate dev bot in @BotFather. The Mini App URL must be HTTPS, so point it at a tunnel (e.g. cloudflared) to the Vite dev server on port 5173, and add the tunnel's domain to `MINIAPP_DEV_ALLOWED_HOSTS`. Vite proxies `/api` to the server, so one tunnel is enough. Production (Phase 6) runs the bot through a webhook with a secret token, and the same process serves the built Mini App.
+
+pnpm enforces a minimum release age for new package versions. Don't add `minimumReleaseAgeExclude` entries to get around it: pin the previous release instead. Only packages listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
 
 ## Working rules
 
