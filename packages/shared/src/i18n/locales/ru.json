@@ -1,0 +1,12 @@
+{
+  "bot.start.greeting": "Привет, {name}! Это SameSync. Здесь знакомятся через общие вкусы и мнения, а не через фото.\n\nОткрой приложение, чтобы начать.",
+  "bot.start.open_app": "Открыть SameSync",
+  "bot.help": "SameSync подбирает людей по общим интересам и мнениям.\n\n/start — открыть приложение\n/help — эта подсказка",
+  "miniapp.hello.title": "Привет, {name}!",
+  "miniapp.hello.subtitle": "Скоро здесь появится твой профиль.",
+  "miniapp.status.loading": "Загрузка…",
+  "miniapp.error.unauthorized": "Не получилось подтвердить вход через Telegram. Открой приложение заново из бота.",
+  "miniapp.error.network": "Нет связи с сервером. Попробуй ещё раз.",
+  "miniapp.error.outside_telegram": "Открой SameSync в Telegram.",
+  "miniapp.action.retry": "Повторить"
+}

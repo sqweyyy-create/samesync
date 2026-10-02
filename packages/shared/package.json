@@ -1,0 +1,19 @@
+{
+  "name": "@samesync/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api/index.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./i18n/static": "./src/i18n/static.ts",
+    "./i18n/load": "./src/i18n/load.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}
