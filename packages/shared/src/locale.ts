@@ -10,7 +10,7 @@ export function isLocale(value: unknown): value is Locale {
 
 /**
  * Maps a Telegram `language_code` to a supported locale.
- * Provisional rule (PLAN.md Q13): `ru` and `ru-*` → ru, everything else → en.
+ * Rule decided in PLAN.md Q13: `ru` and `ru-*` → ru, everything else → en.
  */
 export function resolveLocale(languageCode: string | null | undefined): Locale {
   if (!languageCode) return 'en';
