@@ -1,4 +1,11 @@
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+
+/**
+ * The repository's content/ folder. Both src/config.ts and the bundled dist/main.js sit two levels
+ * below apps/server, so the same relative URL works for both. Deployments set CONTENT_DIR.
+ */
+export const DEFAULT_CONTENT_DIR = fileURLToPath(new URL('../../../content/', import.meta.url));
 
 const booleanFlag = z.enum(['true', 'false']).transform((v) => v === 'true');
 
@@ -23,6 +30,7 @@ const EnvSchema = z.object({
     .default(86_400),
   INITDATA_CLOCK_SKEW_SEC: z.coerce.number().int().min(0).max(600).default(60),
   U18_POOL_ENABLED: booleanFlag.default(false),
+  CONTENT_DIR: z.string().min(1).default(DEFAULT_CONTENT_DIR),
   ADMIN_TELEGRAM_IDS: z
     .string()
     .regex(/^\d+(,\d+)*$/, 'must be a comma-separated list of numeric Telegram user IDs')
@@ -40,6 +48,7 @@ export interface Config {
   initData: { maxAgeSec: number; clockSkewSec: number };
   u18PoolEnabled: boolean;
   adminTelegramIds: readonly number[];
+  contentDir: string;
 }
 
 export interface ConfigIssue {
@@ -100,5 +109,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     initData: { maxAgeSec: e.INITDATA_MAX_AGE_SEC, clockSkewSec: e.INITDATA_CLOCK_SKEW_SEC },
     u18PoolEnabled: e.U18_POOL_ENABLED,
     adminTelegramIds: e.ADMIN_TELEGRAM_IDS,
+    contentDir: e.CONTENT_DIR,
   };
 }

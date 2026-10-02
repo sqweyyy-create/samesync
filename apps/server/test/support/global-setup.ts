@@ -1,6 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import type { TestProject } from 'vitest/node';
+import { contentChecksum, loadValidContent } from '@samesync/content';
+import { DEFAULT_CONTENT_DIR } from '../../src/config';
+import { seedContent } from '../../src/content/seed';
 import { runMigrations } from '../../src/db/migrate';
 import { quoteIdent, testDatabaseUrl, withDatabase } from './env';
 
@@ -28,12 +31,20 @@ async function admin<T>(url: string, fn: (client: pg.Client) => Promise<T>): Pro
   }
 }
 
-/** Migrates a template database once per run; each test file then clones it (see db.ts). */
+/** Migrates and seeds a template database once per run; each test file then clones it (see db.ts). */
 export default async function setup(project: TestProject) {
   const adminUrl = testDatabaseUrl();
   const template = `samesync_tpl_${randomBytes(6).toString('hex')}`;
   await admin(adminUrl, (c) => c.query(`CREATE DATABASE ${quoteIdent(template)}`));
   await runMigrations(withDatabase(adminUrl, template));
+  // Every test database starts with the real content seeded, like a deployed environment.
+  const bundle = await loadValidContent(DEFAULT_CONTENT_DIR);
+  const seedPool = new pg.Pool({ connectionString: withDatabase(adminUrl, template), max: 1 });
+  try {
+    await seedContent(seedPool, bundle, contentChecksum(bundle));
+  } finally {
+    await seedPool.end();
+  }
   project.provide('templateDatabase', template);
 
   return async () => {

@@ -18,7 +18,8 @@
     "test": "vitest run",
     "test:safety": "vitest run --project server-safety",
     "content:check": "pnpm --filter @samesync/content run check",
-    "content:lock": "pnpm --filter @samesync/content run lock"
+    "content:lock": "pnpm --filter @samesync/content run lock",
+    "content:seed": "pnpm --filter @samesync/server run content:seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

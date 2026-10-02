@@ -37,7 +37,17 @@ describe('migrations', () => {
     const tables = await owner.query<{ table_name: string }>(
       "select table_name from information_schema.tables where table_schema = 'public' order by 1",
     );
-    expect(tables.rows.map((r) => r.table_name)).toEqual(['users']);
+    expect(tables.rows.map((r) => r.table_name)).toEqual([
+      'admin_actions',
+      'answers',
+      'content_releases',
+      'dating_options',
+      'interest_categories',
+      'interest_items',
+      'questions',
+      'user_interests',
+      'users',
+    ]);
   });
 
   it('are a no-op when re-run', async () => {
@@ -82,6 +92,40 @@ describe('migrations', () => {
 
     it('cannot bypass triggers with session_replication_role', async () => {
       await expectDenied('set session_replication_role = replica');
+    });
+
+    it('can only read the content tables (seeding runs as the owner)', async () => {
+      const keyColumn: Record<string, string> = {
+        content_releases: 'version',
+        questions: 'id',
+        interest_categories: 'id',
+        interest_items: 'id',
+        dating_options: 'id',
+      };
+      for (const [table, key] of Object.entries(keyColumn)) {
+        await app.query(`SELECT 1 FROM ${table} LIMIT 1`);
+        await expectDenied(`DELETE FROM ${table}`);
+        await expectDenied(`UPDATE ${table} SET ${key} = ${key}`);
+      }
+      await expectDenied(
+        "INSERT INTO content_releases (version, checksum) VALUES ('2099.01.1', 'x')",
+      );
+    });
+
+    it('can write answers but not delete them; can add and remove interests', async () => {
+      await app.query('SELECT 1 FROM answers');
+      await expectDenied('DELETE FROM answers');
+      await app.query('DELETE FROM user_interests WHERE false');
+      await expectDenied('UPDATE user_interests SET item_id = item_id');
+    });
+
+    it('can only append to admin_actions', async () => {
+      await app.query(
+        "INSERT INTO admin_actions (admin_telegram_id, action, reason) VALUES (1, 'test', 'test')",
+      );
+      await expectDenied('SELECT * FROM admin_actions');
+      await expectDenied("UPDATE admin_actions SET reason = 'x'");
+      await expectDenied('DELETE FROM admin_actions');
     });
 
     it('cannot read the migrations journal', async () => {

@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from '../src/config';
+import { ConfigError, DEFAULT_CONTENT_DIR, loadConfig } from '../src/config';
 import { TEST_BOT_TOKEN } from './support/fixtures';
 
 const VALID = {
@@ -34,6 +34,7 @@ describe('loadConfig', () => {
       initData: { maxAgeSec: 86_400, clockSkewSec: 60 },
       u18PoolEnabled: false,
       adminTelegramIds: [],
+      contentDir: DEFAULT_CONTENT_DIR,
     });
   });
 
@@ -58,6 +59,11 @@ describe('loadConfig', () => {
     expect(message).toContain('HTTP_PORT');
     expect(message).not.toContain(secret);
     expect(message).not.toContain('mysql://x');
+  });
+
+  it('defaults CONTENT_DIR to the repository content folder', async () => {
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(`${DEFAULT_CONTENT_DIR}/release.json`)).toBe(true);
   });
 
   it('requires an https Mini App URL', () => {

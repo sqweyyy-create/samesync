@@ -67,7 +67,10 @@ export default defineConfig(
     rules: {
       'vitest/no-focused-tests': 'error',
       'vitest/no-disabled-tests': 'error',
-      'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'expectDenied'] }],
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'expectDenied', 'expectParity', 'fc.assert'] },
+      ],
     },
   },
   {
