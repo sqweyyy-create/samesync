@@ -33,7 +33,11 @@ export default defineConfig(
   },
   {
     // Node-side config, type-checked with its own tsconfig (not part of the browser project).
-    files: ['apps/miniapp/vite.config.ts'],
+    files: [
+      'apps/miniapp/vite.config.ts',
+      'apps/miniapp/dev-env.ts',
+      'apps/miniapp/dev-env.test.ts',
+    ],
     languageOptions: {
       parserOptions: { projectService: false, project: './apps/miniapp/tsconfig.node.json' },
     },
