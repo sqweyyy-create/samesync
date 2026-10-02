@@ -26,7 +26,7 @@ export function Settings({
   return (
     <Screen title={t('miniapp.settings.title')}>
       <h2>{t('miniapp.settings.language')}</h2>
-      <p className="hint">{t('miniapp.language.note')}</p>
+      <p className="hint">{t('miniapp.settings.language_note')}</p>
       <div className="row">
         {LOCALES.map((l) => (
           <Choice key={l} selected={me.locale === l} disabled={busy} onClick={() => onLocale(l)}>

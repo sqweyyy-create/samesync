@@ -76,6 +76,7 @@
   "miniapp.done.settings": "Настройки",
   "miniapp.settings.title": "Настройки",
   "miniapp.settings.language": "Язык",
+  "miniapp.settings.language_note": "Новый язык будет учитываться в следующих знакомствах.",
   "miniapp.settings.mode": "Режим",
   "miniapp.settings.answers": "Изменить ответы",
   "miniapp.settings.interests": "Изменить интересы",

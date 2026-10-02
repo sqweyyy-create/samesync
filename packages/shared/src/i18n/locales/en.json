@@ -72,6 +72,7 @@
   "miniapp.done.settings": "Settings",
   "miniapp.settings.title": "Settings",
   "miniapp.settings.language": "Language",
+  "miniapp.settings.language_note": "A new language applies to future matches.",
   "miniapp.settings.mode": "Mode",
   "miniapp.settings.answers": "Edit answers",
   "miniapp.settings.interests": "Edit interests",
