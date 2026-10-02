@@ -6,7 +6,7 @@ SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is
 
 ## Product summary
 
-1. **Onboarding** (Mini App): the user enters a birth date (set once and never editable by the user), picks a mode, and fills a *swipe profile*: ~30–40 agree/disagree "hot takes" plus picks from an interest catalog (artists, games, shows, memes…). The swipe profile is the whole profile. There are no long forms, and photos aren't needed for matching.
+1. **Onboarding** (Mini App): the user enters a birth date (set once and never editable by the user), picks a mode, and fills a *swipe profile*: ~30–40 agree/disagree "hot takes" plus picks from an interest catalog (artists, games, shows, memes…). The swipe profile is the whole profile. There are no long forms and no photos anywhere in the MVP (PLAN.md Q7).
 2. **Matching** (scheduled batch job, not realtime): pairs users whose answers and interests overlap. Rare overlaps count far more than common ones. When a pool is thin, the job falls back to broader overlaps. The bot notifies both users with a teaser of the specific overlap.
 3. **Game** (async, Mini App): each user predicts the other's answers to a few questions. The results show how well they read each other and always end on one disagreement ("You split on this one. Ask why."), with a pre-generated first message.
 4. **Chat** (bot DM): anonymous text that the bot relays. A match expires after 48h if nobody writes. In the 18+ pool both users can agree to reveal Telegram usernames. In the under-18 pool usernames are never revealed.
@@ -17,7 +17,7 @@ These are also part of the MVP: report, block, auto-freeze, admin commands in th
 
 Decided by the product owner:
 - TypeScript everywhere, single repo.
-- Mini App: Vite + React + Telegram Mini Apps SDK. The bundle must stay small.
+- Mini App: Vite + React + Telegram Mini Apps SDK (`@tma.js/sdk-react`, PLAN.md Q32). The bundle must stay small (≤ 100 KB gzip initial JS, Q33).
 - Backend: **one** Node process that runs the grammY bot, a lightweight HTTP API and the scheduled jobs.
 - Auth: Telegram `initData` validated on the server only. No custom login.
 - PostgreSQL with a typed ORM. **No Redis, no WebSockets.**
@@ -49,7 +49,7 @@ apps/
       api/  screens/  ui/
 packages/
   shared/                 # zod API schemas, domain types, ageOn(), i18n runtime + locales/{ru,en}.json
-content/                  # questions/, interests/, openers, aliases, products.json, schemas, content.lock.json
+content/                  # questions/, interests/, openers, aliases, products.json, schemas; content.lock.json from Phase 1
 ```
 
 ## Non-negotiable safety invariants
@@ -62,7 +62,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
 4. **A band change closes everything.** When a user's band changes (18th birthday or an admin birth-date correction), the same transaction closes all their open matches and chats, cancels their pending notifications, and makes the counterparts' data from those matches unreadable.
 5. **Under-18 rules:**
    - Friends mode only.
-   - Partners' birth dates must be within 2 years of each other (exact definition: PLAN.md Q14).
+   - Partners' birth dates must be at most 2 calendar years apart (PLAN.md Q14, decided).
    - Plain text only: no photos, voice, video, stickers, files or formatting entities.
    - Every message passes the contact/link filter before it is relayed. If the filter throws, the message is not delivered.
    - Matching fallback tiers never relax any of these rules.
@@ -76,7 +76,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
 9. **Frozen users** can't be matched, can't send or receive relayed messages, get no match notifications, and can't call product APIs.
 10. **Fail closed.** A missing or unknown birth date or band, a filter error, or failed `initData` validation all lead to *deny*.
 11. **Tests guard every invariant.** Each invariant has dedicated tests in `apps/server/test/safety/` (`pnpm test:safety`), including tests that skip the app layer and attack the database directly as the app role. Never skip, weaken or delete these tests to get a change through. If one fails, the change is wrong. Any change to safety tests, safety triggers, auth, relay or filters needs explicit human sign-off.
-12. **Production gate for minors.** `U18_POOL_ENABLED` stays `false` in production until the Phase 5 acceptance criteria are met and legal review is done (PLAN.md §7).
+12. **Production gate for minors.** `U18_POOL_ENABLED` stays `false` in production until the Phase 5 acceptance criteria are met and legal review is done (PLAN.md §7). The planned public launch is adult-only; the `u18` pool is built but disabled until G3.
 
 ## Conventions
 
@@ -100,7 +100,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - Plurals follow `Intl.PluralRules` categories.
   - **Russian copy that addresses the user must be gender-neutral**, because we don't know their gender.
   - Content (questions, interests, openers) carries its own ru/en text in `content/`.
-- **Content:** IDs are permanent. Never change what an ID means: retire it and add a new one. A typo fix needs a `revision` bump. `pnpm content:check` must pass.
+- **Content:** IDs are permanent. Never change what an ID means: retire it and add a new one. A typo fix needs a `revision` bump (enforced by `content.lock.json` from Phase 1). `pnpm content:check` must pass.
 - **Database:**
   - Drizzle schema lives in `apps/server/src/db/schema/`. Migrations are generated and committed.
   - Triggers, functions and CHECKs go in hand-written SQL migrations.
@@ -114,7 +114,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - The Telegram SDK is imported only in `src/platform/`.
   - No UI kits, no web fonts.
   - Locale JSON and content are loaded at runtime, not bundled.
-  - The size budget is enforced in CI.
+  - The size budget is enforced in CI from Phase 6 (size-limit).
 - **Tests:** Vitest. DB tests run against real Postgres; safety tests never mock the database. Matching invariants use property-based tests (fast-check). `.only` and `.skip` are lint errors.
 - **Commits:** small, one concern each, Conventional Commits.
 

@@ -72,7 +72,7 @@ The product owner fixed the stack only partly. These choices are this plan's (ea
 | Bot transport | Long polling in dev. Webhook with `secret_token` in prod. grammY `auto-retry` + throttler | Telegram rate limits |
 | Mini App hosting | The same Node process serves the built static files (hashed, immutable caching) | One deployable |
 | Logging | pino JSON with a redaction list | Keeps PII out of logs |
-| CI | GitHub Actions with a Postgres service container (*assumed*, see Q29) | |
+| CI | GitHub + GitHub Actions with a Postgres service container (decided, Q29) | |
 | Deploy | One Docker image plus managed Postgres | Matches the one-process constraint |
 
 ## 3. How pool isolation is enforced
@@ -88,7 +88,7 @@ Pool isolation is enforced in six layers, so a bug in one layer can't break it:
    - `matches` INSERT requires:
      - both users `active`;
      - the same live band as `matches.band` and the same locale;
-     - for `u18`: mode `friends` and birth dates within 2 years (Q14);
+     - for `u18`: mode `friends` and birth dates at most 2 calendar years apart (Q14, decided);
      - no block in either direction.
    - `messages` INSERT requires an open match, a sender who is a participant, both live bands equal to `matches.band`, and neither user frozen.
    - `game_predictions` INSERT requires an open match and a predictor who is a participant.
@@ -203,7 +203,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 
 **Hard filters.** These never relax, at any tier:
 - same band, locale and mode;
-- `u18`: birth dates within 2 years;
+- `u18`: birth dates at most 2 calendar years apart (Q14);
 - dating: each user's gender is in the other's `seeking` (and the age range from Q12);
 - not blocked in either direction, never matched before (Q9);
 - both active, not frozen, bot reachable, active within 14 days (provisional);
@@ -248,17 +248,17 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - Content:
   - zod schemas for questions, interests, openers, aliases and products;
   - a few sample entries;
-  - `pnpm content:check` (unique IDs, every locale present, valid references, `content.lock.json` text hashes so text can't change without a `revision` bump).
+  - `pnpm content:check`: zod schema validation, unique IDs, every locale present, valid references. (The `content.lock.json` text-hash and revision-bump check moved to Phase 1, where seeding happens.)
 - `apps/miniapp`:
   - Vite + React + TS;
-  - SDK init inside `src/platform/` (package choice: Q32);
+  - SDK init inside `src/platform/` using `@tma.js/sdk-react` (Q32, decided); verify the current version and bundle cost;
   - Telegram theme params mapped to CSS variables;
   - typed API client that sends `Authorization: tma <initData>`;
   - a screen with a localized greeting from `/api/me`;
   - browser dev mode using the SDK's environment mock plus `pnpm dev:initdata`, which signs initData with the **dev** bot token. The server has no bypass.
-- CI (GitHub Actions): frozen install, lint, typecheck, `test` (Postgres service), `content:check`, build, and a bundle budget via size-limit (Q33, provisional 100 KB gzip of initial JS).
+- CI (GitHub Actions): frozen install, lint, typecheck, `test` (Postgres service), `content:check`, build. (The size-limit bundle budget step moved to Phase 6.)
 - `apps/server/test/safety/` exists with its first suite (auth) and its own CI step.
-- Manual one-time setup: create dev and staging bots in @BotFather, set the Mini App URL and menu button, and set up a local HTTPS tunnel.
+- Manual one-time setup: create a **dev** bot in @BotFather, set its Mini App URL and menu button, and set up a local HTTPS tunnel. (Staging bot creation moved to Phase 6.)
 
 **Out of scope.** Any product feature, birth date, content seeding into the DB, deployment, payments.
 
@@ -269,7 +269,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - [ ] A request with no initData, forged initData, initData for another bot, or expired initData gets 401.
 - [ ] A `user_id` in the body or query is ignored.
 - [ ] Migrations apply to an empty database, and re-running them does nothing.
-- [ ] CI is green on main: lint, typecheck, tests, safety suite, content check, build, bundle budget.
+- [ ] CI is green on main: lint, typecheck, tests, safety suite, content check, build.
 
 **Tests that prove it**
 - `packages/shared/src/i18n/i18n.test.ts`: ru and en have identical keys and identical placeholders per key; every key has every plural category for its locale (ru: one/few/many/other; en: one/other); interpolation and plural selection work (1, 2, 5, 21 in ru).
@@ -278,7 +278,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/test/bot/start.test.ts`: uses a grammY harness that feeds updates through `bot.handleUpdate` and captures outgoing API calls via a transformer. `/start` sends a localized text and a `web_app` button.
 - `apps/server/test/config.test.ts`: the process refuses to start with missing or invalid env and names the variable.
 - `apps/server/test/db/migrations.test.ts`: migrating from empty succeeds, re-running is a no-op, and `samesync_app` cannot `ALTER TABLE`.
-- `content/test/check.test.ts`: sample content passes; fixtures with a missing locale, a duplicate ID, a dangling reference, or changed text without a revision bump fail.
+- `content/test/check.test.ts`: sample content passes; fixtures that fail schema validation, have a missing locale, a duplicate ID, or a dangling reference fail.
 - `apps/miniapp/src/screens/Hello.test.tsx`: renders the greeting through a mocked platform adapter and API.
 
 ---
@@ -297,6 +297,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - `admin_set_birth_date(user_id, new_date, admin_tg_id, reason)`: a SECURITY DEFINER function that requires a reason, writes `admin_actions`, and recomputes `age_band`. Phase 1 has no bot command for it; Phase 5 adds one.
   - the band/mode/username CHECKs.
 - `packages/shared`: `ageOn(birthDate, onDate)` and `bandFor(age)`. Provisional: UTC date, and Feb 29 birthdays fall on Mar 1 in non-leap years (Q15), which matches Postgres `age()`.
+- Content lockfile (moved from Phase 0): `content.lock.json` stores a hash of every localized text per content ID; `pnpm content:check` fails if a text changes without a `revision` bump.
 - Content seeding: `pnpm content:seed` is an idempotent upsert that records a release and handles retirement. Initial content must at least let the band × mode decks each draw 35 takes in both locales, plus ≥ 150 interest items across ≥ 4 domains. Real launch content is a content task (Q6).
 - API:
   - `POST /api/onboarding/birth-date`: once only, returns the band or `ineligible`;
@@ -340,6 +341,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/test/safety/band-constraints.test.ts`: `u18` + dating is rejected; `u18` + username is rejected; a change to `u18` through the admin function nulls the username.
 - `apps/server/test/onboarding/flow.test.ts`: steps can't run out of order; the minimums are enforced; unknown or retired question IDs and items for the wrong locale or audience are rejected; re-submission is idempotent; `waitlisted` applies while the flag is off.
 - `apps/server/test/content/seed.test.ts`: seeding is idempotent; retiring a question keeps existing answers; the lockfile catches silent text changes.
+- `content/test/check.test.ts` (extended): a fixture with changed text and no `revision` bump fails; the same change with a bump passes and updates the lockfile.
 - `apps/miniapp`: birth date form validation and confirmation; deck agree/disagree/skip/undo; no mode picker for `u18`; the write-access request runs when needed.
 
 ---
@@ -424,8 +426,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - Notifications through the outbox:
   - "Your match finished — your turn" when the other user finishes first;
   - "Results are ready" to both;
-  - one reminder before the game deadline (Q2).
-- Expiry job: a `pending_game` match past `game_deadline_at` (provisional: created + 48h, Q2) becomes `expired`, and both users get a neutral notification.
+  - one reminder before the game deadline (Q2, decided).
+- Expiry job: a `pending_game` match past `game_deadline_at` (created + 48h, Q2, decided) becomes `expired`, and both users get a neutral notification.
 - Mini App: match intro (teaser), prediction cards, a waiting screen (refetches on `visibilitychange` or focus; no WebSockets), results.
 
 **Out of scope.** Sending messages (Phase 4), LLM-generated text, score history or leaderboards, rematches.
@@ -476,7 +478,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - `/reveal`: adults only.
   - Commands are registered per locale with `setMyCommands(language_code)`.
 - Edited messages are not passed on, and the sender is told that edits don't go through. Non-text messages are rejected with a localized notice.
-- Expiry job: `results_ready` matches with no message by `chat_deadline_at` (provisional: results_ready + 48h, Q2) become `expired`, and both users are notified.
+- Expiry job: `results_ready` matches with no message by `chat_deadline_at` (results_ready + 48h, Q2, decided) become `expired`, and both users are notified. After the first message a match no longer expires; one reminder is sent before the chat deadline.
 - Mutual reveal (adults only):
   - the first consent sends the other user an "Agree / Not now" prompt;
   - when both agree, the bot reads each user's **current** username via `getChat` and sends each one the other's;
@@ -604,18 +606,19 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - the swipe gesture built on pointer events and CSS transforms (no animation library);
   - empty, loading and error states for every screen;
   - copy review in ru and en;
-  - checks on iOS, Android and Desktop Telegram.
+  - checks on iOS, Android and Desktop Telegram;
+  - CI: a size-limit bundle budget step (moved from Phase 0): ≤ 100 KB gzip of initial JS (Q33, decided).
 - Deployment:
   - a multi-stage Dockerfile building one image that serves the API, `/tg/webhook` (checks `X-Telegram-Bot-Api-Secret-Token`) and the static Mini App;
   - `pnpm db:migrate` runs as a release step before start;
   - forward-only expand/contract migrations, so rolling back the image is safe;
   - managed Postgres with daily backups and PITR, plus a restore drill;
-  - separate staging and production bots, databases and secrets;
+  - create the staging bot in @BotFather (moved from Phase 0) and set up the production bot @samesync_bot; separate staging and production bots, databases and secrets;
   - setup automated in code: `setWebhook`, `setMyCommands` per locale, menu button;
   - `/healthz` for the host's health check;
   - pino logs with a tested redaction list;
   - a runbook at `docs/ops.md` (deploy, rollback, rotate the bot token, restore a backup, flip `U18_POOL_ENABLED`).
-  - Host choice: Q29.
+  - Host choice: Q29. It must account for Russia's personal-data localization requirement for ru users (Q28) and be decided before Phase 6 starts.
 
 **Out of scope.** Choosing paid features or prices, subscriptions (Q27), ads, analytics dashboards beyond `/stats`, multi-region, autoscaling.
 
@@ -623,7 +626,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - [ ] In staging, buying the placeholder product works end-to-end (a real 1-Star purchase, refunded with `/refund`). A duplicate `successful_payment` grants the entitlement once; a refund revokes it.
 - [ ] Pre-checkout rejects frozen users, an unknown or disabled product, an amount mismatch, and `u18` users while purchases are off for them.
 - [ ] Free-tier limits are enforced in matching and shown correctly in the Mini App.
-- [ ] Every screen passes a manual check in light and dark themes on three Telegram clients. The bundle stays within budget.
+- [ ] Every screen passes a manual check in light and dark themes on three Telegram clients. The bundle stays within budget, enforced by the size-limit CI step.
 - [ ] Production runs as one container with the webhook secret checked, migrations applied by the release step, a successful backup restore drill, no PII in a sampled day of logs, and `U18_POOL_ENABLED=false` unless §7 G3 is signed off.
 
 **Tests that prove it**
@@ -645,8 +648,10 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 |---|---|
 | **G1 — Internal alpha** (team accounts, adult pool) | Phase 4 done |
 | **G2 — Public adult beta** | Phase 5 done; Terms of Service and privacy policy published; Q28 legal review done for the adult/dating features; admins named (Q30); "SameSync" trademark check passed (Q31) |
-| **G3 — Enable `u18` pool in production** | G2 plus: Q28 review of minors' data and consent; filter corpus at acceptance level; admin response time for `u18` reports defined and staffed; Q14–Q18 answered; a dry run in staging with test accounts |
+| **G3 — Enable `u18` pool in production** | G2 plus: Q28 review of minors' data and consent; filter corpus at acceptance level; admin response time for `u18` reports defined and staffed; Q15–Q18 answered (Q14 is decided); a dry run in staging with test accounts |
 | **G4 — Payments live** | Phase 6 done; Q26 and Q27 answered |
+
+**Launch scope.** The realistic public launch (G2) is the **adult pool only**. The `u18` pool is fully built and tested in Phases 1–5, but `U18_POOL_ENABLED` stays `false` in production until G3 is signed off. Until then, `u18` users who onboard are `waitlisted`.
 
 ## 8. Open questions
 
@@ -654,12 +659,12 @@ Each question lists a *provisional* default used until it is answered (implement
 
 **Product & core loop**
 - **Q1. Is the game required before chatting?** The loop implies yes, but it isn't stated. *Provisional:* yes; chat opens at `results_ready`. *Needed by:* Phase 3.
-- **Q2. When does the 48h clock start, and what about later silence?** "Expires after 48h if nobody writes" doesn't say whether the clock starts at match creation or at results. *Provisional:* the game has 48h from match creation; chat has 48h from `results_ready` if no message is sent; nothing expires after the first message; one reminder each. *Needed by:* Phase 3.
+- **Q2. When does the 48h clock start, and what about later silence?** ✅ **Decided (2026-10-02, product owner):** the game has 48h from match creation; chat has 48h from `results_ready` if no message is sent; nothing expires after the first message; one reminder each.
 - **Q3. How many game questions?** "Several". *Provisional:* 5, including the closing split. *Needed by:* Phase 3.
 - **Q4. Is the opener template-based or LLM-generated, and can the user edit it?** "Pre-generated" is ambiguous, and no LLM is in the stack. An LLM would also send minors' data to a third party. *Provisional:* per-take templates in `content/`, editable before sending. *Needed by:* Phase 3.
 - **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? *Provisional:* 35 drawn per band × mode, skip allowed (≥ 25 non-skip answers required), editable later with effect on future matches only. *Needed by:* Phase 1.
 - **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? *Provisional:* catalog-only, 5–30 picks, a curated team-maintained catalog. *Needed by:* Phase 1 (rules), G2 (launch content).
-- **Q7. Are photos in the product at all?** "No photos *required* for matching" suggests they might be optional somewhere. *Provisional:* no photos anywhere in the MVP. *Needed by:* Phase 1.
+- **Q7. Are photos in the product at all?** ✅ **Decided (2026-10-02, product owner):** no photos anywhere in the MVP.
 - **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? *Provisional:* configurable cron, twice daily per pool, times in Europe/Moscow for ru and UTC for en. *Needed by:* Phase 2.
 - **Q9. Rematch policy.** Can an expired pair ever be matched again? *Provisional:* never (UNIQUE pair). *Needed by:* Phase 2.
 - **Q10. Adult modes.** Can an adult be in friends and dating at once? What happens to open matches when they switch? *Provisional:* one mode at a time, switchable in settings; open matches stay. *Needed by:* Phase 1.
@@ -668,7 +673,7 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q13. Choosing and switching language.** Picked by the user or taken from `language_code`? Where do `uk`/`be`/`kk`… go? Does switching move pools and close open matches? Can bilingual users join both pools? *Provisional:* preselected from `language_code` (`ru` → ru, otherwise en), changeable in settings, affects future matches only, one pool per user. *Needed by:* Phase 1.
 
 **Age & safety**
-- **Q14. What does "±2 years" mean?** It could mean whole-year ages differ by ≤ 2 (a 14y0m and a 16y11m user qualify, almost 3 years apart), or birth dates are ≤ 2 years apart (stricter, and constant over time). *Provisional:* birth dates ≤ 2 calendar years apart. *Needed by:* Phase 2.
+- **Q14. What does "±2 years" mean?** ✅ **Decided (2026-10-02, product owner):** birth dates at most 2 calendar years apart (the stricter reading; constant over time). The looser whole-year-age reading was rejected.
 - **Q15. Which timezone decides birthdays, and how are Feb 29 births handled?** *Provisional:* the UTC calendar date; Feb 29 → Mar 1 in non-leap years (matches Postgres `age()`). *Needed by:* Phase 1.
 - **Q16. Under-14 users.** Should their birth date be kept (so they can't retry with another) or nothing stored? Do they become eligible automatically at 14? *Provisional:* keep `birth_date` with status `ineligible` and nothing else; they become eligible on their 14th birthday. *Needed by:* Phase 1.
 - **Q17. Policy for birth-date corrections.** How do users ask (provisional `/support`), what proof is needed, and do adult → `u18` corrections (a grooming vector) need extra scrutiny, such as a second admin? *Needed by:* Phase 5.
@@ -692,26 +697,28 @@ Each question lists a *provisional* default used until it is answered (implement
   - Terms of Service and privacy policy;
   - consent and processing of 14–17-year-olds' data (rules on parental consent differ by country);
   - dating data that may reveal sexual orientation (special-category data in many jurisdictions, and restricted content rules in some target markets);
-  - data residency: for example, Russia's personal-data localization requirement affects where the database can be hosted;
+  - data residency: hosting for ru users must account for Russia's personal-data localization requirement (where the database holding their data may live). Decide before Phase 6 (see Q29);
   - Telegram's own terms for Mini Apps and bots, including its minimum-age rules;
   - consumer rules for purchases by minors.
 
   *Needed by:* G2 and G3.
-- **Q29. Hosting, domain, repo host and CI, error tracking.** *Provisional:* GitHub plus GitHub Actions; any Docker host with managed Postgres in the jurisdiction Q28 picks; no third-party error tracker (logs only). *Needed by:* Phase 0 (repo/CI), Phase 6 (hosting).
+- **Q29. Hosting, domain, repo host and CI, error tracking.** ✅ **Repo and CI decided (2026-10-02, product owner):** GitHub + GitHub Actions. **Still open:** hosting is decided in Phase 6, and must account for Russia's personal-data localization requirement for ru users (Q28); decide it before Phase 6 starts. Domain and error tracking are also open. *Provisional:* any Docker host with managed Postgres in the jurisdiction Q28 picks; no third-party error tracker (logs only). *Needed by:* Phase 6.
 - **Q30. Admin team.** Who are the admins, what response time applies to `u18` reports, and where do alerts go? *Provisional:* DMs to every ID in `ADMIN_TELEGRAM_IDS`. *Needed by:* Phase 5, G2.
 - **Q31. Name.** ✅ **Decided (2026-10-02):** the product is named **SameSync** and the production bot is **@samesync_bot** (it was "VibeCheck" before). **Still open:** a trademark check for "SameSync" in the target markets. *Needed by:* G2.
 
 **Technical**
-- **Q32. Which "official Telegram Mini Apps SDK"?** Telegram's own client library is the `telegram-web-app.js` script (`window.Telegram.WebApp`: no npm package, no tree-shaking). The React SDK most projects use is the community-maintained tma.js project, whose npm scope has moved between `@telegram-apps/*` and `@tma.js/*`. *Provisional:* `@telegram-apps/sdk-react`, wrapped in `apps/miniapp/src/platform/` so it can be swapped; confirm the current package and its bundle cost in Phase 0. *Needed by:* Phase 0.
-- **Q33. Bundle budget.** "Keep the bundle small" has no number. *Provisional:* ≤ 100 KB gzip for initial JS (React + ReactDOM alone is ~45 KB). *Needed by:* Phase 0.
+- **Q32. Which "official Telegram Mini Apps SDK"?** Telegram's own client library is the `telegram-web-app.js` script (`window.Telegram.WebApp`: no npm package, no tree-shaking). The React SDK most projects use is the community-maintained tma.js project, whose npm scope has moved between `@telegram-apps/*` and `@tma.js/*`. ✅ **Decided (2026-10-02, product owner):** `@tma.js/sdk-react`, wrapped in `apps/miniapp/src/platform/` so it can be swapped. Phase 0 verifies the current version and bundle cost.
+- **Q33. Bundle budget.** ✅ **Decided (2026-10-02, product owner):** ≤ 100 KB gzip for initial JS, enforced by a size-limit CI step from Phase 6.
 
 ## 9. Main risks
+
+The public launch is planned as **adult pool only** (§7). The `u18` pool stays built but disabled until G3, so at launch the minor-specific risks below apply to staging and dry runs, not to real users, and only the adult pools (`adult:ru`, `adult:en` × friends/dating) need liquidity.
 
 | Risk | Why it matters | Mitigations in this plan | Residual |
 |---|---|---|---|
 | **Adults posing as minors** (and minors posing as adults) | Birth dates are self-declared. This is the most serious harm the product could enable. | Write-once birth date (no flip-flopping); ±2y window in `u18`; friends-only; text-only; contact/link filter including obfuscation and split messages; usernames never revealed or stored for `u18`; no photos; age-misrepresentation report reason with immediate admin alert; lower freeze threshold in `u18`; audited corrections with extra scrutiny for adult → `u18` (Q17); `u18` pool gated behind G3 | Real age can't be verified (Q21). Treat it as a known, documented risk and revisit verification after launch. |
 | **Cold start** | Matching needs enough users per pool × mode. An empty "waiting" state kills retention. | Scheduled drops concentrate activity (Q8); fallback tiers; small-pool priors so rarity works from day one; launch ru first with en behind a flag if it's thin; honest waiting copy plus a notification when a match lands; `/stats` liquidity monitoring; seed through niche communities that match the catalog's niches | The tiers trade match quality for liquidity. Watch tier-3 share in `match_runs`. |
-| **Pool fragmentation** | 2 bands × 2 locales × modes gives 6 pools; then the `u18` ±2y window and dating gender/age filters cut each one further. | Rarity stats shared across modes within a pool; tiers; per-pool liquidity in `/stats`; option to delay the en locale or dating mode until a pool has enough users | Small `u18` age cohorts and minority dating preferences may still wait a long time. |
+| **Pool fragmentation** | 2 bands × 2 locales × modes gives 6 pools; then the `u18` ±2y window and dating gender/age filters cut each one further. | Adult-only launch removes the two `u18` pools at first; rarity stats shared across modes within a pool; tiers; per-pool liquidity in `/stats`; option to delay the en locale or dating mode until a pool has enough users | Small `u18` age cohorts and minority dating preferences may still wait a long time. |
 | **Abuse: harassment, spam, scams, report brigading** | Anonymous chat attracts abuse, and false reports can be used as a weapon. | Report and block everywhere; distinct-reporter counting; admin review and unfreeze; rate limits on messages and matches (free-tier limits); bot reachability checks; audit log | Moderation is manual through bot commands, which won't scale. Plan a web panel when report volume justifies it. |
 | **Filter evasion** | Determined users will find ways around a text filter. | Normalization, homoglyphs, number words, sliding window; fail closed; production bypasses go into the corpus; escalation of repeated hits | No text filter is complete, so it's backed by reports and freezes. |
 | **Deanonymization** | A very niche shared item or the timing of messages could identify someone in a small pool. | Teasers use content IDs only; no counts shown; aliases change per match; no forwarding; no names | Small pools carry an inherent risk. Consider hiding teaser items shared by < k users. |
