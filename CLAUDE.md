@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** Phase 0 (scaffold) is done; Phase 1 (onboarding) is next. No product features yet. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phase 0 is done. Phase 1 (onboarding) is implemented and waiting for the product owner's manual check in Telegram; see the status table. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -132,16 +132,18 @@ pnpm install
 cp .env.example .env            # then fill in BOT_TOKEN, MINIAPP_URL, passwords and the three DB URLs
 docker compose up -d db         # local Postgres 17; creates samesync_app from APP_DB_PASSWORD on first start
 pnpm db:migrate                 # as the owner role (MIGRATION_DATABASE_URL)
+pnpm content:seed               # content IDs + release into the DB (owner role); the server won't start without it
 pnpm dev                        # server (bot long-polling + API + jobs) and Vite dev server
 pnpm dev:initdata               # signed initData + a URL to open the Mini App in a plain browser
 pnpm lint && pnpm typecheck && pnpm test
 pnpm test:safety                # pool isolation and minor-safety suites only
-pnpm content:check
+pnpm content:check              # add --launch for the launch coverage minimums
+pnpm content:lock               # after a legitimate text change (bump the entry's revision first)
 pnpm build
 pnpm format                     # Prettier --write (pnpm lint runs --check)
 ```
 
-`pnpm content:seed` arrives in Phase 1.
+After any content change: bump `content/release.json`, run `pnpm content:lock`, then `pnpm content:seed`. The server checks at startup that the seeded release matches the files.
 
 Tests need Postgres: they read `TEST_DATABASE_URL` (owner connection to the `postgres` maintenance DB) from the environment or the root `.env`. They create and drop their own throwaway databases.
 
