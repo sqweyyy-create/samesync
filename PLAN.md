@@ -351,8 +351,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - swipe deck: agree / disagree / skip, progress, undo last;
   - interest picker: domain tabs, search, chips, min/max counter;
   - done screen. If `allows_write_to_pm` is false, it calls `requestWriteAccess()` so the bot can send notifications.
-- Profile editing (answers and interests) from a settings screen. Changes affect future matches only (Q5).
-- Mode switching (Q10, decided): adults can switch between friends and dating in settings, one mode at a time. Switching to friends clears `gender` and `seeking` (the §4 CHECK requires it); switching to dating asks for them. Open matches stay open. `u18` users have no switch. The birth date is shown read-only, with the support code and a hint to contact support.
+- Profile editing (answers and interests) from a settings screen. Changes affect future matches only (Q5). The birth date is shown read-only, with the support code and a hint to contact support.
+- Mode switching (Q10, decided): adults can switch between friends and dating in settings, one mode at a time. Switching to friends clears `gender` and `seeking` (the §4 CHECK requires it); switching to dating asks for them. Open matches stay open. `u18` users have no switch.
 - Under-14: store `birth_date` and set status `ineligible`, with no other profile data. The user can't retry with a different date (Q16).
 - Turning 14 (Q16, decided): when an `ineligible` user opens the Mini App and `ageOn(birth_date, today)` is ≥ 14, their status moves to `onboarding` and they continue. The birth date is still not editable.
 - `U18_POOL_ENABLED=false` → `u18` users finish onboarding as `waitlisted`.
@@ -364,13 +364,13 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 **Out of scope.** Matching. Any way for a user to edit their birth date (never planned). The admin bot command (Phase 5). Photos, bios, avatars (Q7).
 
 **Acceptance criteria**
-- [ ] A manual run in Telegram completes onboarding in ≤ 3 minutes in both locales.
-- [ ] Birth date: a second submission gets 409; a direct `UPDATE` as `samesync_app` raises; `admin_set_birth_date()` succeeds only with a reason and writes an audit row.
-- [ ] `ageOn()` and `vc_age_years()` agree on all tested dates.
-- [ ] A `u18` user can't be put in dating mode or have a username stored, through either the API or SQL.
-- [ ] An under-14 user sees the ineligible screen, and nothing but `telegram_id`, `birth_date` and `status` is stored for them.
-- [ ] A `u18` deck never contains adult-only takes. Interest items respect locale and audience.
-- [ ] Every new screen and bot message exists in ru and en. Russian copy is gender-neutral.
+- [ ] A manual run in Telegram completes onboarding in ≤ 3 minutes in both locales. *(Pending the product owner. A browser run with dev initData completed the whole flow in en, including settings and a switch to ru.)*
+- [x] Birth date: a second submission gets 409; a direct `UPDATE` as `samesync_app` raises; `admin_set_birth_date()` succeeds only with a reason and writes an audit row. *(test/safety/birth-date-immutable.test.ts)*
+- [x] `ageOn()` and `vc_age_years()` agree on all tested dates. *(test/safety/age-sql-parity.test.ts: 1,500 random pairs plus birthday, Feb 29 and fixed edge cases)*
+- [x] A `u18` user can't be put in dating mode or have a username stored, through either the API or SQL. *(test/safety/band-constraints.test.ts, username-capture.test.ts)*
+- [x] An under-14 user sees the ineligible screen, and nothing but `telegram_id`, `birth_date` and `status` is stored for them. *(Plus the Phase 0 account basics; see the implementation notes. test/onboarding/flow.test.ts, apps/miniapp/src/App.test.tsx)*
+- [x] A `u18` deck never contains adult-only takes. Interest items respect locale and audience. *(test/onboarding/flow.test.ts)*
+- [x] Every new screen and bot message exists in ru and en. Russian copy is gender-neutral. *(Key, placeholder and plural parity in packages/shared/src/i18n/i18n.test.ts; gender-neutrality by review)*
 
 **Tests that prove it**
 - `packages/shared/src/age.test.ts`: the day before, of and after the 14th and 18th birthdays; Feb 29 births in leap and non-leap years; future and implausible dates rejected.
@@ -381,6 +381,44 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/test/content/seed.test.ts`: seeding is idempotent; retiring a question keeps existing answers; the lockfile catches silent text changes.
 - `content/test/check.test.ts` (extended): a fixture with changed text and no `revision` bump fails; the same change with a bump passes and updates the lockfile.
 - `apps/miniapp`: birth date form validation and confirmation; deck agree/disagree/skip/undo; no mode picker for `u18`; the write-access request runs when needed.
+
+**Phase 1 implementation notes (2026-10-03).** Deviations from, and additions to, the scope above:
+- **Content (docs/content-format.md is the reference):**
+  - The launch content (`questions/core.json`, `questions/dating.json`, `interests/catalog.json`) is committed exactly as authored. Authored content and the generated lockfile are excluded from Prettier; `content:check` validates them.
+  - Every §8 schema change is implemented. `release.json` is **required** (every content root declares its version), so the content tests build their fixtures programmatically instead of using static folders.
+  - The item-ID domain check (§8 called it optional) is enforced; the launch content passes it.
+  - Hidden files such as `.DS_Store` are ignored by the folder allowlist.
+  - `pnpm content:lock` rewrites the lockfile and refuses to hide a text change without a revision bump, a lowered revision, or a removed ID. The lockfile hashes texts only, not `priorAgree`, `popularity` or `audiences`.
+  - `content:check --launch` counts items **per locale** (ru 187, en 157). Counted per band × locale, `u18:en` would have only 127 items (< 150); see Q6.
+- **Seeding and startup:**
+  - `pnpm content:seed` (owner role) refuses to reuse a seeded release version for changed content, to seed an older release, or to drop a seeded ID.
+  - The server refuses to start unless the seeded release and checksum match the files. Workflow after a content change: bump `release.json`, then `pnpm content:lock` and `pnpm content:seed`.
+  - Test databases are cloned from a template that is migrated **and** seeded with the real content.
+- **Schema:**
+  - `users.locale_confirmed_at` (not in §4) records the language step.
+  - `admin_actions.id` uses `gen_random_uuid()` because the rows are written by `admin_set_birth_date()`.
+  - The band, mode and username CHECKs use `coalesce(…, false)`. Without it, a NULL `age_band` satisfied `= 'adult'`; the safety suite caught this before anything shipped.
+  - `vc_age_years()` returns NULL for a date before the birth date, and `ageOn()` throws there (found by the parity property test).
+  - `admin_set_birth_date()` is executable by the owner only. Phase 5 must grant it to `samesync_app` deliberately, together with the admin allowlist check.
+- **Under-14 (Q16):** besides `telegram_id`, `birth_date` and `status`, the account basics from Phase 0 also exist (`id`, `public_id`, `locale`, `locale_confirmed_at`, timestamps, `bot_reachable`). No profile data, answers or interests are stored (CHECK plus tests).
+- **API (additions to the scope list):**
+  - `GET /api/dating-options` serves the localized labels.
+  - `PUT /api/profile/locale` and `PUT /api/profile/mode` serve settings next to the onboarding routes.
+  - Progress counts non-skip answers among the takes in the user's current deck scope.
+  - During onboarding, interests can only be saved once the deck minimum is met.
+  - The deck draw is deterministic per user ID, so the same deck comes back on every open.
+- **Locale (Q13):** bot replies, API responses and the Mini App all use the stored `users.locale`. Telegram's `language_code` only preselects the language before a user row exists. `/start` alone creates no user row.
+- **Usernames:** refreshed from initData and bot updates for live adults only (age checked in SQL), and cleared when an adult removes theirs. Never stored for `u18` users or users without a birth date.
+- **Mini App:**
+  - The deck brings skipped cards back until 25 are answered, and stops as soon as the minimum is reached.
+  - The done screen asks for write access automatically when `allows_write_to_pm` is false, with a button as fallback.
+  - The domain tab labels mirror the content `DOMAINS` list.
+  - Initial JS is 93.9 KB gzip (budget 150 KB).
+- **Not testable yet:** "open matches stay open" when the mode changes (Q10). No matches exist before Phase 2; the flow test checks that answers and interests are kept. **Phase 2 must add the open-match assertion.**
+- **Found and fixed during Phase 1:**
+  - A root `.env` with `NODE_ENV=development` made `vite build` produce a development build (React dev runtime and the dev Telegram mock, 156.5 KB gzip). This was a Phase 0 bug in `vite.config.ts`, now covered by a regression test.
+  - The JSX i18n lint rule also flagged keys passed to `t()` in attributes; it now flags only direct attribute text.
+- **Local setup after pulling Phase 1:** run `pnpm db:migrate` and `pnpm content:seed` before `pnpm dev`. Existing users start at the language step.
 
 ---
 
@@ -701,7 +739,7 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q3. How many game questions?** "Several". *Provisional:* 5, including the closing split. *Needed by:* Phase 3.
 - **Q4. Is the opener template-based or LLM-generated, and can the user edit it?** "Pre-generated" is ambiguous, and no LLM is in the stack. An LLM would also send minors' data to a third party. *Provisional:* per-take templates in `content/`, editable before sending. *Needed by:* Phase 3.
 - **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? ✅ **Decided (2026-10-03, product owner):** 35 takes drawn per band × mode, skip allowed (≥ 25 non-skip answers required), answers editable later with effect on future matches only.
-- **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? ✅ **Decided (2026-10-03, product owner):** catalog-only (no free-text entries), 5–30 picks per user, a curated catalog maintained by the team (format: `docs/content-format.md`). **Still open:** how big the ru catalog must be at launch. *Needed by:* G2.
+- **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? ✅ **Decided (2026-10-03, product owner):** catalog-only (no free-text entries), 5–30 picks per user, a curated catalog maintained by the team (format: `docs/content-format.md`). **Still open:** how big the ru catalog must be at launch, and whether the launch check should count items per band × locale. The current launch content has 187 ru / 157 en items, but `u18:en` sees only 127 (below the 150 used per locale). *Needed by:* G2 (and G3 for `u18`).
 - **Q7. Are photos in the product at all?** ✅ **Decided (2026-10-02, product owner):** no photos anywhere in the MVP.
 - **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? *Provisional:* configurable cron, twice daily per pool, times in Europe/Moscow for ru and UTC for en. *Needed by:* Phase 2.
 - **Q9. Rematch policy.** Can an expired pair ever be matched again? *Provisional:* never (UNIQUE pair). *Needed by:* Phase 2.
