@@ -17,7 +17,7 @@ These are also part of the MVP: report, block, auto-freeze, admin commands in th
 
 Decided by the product owner:
 - TypeScript everywhere, single repo.
-- Mini App: Vite + React + Telegram Mini Apps SDK (`@tma.js/sdk-react`, PLAN.md Q32). The bundle must stay small (≤ 100 KB gzip initial JS, Q33).
+- Mini App: Vite + React + Telegram Mini Apps SDK (`@tma.js/sdk-react`, PLAN.md Q32). The bundle must stay small (≤ 150 KB gzip initial JS, Q33).
 - Backend: **one** Node process that runs the grammY bot, a lightweight HTTP API and the scheduled jobs.
 - Auth: Telegram `initData` validated on the server only. No custom login.
 - PostgreSQL with a typed ORM. **No Redis, no WebSockets.**
@@ -118,13 +118,13 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - The Telegram SDK is imported only in `src/platform/`.
   - No UI kits, no web fonts.
   - Locale JSON and content are loaded at runtime, not bundled.
-  - The size budget is enforced in CI from Phase 6 (size-limit).
+  - The size budget (≤ 150 KB gzip initial JS) is enforced in CI from Phase 6 (size-limit).
 - **Tests:** Vitest. DB tests run against real Postgres; safety tests never mock the database. Matching invariants use property-based tests (fast-check). `.only` and `.skip` are lint errors.
 - **Commits:** small, one concern each, Conventional Commits.
 
 ## Run & test
 
-Prerequisites: Node 24 (`.nvmrc`), pnpm 12 (`npm i -g pnpm@12`), Docker. The Docker CLI may only have the standalone `docker-compose` binary; it works the same as `docker compose`.
+Prerequisites: Node 24 (`.nvmrc`; use it locally too, so results match CI), pnpm 12 (`npm i -g pnpm@12`), Docker. The Docker CLI may only have the standalone `docker-compose` binary; it works the same as `docker compose`.
 
 ```bash
 pnpm install

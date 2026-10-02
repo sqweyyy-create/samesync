@@ -289,7 +289,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - **Toolchain pins:**
   - TypeScript 6.0, ESLint 10 without `eslint-plugin-react`, and pnpm 12 (see §2).
   - `eslint` is pinned to `~10.11` and `pino` to `~10.3.1` because 10.12.0 and 10.4.0 were published inside pnpm's minimum-release-age window. Bump them once they age.
-  - Local verification ran on Node 26.8.1; CI and `.nvmrc` target Node 24.
+  - **Local development must use Node 24 (per `.nvmrc`), matching CI.** Phase 0 itself was verified locally on Node 26.8.1 and in CI on Node 24; from now on run everything locally on Node 24 so local and CI results are comparable.
 - **App role bootstrap:**
   - Migration `0001_app_role` creates `samesync_app` NOLOGIN (no passwords in migrations) and grants SELECT/INSERT/UPDATE on `users` (no DELETE).
   - The login is set by `infra/postgres/init/01-app-role.sh` locally and by the hosting provider in production (Phase 6).
@@ -635,7 +635,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - empty, loading and error states for every screen;
   - copy review in ru and en;
   - checks on iOS, Android and Desktop Telegram;
-  - CI: a size-limit bundle budget step (moved from Phase 0): ≤ 100 KB gzip of initial JS (Q33, decided).
+  - CI: a size-limit bundle budget step (moved from Phase 0): ≤ 150 KB gzip of initial JS (Q33, decided).
 - Deployment:
   - a multi-stage Dockerfile building one image that serves the API, `/tg/webhook` (checks `X-Telegram-Bot-Api-Secret-Token`) and the static Mini App;
   - `pnpm db:migrate` runs as a release step before start;
@@ -654,7 +654,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - [ ] In staging, buying the placeholder product works end-to-end (a real 1-Star purchase, refunded with `/refund`). A duplicate `successful_payment` grants the entitlement once; a refund revokes it.
 - [ ] Pre-checkout rejects frozen users, an unknown or disabled product, an amount mismatch, and `u18` users while purchases are off for them.
 - [ ] Free-tier limits are enforced in matching and shown correctly in the Mini App.
-- [ ] Every screen passes a manual check in light and dark themes on three Telegram clients. The bundle stays within budget, enforced by the size-limit CI step.
+- [ ] Every screen passes a manual check in light and dark themes on three Telegram clients. Initial JS stays within the 150 KB gzip budget (Q33), enforced by the size-limit CI step.
 - [ ] Production runs as one container with the webhook secret checked, migrations applied by the release step, a successful backup restore drill, no PII in a sampled day of logs, and `U18_POOL_ENABLED=false` unless §7 G3 is signed off.
 
 **Tests that prove it**
@@ -666,7 +666,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/src/domain/limits/quota.test.ts`, plus a matching integration test showing quotas and entitlements change eligibility.
 - `apps/server/test/http/webhook-secret.test.ts`: a missing or wrong secret gets 401, and the update is not processed.
 - `apps/server/test/logging/redaction.test.ts`: the redacted fields never appear in log output.
-- CI: build the Docker image and smoke-test it (container starts, `/healthz` returns 200 against a CI Postgres), plus the size-limit budget.
+- CI: build the Docker image and smoke-test it (container starts, `/healthz` returns 200 against a CI Postgres), plus the size-limit budget (≤ 150 KB gzip initial JS).
 
 ---
 
@@ -736,7 +736,7 @@ Each question lists a *provisional* default used until it is answered (implement
 
 **Technical**
 - **Q32. Which "official Telegram Mini Apps SDK"?** Telegram's own client library is the `telegram-web-app.js` script (`window.Telegram.WebApp`: no npm package, no tree-shaking). The React SDK most projects use is the community-maintained tma.js project, whose npm scope has moved between `@telegram-apps/*` and `@tma.js/*`. ✅ **Decided (2026-10-02, product owner):** `@tma.js/sdk-react`, wrapped in `apps/miniapp/src/platform/` so it can be swapped. **Verified in Phase 0 (2026-10-03):** `@tma.js/sdk-react@3.0.23` on `@tma.js/sdk@3.3.0`; neither it nor `@telegram-apps/sdk-react` is deprecated on npm, so the decision stands. The subset we use (`init`, `isTMA`, `retrieveRawInitData`, `themeParams`, `miniApp`) costs ≈ 23 KB gzip. `mockTelegramEnv` (dev browser mode) is stripped from production builds (verified by an A/B build).
-- **Q33. Bundle budget.** ✅ **Decided (2026-10-02, product owner):** ≤ 100 KB gzip for initial JS, enforced by a size-limit CI step from Phase 6. **Phase 0 measurement (2026-10-03):** initial JS is 88.5 KB gzip, of which React 19.3 + ReactDOM is ≈ 67 KB (not the ~45 KB this plan first assumed) and the SDK ≈ 23 KB. That leaves only ≈ 11.5 KB for all product UI in Phases 1–5. **Flag for the product owner:** the budget will likely be exceeded; options are raising it, code-splitting screens (initial JS only), or swapping React for Preact via `preact/compat`.
+- **Q33. Bundle budget.** ✅ **Decided (2026-10-03, product owner):** ≤ **150 KB gzip** for initial JS (raised from the provisional 100 KB of 2026-10-02), because React 19 + ReactDOM alone take ≈ 67 KB gzip. Enforced by a size-limit CI step from Phase 6. **Phase 0 measurement (2026-10-03):** initial JS is 88.5 KB gzip (React 19.3 + ReactDOM ≈ 67 KB, SDK ≈ 23 KB), which leaves ≈ 61.5 KB for the product UI of Phases 1–5. Code-splitting screens out of the initial chunk stays the first tool if that gets tight.
 
 ## 9. Main risks
 
