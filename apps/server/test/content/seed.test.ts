@@ -12,6 +12,7 @@ import { birthDateYearsAgo, insertUser } from '../support/users';
 
 let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
 let owner: pg.Pool;
+let app: pg.Pool;
 let bundle: ContentBundle;
 const tmp: string[] = [];
 
@@ -19,10 +20,11 @@ beforeAll(async () => {
   db = await createEmptyDatabase();
   await runMigrations(db.url);
   owner = new pg.Pool({ connectionString: db.url, max: 2 });
+  app = appRolePool(db.url);
   bundle = await loadValidContent(DEFAULT_CONTENT_DIR);
 });
 afterAll(async () => {
-  await owner.end();
+  await Promise.all([owner.end(), app.end()]);
   await db.drop();
   for (const dir of tmp) rmSync(dir, { recursive: true, force: true });
 });
@@ -57,7 +59,7 @@ describe('pnpm content:seed', () => {
 
   it('retires a question in a new release and keeps existing answers', async () => {
     const question = bundle.questions[0]!;
-    const { id: userId } = await insertUser(appRolePool(db.url), {
+    const { id: userId } = await insertUser(app, {
       birthDate: birthDateYearsAgo(20),
       mode: 'friends',
     });
