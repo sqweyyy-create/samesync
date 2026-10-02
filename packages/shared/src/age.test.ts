@@ -29,6 +29,11 @@ describe('ageOn', () => {
     });
   });
 
+  it('throws for a date before the birth date (there is no age)', () => {
+    expect(() => ageOn('2010-06-15', '2010-06-14')).toThrow(/before the birth date/);
+    expect(ageOn('2010-06-15', '2010-06-15')).toBe(0);
+  });
+
   it('throws on invalid dates instead of guessing', () => {
     expect(() => ageOn('2010-02-30', '2026-01-01')).toThrow(/not a valid/);
     expect(() => ageOn('2010-01-01', '01.01.2026')).toThrow(/not a valid/);

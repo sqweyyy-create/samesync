@@ -52,10 +52,14 @@ function mustParse(value: string): CalendarDate {
   return date;
 }
 
-/** Completed years between `birthDate` and `onDate` (both `YYYY-MM-DD`). */
+/**
+ * Completed years between `birthDate` and `onDate` (both `YYYY-MM-DD`). Throws if `onDate` is
+ * before `birthDate`: there is no age then (the SQL twin returns NULL).
+ */
 export function ageOn(birthDate: string, onDate: string): number {
   const birth = mustParse(birthDate);
   const on = mustParse(onDate);
+  if (compare(on, birth) < 0) throw new Error(`${onDate} is before the birth date ${birthDate}`);
   let { month, day } = birth;
   if (month === 2 && day === 29 && !isLeapYear(on.year)) {
     month = 3;
