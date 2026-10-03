@@ -58,6 +58,19 @@ export interface UsersRepository {
    * the bot, true again once they talk to it. Unreachable users are not matched.
    */
   setBotReachable(telegramId: number, reachable: boolean): Promise<void>;
+  /** Users whose cached `age_band` no longer follows their birth date (a birthday has passed). */
+  staleBandUserIds(): Promise<string[]>;
+  /**
+   * Rewrites the `age_band` cache of one user from the birth date. If the band changed, the
+   * state-change trigger closes their open matches and cancels their notifications in the same
+   * transaction (CLAUDE.md invariant 4).
+   */
+  reconcileBand(userId: string): Promise<void>;
+  /**
+   * Waitlisted users whose pool is open become active: adults always (someone who turned 18 on
+   * the waitlist joins the adult pool), u18 users only while the u18 pool is enabled.
+   */
+  activateWaitlisted(u18PoolEnabled: boolean): Promise<number>;
   /** Q16: an ineligible user whose live age reached 14 continues onboarding. */
   reopenIfFourteen(userId: string): Promise<UserRecord | null>;
   confirmLocale(userId: string, locale: Locale, now: Date): Promise<UserRecord>;
@@ -153,6 +166,40 @@ export function createUsersRepository(db: Db): UsersRepository {
         .update(users)
         .set({ botReachable: reachable })
         .where(and(eq(users.telegramId, telegramId), ne(users.botReachable, reachable)));
+    },
+
+    async staleBandUserIds() {
+      const rows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          sql`${users.birthDate} IS NOT NULL AND ${users.ageBand} IS DISTINCT FROM vc_band(${users.birthDate}, vc_today())`,
+        );
+      return rows.map((r) => r.id);
+    },
+
+    async reconcileBand(userId) {
+      // The BEFORE trigger derives the value; this write is what makes the triggers run.
+      await db
+        .update(users)
+        .set({ ageBand: sql`vc_band(${users.birthDate}, vc_today())` })
+        .where(eq(users.id, userId));
+    },
+
+    async activateWaitlisted(u18PoolEnabled) {
+      const rows = await db
+        .update(users)
+        .set({ status: 'active' })
+        .where(
+          and(
+            eq(users.status, 'waitlisted'),
+            u18PoolEnabled
+              ? sql`vc_band(${users.birthDate}, vc_today()) IS NOT NULL`
+              : sql`coalesce(vc_band(${users.birthDate}, vc_today()) = 'adult', false)`,
+          ),
+        )
+        .returning({ id: users.id });
+      return rows.length;
     },
 
     async reopenIfFourteen(userId) {
