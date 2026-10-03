@@ -42,6 +42,8 @@ export function utcDate(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
 function compare(a: CalendarDate, b: CalendarDate): number {
   return a.year - b.year || a.month - b.month || a.day - b.day;
 }
@@ -67,6 +69,29 @@ export function ageOn(birthDate: string, onDate: string): number {
   }
   const hadBirthday = on.month > month || (on.month === month && on.day >= day);
   return on.year - birth.year - (hadBirthday ? 0 : 1);
+}
+
+/** The `n`th birthday as `YYYY-MM-DD`, by the same Q15 rule as `ageOn` (Feb 29 → Mar 1). */
+export function nthBirthday(birthDate: string, n: number): string {
+  const birth = mustParse(birthDate);
+  const year = birth.year + n;
+  const moved = birth.month === 2 && birth.day === 29 && !isLeapYear(year);
+  const month = moved ? 3 : birth.month;
+  const day = moved ? 1 : birth.day;
+  return [String(year).padStart(4, '0'), pad2(month), pad2(day)].join('-');
+}
+
+/**
+ * True when two birth dates are at most `years` calendar years apart (PLAN.md Q14: the gap never
+ * changes over time). The younger person is born no later than the older one's `years`-th
+ * birthday. The SQL twin is `vc_within_years()`; a property test checks that both agree.
+ */
+export function birthDatesWithinYears(a: string, b: string, years: number): boolean {
+  mustParse(a);
+  mustParse(b);
+  // ISO dates with 4-digit years sort as text.
+  const [earlier, later] = a <= b ? [a, b] : [b, a];
+  return later <= nthBirthday(earlier, years);
 }
 
 /** `u18` for 14–17, `adult` for 18+, null below 14 (no profile, no matching). */
