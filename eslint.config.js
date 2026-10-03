@@ -79,6 +79,7 @@ export default defineConfig(
             'expectDenied',
             'expectError',
             'expectParity',
+            'expectRejected',
             'fc.assert',
           ],
         },

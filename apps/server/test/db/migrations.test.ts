@@ -134,6 +134,49 @@ describe('migrations', () => {
       await expectDenied('DELETE FROM admin_actions');
     });
 
+    it('can create matches and change their lifecycle columns only, and never delete them', async () => {
+      await app.query('SELECT 1 FROM matches');
+      await app.query("UPDATE matches SET status = 'active' WHERE false");
+      await expectDenied('UPDATE matches SET user_b_id = user_b_id');
+      await expectDenied("UPDATE matches SET band = 'adult'");
+      await expectDenied("UPDATE matches SET teaser = '{}'");
+      await expectDenied('DELETE FROM matches');
+      await expectDenied('TRUNCATE matches CASCADE');
+      await expectDenied('ALTER TABLE matches DISABLE TRIGGER matches_10_guard_insert');
+      await expectDenied('ALTER TABLE users DISABLE TRIGGER users_90_close_matches');
+    });
+
+    it('can write runs, the outbox and game shells, but not delete them', async () => {
+      for (const table of ['match_runs', 'outbox', 'games']) {
+        await app.query(`SELECT 1 FROM ${table}`);
+        await expectDenied(`DELETE FROM ${table}`);
+      }
+      await app.query("UPDATE outbox SET status = 'pending' WHERE false");
+      await app.query('UPDATE match_runs SET pairs_created = 0 WHERE false');
+      await expectDenied('UPDATE games SET created_at = now()');
+    });
+
+    it('can only read blocks (they are written from Phase 5)', async () => {
+      await app.query('SELECT 1 FROM blocks');
+      await expectDenied(
+        'INSERT INTO blocks (blocker_id, blocked_id) VALUES (gen_random_uuid(), gen_random_uuid())',
+      );
+      await expectDenied('DELETE FROM blocks');
+    });
+
+    it('can replace the derived feature statistics', async () => {
+      await app.query(
+        "INSERT INTO feature_stats (band, locale, feature_key, n_users, pool_size, weight, computed_at) VALUES ('adult', 'ru', 'i:test', 1, 2, 0.5, now())",
+      );
+      await app.query("DELETE FROM feature_stats WHERE band = 'adult' AND locale = 'ru'");
+      await expectDenied('UPDATE feature_stats SET weight = 0');
+    });
+
+    it('cannot call the trigger functions or the admin function directly', async () => {
+      await expectDenied('SELECT matches_guard_insert()');
+      await expectDenied('SELECT users_close_matches_on_state_change()');
+    });
+
     it('cannot read the migrations journal', async () => {
       await expectDenied('select * from drizzle.__drizzle_migrations');
     });

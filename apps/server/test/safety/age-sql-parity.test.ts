@@ -1,8 +1,9 @@
 /**
  * SAFETY SUITE — ages and bands agree between TypeScript (ageOn/bandFor) and SQL
  * (vc_age_years/vc_band), so the app and the DB triggers always put a user in the same band.
+ * The same holds for the u18 two-year rule (birthDatesWithinYears / vc_within_years, Q14).
  */
-import { ageOn, bandFor, utcDate } from '@samesync/shared';
+import { ageOn, bandFor, birthDatesWithinYears, utcDate } from '@samesync/shared';
 import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../support/db';
@@ -141,5 +142,89 @@ describe('ageOn() equals vc_age_years() and bandFor() equals vc_band()', () => {
     const before = utcDate(new Date(Date.now() - 1000));
     const after = utcDate(new Date(Date.now() + 1000));
     expect([before, after]).toContain(rows[0]?.today);
+  });
+});
+
+describe('birthDatesWithinYears() equals vc_within_years() (Q14: at most 2 calendar years apart)', () => {
+  async function expectSameGapRule(pairs: ReadonlyArray<readonly [string, string]>) {
+    const { rows } = await testDb.appPool.query<{ within: boolean; reversed: boolean }>(
+      `SELECT vc_within_years(a::date, b::date, 2) AS within, vc_within_years(b::date, a::date, 2) AS reversed
+         FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS t(a, b, n) ORDER BY n`,
+      [pairs.map((p) => p[0]), pairs.map((p) => p[1])],
+    );
+    pairs.forEach(([a, b], i) => {
+      const ts = birthDatesWithinYears(a, b, 2);
+      expect({ a, b, within: rows[i]?.within, reversed: rows[i]?.reversed }).toEqual({
+        a,
+        b,
+        within: ts,
+        reversed: ts,
+      });
+    });
+  }
+
+  /** Two birth dates up to about four years apart, in either order. */
+  const nearbyBirthDates = fc
+    .tuple(
+      fc.integer({ min: Date.UTC(1990, 0, 1), max: Date.UTC(2016, 11, 31) }),
+      fc.integer({ min: -4 * 366, max: 4 * 366 }),
+    )
+    .map(([first, offsetDays]) => [iso(first), iso(first + offsetDays * DAY)] as const);
+
+  /** The other birth date lands exactly 2 years later, give or take a day. */
+  const aroundTwoYears = fc
+    .tuple(
+      fc.integer({ min: Date.UTC(1990, 0, 1), max: Date.UTC(2016, 11, 31) }),
+      fc.constantFrom(-1, 0, 1),
+    )
+    .map(([first, shift]) => {
+      const later = new Date(first);
+      later.setUTCFullYear(later.getUTCFullYear() + 2);
+      return [iso(first), iso(later.getTime() + shift * DAY)] as const;
+    });
+
+  it('on ≥ 1,000 random pairs of birth dates', async () => {
+    let checked = 0;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(nearbyBirthDates, { minLength: 250, maxLength: 250 }),
+        async (pairs) => {
+          checked += pairs.length;
+          await expectSameGapRule(pairs);
+        },
+      ),
+      { numRuns: 5 },
+    );
+    expect(checked).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('exactly at the two-year boundary', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(aroundTwoYears, { minLength: 200, maxLength: 200 }),
+        expectSameGapRule,
+      ),
+      { numRuns: 5 },
+    );
+  });
+
+  it('on fixed edge dates, including Feb 29 births', async () => {
+    await expectSameGapRule([
+      ['2010-06-15', '2010-06-15'],
+      ['2010-06-15', '2012-06-15'],
+      ['2010-06-15', '2012-06-16'],
+      ['2008-02-29', '2010-02-28'],
+      ['2008-02-29', '2010-03-01'],
+      ['2008-02-29', '2010-03-02'],
+      ['2008-02-28', '2010-02-28'],
+      ['2008-02-28', '2010-03-01'],
+      ['2010-03-01', '2012-02-29'],
+      ['2010-03-01', '2012-03-01'],
+      ['2010-03-01', '2012-03-02'],
+      ['2009-12-31', '2011-12-31'],
+      ['2009-12-31', '2012-01-01'],
+    ]);
+    expect(birthDatesWithinYears('2008-02-29', '2010-03-01', 2)).toBe(true);
+    expect(birthDatesWithinYears('2008-02-29', '2010-03-02', 2)).toBe(false);
   });
 });
