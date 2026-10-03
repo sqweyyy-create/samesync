@@ -32,6 +32,10 @@ afterAll(async () => {
 const seed = (b: ContentBundle) => seedContent(owner, b, contentChecksum(b));
 const count = async (table: string) =>
   Number((await owner.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`)).rows[0]?.n);
+/** Releases that don't depend on the committed content version: one later than it, and more. */
+const NEXT_RELEASE = '2098.01.1';
+const LATER_RELEASE = '2098.01.2';
+const NEVER_SEEDED = '2099.01.1';
 const withRelease = (b: ContentBundle, version: string): ContentBundle => ({
   ...b,
   release: { schemaVersion: 1, version },
@@ -71,36 +75,36 @@ describe('pnpm content:seed', () => {
       {
         ...bundle,
         questions: bundle.questions.map((q) =>
-          q.id === question.id ? { ...q, retiredIn: '2026.10.2' } : q,
+          q.id === question.id ? { ...q, retiredIn: NEXT_RELEASE } : q,
         ),
       },
-      '2026.10.2',
+      NEXT_RELEASE,
     );
-    expect(await seed(retired)).toEqual({ status: 'seeded', version: '2026.10.2' });
+    expect(await seed(retired)).toEqual({ status: 'seeded', version: NEXT_RELEASE });
     const { rows } = await owner.query<{ retired_in: string; added_in: string }>(
       'SELECT retired_in, added_in FROM questions WHERE id = $1',
       [question.id],
     );
-    expect(rows[0]).toEqual({ retired_in: '2026.10.2', added_in: bundle.release!.version });
+    expect(rows[0]).toEqual({ retired_in: NEXT_RELEASE, added_in: bundle.release!.version });
     expect(await count('answers')).toBe(1);
   });
 
   it('refuses an older release than one already seeded', async () => {
     await expect(seed(withRelease(bundle, '2026.09.9'))).rejects.toThrow(
-      /older than the already seeded release 2026.10.2/,
+      new RegExp(`older than the already seeded release ${NEXT_RELEASE.replaceAll('.', '\\.')}`),
     );
   });
 
   it('refuses to drop an ID that is already seeded', async () => {
-    const dropped = withRelease({ ...bundle, items: bundle.items.slice(1) }, '2026.10.3');
+    const dropped = withRelease({ ...bundle, items: bundle.items.slice(1) }, LATER_RELEASE);
     await expect(seed(dropped)).rejects.toThrow(/IDs are permanent/);
   });
 
   it('assertContentSeeded rejects a release that was never seeded or a different checksum', async () => {
-    await expect(assertContentSeeded(owner, '2099.01.1', 'x')).rejects.toThrow(
+    await expect(assertContentSeeded(owner, NEVER_SEEDED, 'x')).rejects.toThrow(
       /not seeded: run pnpm content:seed/,
     );
-    await expect(assertContentSeeded(owner, '2026.10.2', 'not-the-checksum')).rejects.toThrow(
+    await expect(assertContentSeeded(owner, NEXT_RELEASE, 'not-the-checksum')).rejects.toThrow(
       /content changed/,
     );
   });

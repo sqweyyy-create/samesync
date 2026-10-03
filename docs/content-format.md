@@ -2,8 +2,9 @@
 
 This is the reference for writing SameSync's content files: the "hot takes" users swipe on, and the interest catalog they pick from. You can author valid files from this page alone, without reading any code.
 
-- **Applies to:** schema version `1` as extended in Phase 1 (`revision`, `retiredIn`, `searchTerms`, dating options, `release.json`, `content.lock.json`). Checked against the repository on 2026-10-03.
+- **Applies to:** schema version `1` as extended in Phase 1 (`revision`, `retiredIn`, `searchTerms`, dating options, `release.json`, `content.lock.json`) and Phase 2 (chat aliases are required). Checked against the repository on 2026-10-03.
 - **What onboarding (Phase 1) uses:** sections 3 (takes), 4 (interest catalog) and 5 (dating options), plus the release and lockfile workflow in section 7.
+- **What matching (Phase 2) uses:** the same takes and catalog (including `priorAgree` and `popularity`), and the chat aliases in section 6. Match teasers show take texts and item and category names, so see "How teasers use your text" in sections 3 and 4.
 - Fields added in Phase 1 are optional with defaults, so files written before Phase 1 stay valid.
 
 ## 1. Basics
@@ -79,7 +80,7 @@ Every entry has an `id`, for example `q.pineapple_pizza` or `i.music.molchat_dom
 ### Rules
 
 - **Unique across all content.** No two entries may share an ID, even in different files or of different kinds.
-- **Permanent.** IDs are stored in the database: users' answers, their picked interests, their dating options. So once an ID has been published:
+- **Permanent.** IDs are stored in the database: users' answers, their picked interests, their dating options, and the teaser and aliases of every match. So once an ID has been published:
   - never rename it;
   - never reuse it for something else, even after the entry is removed;
   - never change what it means. "Pineapple on pizza is fine" can't become "Pineapple on pizza is gross" under the same ID. Create a new ID and **retire** the old one with `retiredIn` (section 7).
@@ -131,6 +132,8 @@ File structure:
 - Short enough for a phone card: aim for 90 characters or fewer (120 is the hard limit).
 - Specific beats generic: "Голосовые длиннее минуты — преступление" works better than "Люблю общаться".
 - No hate, sexual content, or questions about health or politics that identify a person. Content for `u18` gets an extra review.
+
+**How teasers use your text (Phase 2).** When two matched users are on the same side of a take, the match teaser quotes the statement as it is: «Вы сходитесь во мнении: «Ананасы на пицце — это нормально» — вы за.» / "You see it the same way: “Pineapple on pizza is fine” — you both agree." So write a statement that still reads well inside quotation marks, with no final full stop.
 
 **Deck sizes (Phase 1, decided in PLAN.md Q5).**
 - Each user sees **35 takes**, drawn for their age band and mode. They can skip some but must answer at least 25.
@@ -229,6 +232,8 @@ Domains: `music` (artists, bands, genres), `games` (video and tabletop games), `
 | `niche` | Small, specific fandom; sharing it says a lot (a local underground band, an obscure meme) | ≈ 1% |
 
 If unsure, use `known`. Overrating mainstream items as `niche` produces bad matches, so err towards `mainstream` for anything widely known.
+
+**How teasers use your text (Phase 2).** A match teaser names what two users share: an item, or in broader matches a category. The name is put after a fixed phrase, unchanged: «У кого-то в плейлисте тоже Молчат Дома.», «У кого-то на книжной полке тоже Достоевский.», «Кто-то тоже любит такие игры: Инди-игры.» So keep every Russian name in its dictionary form (nominative), as in the examples, and don't add a full stop.
 
 **Catalog size.** Launch-shaped content needs at least 150 active items across at least 4 domains **in each locale** (`content:check --launch`, section 8). The final launch size is still open (PLAN.md Q6).
 
@@ -334,9 +339,9 @@ There must be at least two options that aren't retired. The decided list (Q11) i
 }
 ```
 
-## 6. Other file types (not needed for Phase 1)
+## 6. Other file types
 
-These are already defined and checked, so files of these types must be valid today, but onboarding doesn't use them. Each entry also accepts `revision` (section 2).
+Chat aliases are used from Phase 2. Openers and products are already defined and checked, so files of these types must be valid today, but nothing uses them yet. Each entry also accepts `revision` (section 2).
 
 ### Openers (`content/openers/*.json`): Phase 3
 
@@ -376,15 +381,21 @@ The pre-written first message suggested after the game, written from the sender'
 }
 ```
 
-### Chat aliases (`content/aliases/*.json`): Phase 2
+### Chat aliases (`content/aliases/*.json`): used from Phase 2
 
-Anonymous display names in chats.
+Anonymous display names. Every match gives its two users two different aliases, for example "🦦 Выдра" and "🦊 Лиса": each of them sees the other under that name. The aliases are picked at random for each match, avoiding names a person already sees in their other open matches.
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
-| `id` | string | yes | Prefix `a.` |
+| `id` | string | yes | Prefix `a.`; permanent, because it's stored with every match |
 | `emoji` | string | yes | 1–16 characters (counted in UTF-16 code units; one emoji is usually 2–8) |
-| `text` | localized text | yes, `ru` and `en` | The name. Russian may use any gender. It names an animal, not the user |
+| `text` | localized text | yes, `ru` and `en` | The name. Russian may use any gender. It names an animal, not the user. At most 40 characters |
+
+- There must be **at least two** aliases. Launch-sized content needs **at least 12** (`content:check --launch`): a user can have 5 open matches at once, each under a different name.
+- Aliases can't be retired or removed once published. To stop using a name, ask a developer.
+- Pick friendly, neutral names. Avoid animals that read as an insult in either language.
+
+The committed file has 32 aliases; the example shows three:
 
 <!-- content-example: aliases/animals.json -->
 ```json
@@ -476,7 +487,7 @@ Set `"retiredIn": "<current release version>"` on the entry and keep it in the f
 Run it from the repository root. It needs Node 24 and pnpm 12 (see `CLAUDE.md`). When everything is valid it prints one summary line (after pnpm's own command echo):
 
 ```
-content:check OK (release 2026.10.1): 67 questions, 31 categories, 187 items, 2 dating options, 2 openers, 3 aliases, 1 products
+content:check OK (release 2026.10.2): 67 questions, 31 categories, 187 items, 2 dating options, 2 openers, 32 aliases, 1 products
 ```
 
 Otherwise it exits with an error and prints one line per problem, named by file (for format errors) or by content ID (for cross-file errors):
@@ -509,14 +520,15 @@ A format error rejects **the whole file**: none of its entries are loaded. Anyth
    - `searchTerms` only for the item's locales.
 9. Length limits, counted in characters (an emoji counts as one):
    - take text ≤ 120;
-   - category, item and dating-option names ≤ 40;
+   - category, item, dating-option and alias names ≤ 40;
    - search terms ≤ 40.
-10. At least two dating options that aren't retired.
+10. At least two dating options that aren't retired, and at least two chat aliases.
 11. The lockfile: no text change without a revision bump, no lowered revision, no removed ID, and the lockfile is up to date.
 
 **`pnpm content:check --launch`** runs all of the above and also checks that the content is big enough to launch, counting only entries that aren't retired:
 - ≥ 35 takes for each deck: `u18`+`friends`, `adult`+`friends` and `adult`+`dating`, each in `ru` and `en`;
-- ≥ 150 items across ≥ 4 domains in each locale.
+- ≥ 150 items across ≥ 4 domains in each locale;
+- ≥ 12 chat aliases.
 
 The small test fixtures only need to pass the normal check; the committed content must pass both.
 

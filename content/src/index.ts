@@ -7,6 +7,7 @@ import {
   DECKS,
   LAUNCH,
   LIMITS,
+  MIN_ALIASES,
   type ContentBundle,
   type ContentIssue,
 } from './check';
@@ -20,6 +21,7 @@ export {
   DECKS,
   LAUNCH,
   LIMITS,
+  MIN_ALIASES,
   loadContent,
   LOCK_FILE,
   type ContentBundle,

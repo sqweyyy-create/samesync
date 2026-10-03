@@ -36,8 +36,19 @@ export interface ContentIssue {
 /** Length limits, in characters (Unicode code points), so texts fit on cards and chips. */
 export const LIMITS = { takeText: 120, name: 40, searchTerm: 40 } as const;
 
-/** Launch coverage minimums (Q5, PLAN.md Phase 1). Counted over entries that are not retired. */
-export const LAUNCH = { takesPerDeck: 35, itemsPerLocale: 150, domainsPerLocale: 4 } as const;
+/**
+ * Launch coverage minimums (Q5, PLAN.md Phase 1). Counted over entries that are not retired.
+ * Aliases: a user can have 5 open matches (Q27), each under a different name, with room to spare.
+ */
+export const LAUNCH = {
+  takesPerDeck: 35,
+  itemsPerLocale: 150,
+  domainsPerLocale: 4,
+  aliases: 12,
+} as const;
+
+/** A match gives its two users different anonymous names, so matching needs at least two. */
+export const MIN_ALIASES = 2;
 
 /** The decks users can actually get: `u18` users only ever use friends mode. */
 export const DECKS: ReadonlyArray<{ band: Band; mode: Mode }> = [
@@ -177,7 +188,13 @@ export function checkContent(bundle: ContentBundle): ContentIssue[] {
     requireLocales(opener.id, 'text', opener.text, question.locales);
   }
 
-  for (const alias of bundle.aliases) requireLocales(alias.id, 'text', alias.text, LOCALES);
+  for (const alias of bundle.aliases) {
+    requireLocales(alias.id, 'text', alias.text, LOCALES);
+    limitLength(alias.id, 'text', alias.text, LIMITS.name);
+  }
+  if (bundle.aliases.length < MIN_ALIASES) {
+    report('aliases', `needs at least ${MIN_ALIASES} chat aliases (content/aliases/*.json)`);
+  }
   for (const product of bundle.products) {
     requireLocales(product.id, 'title', product.title, LOCALES);
     requireLocales(product.id, 'description', product.description, LOCALES);
@@ -213,6 +230,12 @@ export function checkLaunchCoverage(bundle: ContentBundle): ContentIssue[] {
         message: `has ${items.length} items across ${domains.size} domains (needs ≥ ${LAUNCH.itemsPerLocale} items across ≥ ${LAUNCH.domainsPerLocale} domains)`,
       });
     }
+  }
+  if (bundle.aliases.length < LAUNCH.aliases) {
+    issues.push({
+      id: 'aliases',
+      message: `has ${bundle.aliases.length} chat aliases (needs ≥ ${LAUNCH.aliases})`,
+    });
   }
   return issues;
 }

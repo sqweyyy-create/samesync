@@ -1,9 +1,73 @@
 {
   "schemaVersion": 1,
   "entries": {
+    "a.bear": {
+      "revision": 1,
+      "hash": "f004357be27ca73ce6113c894389727d19d327f6b7546e98ad2dc9f566dcd716"
+    },
+    "a.beaver": {
+      "revision": 1,
+      "hash": "f0edf00ed77d9ad18a05de2fd10ac520c8a83ac7df071097294df588c6427820"
+    },
+    "a.bee": {
+      "revision": 1,
+      "hash": "ed41be00a7e0a655064a0e2cfcc475af2047906103a228592a2506614fcd4d59"
+    },
+    "a.butterfly": {
+      "revision": 1,
+      "hash": "c7cd961db9935f1fbd40325fb7c30dec74029e3bbeeab3d9907e6cad6ff549b7"
+    },
+    "a.cat": {
+      "revision": 1,
+      "hash": "f075f846ed872d258ca781fb1820ea379d55e939fa09bf5ef0c002b02bb86f0d"
+    },
+    "a.deer": {
+      "revision": 1,
+      "hash": "1411f4e40ddc33de668e8eee5e401786a65315e60f9301a3b593207437f6e140"
+    },
+    "a.dolphin": {
+      "revision": 1,
+      "hash": "f71aef7e6404a632435459788b292e4cb485e69ea963c268dcf5ec169bb6eac7"
+    },
+    "a.eagle": {
+      "revision": 1,
+      "hash": "e854cab20b7e94e0771fac6c75fd40996cb88096d088726e42604edfe98bd0d4"
+    },
+    "a.flamingo": {
+      "revision": 1,
+      "hash": "7c97a2efdd10d201ef456fcfd79c4f67e3baec19712c4756d0c9594a44dae34a"
+    },
     "a.fox": {
       "revision": 1,
       "hash": "84bf451932f184abe1991b2d85426a6b7829640ea991d23766ceb120bd99b054"
+    },
+    "a.giraffe": {
+      "revision": 1,
+      "hash": "cfa0ebcbaa5caeee279dcd45bf089749ca5c6f2e9434c16e0e9c7376ab9b7070"
+    },
+    "a.hedgehog": {
+      "revision": 1,
+      "hash": "4ce5331f186adf3f676f0ca26f21eb34057d1cb0406c539984b9d5213ec3a872"
+    },
+    "a.kangaroo": {
+      "revision": 1,
+      "hash": "9fac0a66628d54cffbc97bed3ca9f778c067c2b527fc035121dd3d8a53a8fce4"
+    },
+    "a.koala": {
+      "revision": 1,
+      "hash": "d4adaa6f075b44031b9d3fe7a097eed480e7440d44c14764ed0b63e17d6e5be9"
+    },
+    "a.lion": {
+      "revision": 1,
+      "hash": "b11a1c47291bc001bed72600da110da1e932255742421024c9f581ace24b655c"
+    },
+    "a.llama": {
+      "revision": 1,
+      "hash": "7c3d8e564fed0f9633a2d17751f5711e023ffff6eb2daa406c3c9a999410676b"
+    },
+    "a.octopus": {
+      "revision": 1,
+      "hash": "f1bffd42cf43d827770120a600ff2808805ed85612dbbe8385a19f9331cbaef3"
     },
     "a.otter": {
       "revision": 1,
@@ -12,6 +76,58 @@
     "a.owl": {
       "revision": 1,
       "hash": "46003d4db02846210a7579ac4114c64a7c7a04b84a3da5d052888931697f320d"
+    },
+    "a.panda": {
+      "revision": 1,
+      "hash": "1e42d39a0a1688c0c0d496c29d8d9aa2704cf918b8193d2ded222c87960a658c"
+    },
+    "a.parrot": {
+      "revision": 1,
+      "hash": "ca98d874f794a97ac963d0b1ba3cb3c2e6b564179c8521f8a769fd24d971f072"
+    },
+    "a.penguin": {
+      "revision": 1,
+      "hash": "57e06505241b38133ec671a425afa35dd88d79f77e3b9249eb6a1b16b7fd12a0"
+    },
+    "a.rabbit": {
+      "revision": 1,
+      "hash": "e4b4474ea241d4334e2053a8c0c113a6830fa3a66f782f0e1807e94aedf18fd7"
+    },
+    "a.raccoon": {
+      "revision": 1,
+      "hash": "19667efb090be18a0abdc75058e504650efc0bffc8bc8c20367e5c31b71eaa9b"
+    },
+    "a.seal": {
+      "revision": 1,
+      "hash": "db2e9ffdc7e9663eb35f1107d8ef5e33bee454e3002b2dcd258eabbeb7ae8563"
+    },
+    "a.sloth": {
+      "revision": 1,
+      "hash": "c095840ef84ff32ac26c95120f7dd638e3a5a85e987e7c133407e5116d4575fb"
+    },
+    "a.squirrel": {
+      "revision": 1,
+      "hash": "4dee19e55015d6e27c928ae6ede75ecee2c591cac99d4781f5e551a6d74343ad"
+    },
+    "a.swan": {
+      "revision": 1,
+      "hash": "c9086107c3c2db66dc16fdba5ab3698261e42f370cff0de6e546f678854acba8"
+    },
+    "a.tiger": {
+      "revision": 1,
+      "hash": "bb05aa6c8c3fc5d48ec65bc14da0169a212996d451f050831cf06b7c8a7eb2fa"
+    },
+    "a.turtle": {
+      "revision": 1,
+      "hash": "94cdb5ee21e89cece824ca50b9d984f7fbb99aba8d9d02e18372ac6459008893"
+    },
+    "a.whale": {
+      "revision": 1,
+      "hash": "9f142f6b6016bab283248659ed105b61fb73f92ae7d8e86438e47c04f66d339c"
+    },
+    "a.wolf": {
+      "revision": 1,
+      "hash": "47887a564e840ae1244c4ce9b2f9a80172b5102542b625a9a5f5888dfc7c27f9"
     },
     "c.books.classics": {
       "revision": 1,

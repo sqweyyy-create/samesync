@@ -49,9 +49,16 @@ const GENDERS = {
     { id: 'g.woman', self: { ru: 'Женщина', en: 'Woman' }, seeking: { ru: 'Женщин', en: 'Women' } },
   ],
 };
+const alias = (slug: string, emoji = '🦊') => ({
+  id: `a.${slug}`,
+  emoji,
+  text: { ru: 'Лиса', en: 'Fox' },
+});
+const ALIASES = { schemaVersion: 1, aliases: [alias('fox'), alias('owl', '🦉')] };
 const BASE: Record<string, unknown> = {
   'release.json': { schemaVersion: 1, version: '2026.10.1' },
   'dating/genders.json': GENDERS,
+  'aliases/animals.json': ALIASES,
 };
 
 /** Writes a content root: the valid base files plus `files` (null removes a base file). */
@@ -245,6 +252,39 @@ describe('dating options', () => {
   });
 });
 
+describe('chat aliases', () => {
+  const aliases = (...list: unknown[]) => ({
+    'aliases/animals.json': { schemaVersion: 1, aliases: list },
+  });
+
+  it('requires at least two, so a match can give its two users different names', async () => {
+    const message = 'needs at least 2 chat aliases (content/aliases/*.json)';
+    expect(await issuesOf(root({ ...takes(take()), 'aliases/animals.json': null }))).toEqual([
+      { id: 'aliases', message },
+    ]);
+    expect(await issuesOf(root({ ...takes(take()), ...aliases(alias('fox')) }))).toEqual([
+      { id: 'aliases', message },
+    ]);
+  });
+
+  it('requires the name in both locales and limits it to 40 characters', async () => {
+    const issues = await issuesOf(
+      root({
+        ...takes(take()),
+        ...aliases(
+          alias('fox'),
+          { ...alias('owl'), text: { ru: 'Сова' } },
+          { ...alias('long'), text: { ru: 'Я'.repeat(41), en: 'Long' } },
+        ),
+      }),
+    );
+    expect(issues).toEqual([
+      { id: 'a.owl', message: 'text is missing locale(s): en' },
+      { id: 'a.long', message: 'text.ru is 41 characters (max 40)' },
+    ]);
+  });
+});
+
 describe('folder allowlist', () => {
   it('rejects misspelled folders, subfolders and non-JSON files', async () => {
     const dir = root({
@@ -326,7 +366,11 @@ describe('--launch coverage', () => {
       id: 'catalog en',
       message: 'has 1 items across 1 domains (needs ≥ 150 items across ≥ 4 domains)',
     });
-    expect(launch).toHaveLength(8);
+    expect(launch).toContainEqual({
+      id: 'aliases',
+      message: 'has 2 chat aliases (needs ≥ 12)',
+    });
+    expect(launch).toHaveLength(9);
   });
 
   it('does not count retired entries', async () => {
