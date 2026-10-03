@@ -135,7 +135,7 @@ export function Mode({
         </>
       )}
       <button type="button" disabled={!ready || busy} onClick={save}>
-        {t('miniapp.action.next')}
+        {editing ? t('miniapp.action.save') : t('miniapp.action.next')}
       </button>
     </Screen>
   );

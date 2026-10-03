@@ -126,7 +126,7 @@ describe('<App> settings: dating age range (Q12)', () => {
     ]);
     fireEvent.change(from, { target: { value: '24' } });
     fireEvent.change(to, { target: { value: '35' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Дальше' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(() =>
       expect(api.setMode).toHaveBeenCalledWith({
         mode: 'dating',
@@ -141,7 +141,7 @@ describe('<App> settings: dating age range (Q12)', () => {
   it('does not let an invalid range through (below 18, or from above to)', async () => {
     const api = fakeApi({ getMe: vi.fn(() => ok(dating)) });
     const { from, to } = await openModeSettings(api);
-    const next = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Дальше' });
+    const next = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Сохранить' });
     fireEvent.change(from, { target: { value: '17' } });
     expect(next().disabled).toBe(true);
     fireEvent.change(from, { target: { value: '40' } });
