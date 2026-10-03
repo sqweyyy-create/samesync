@@ -1,9 +1,10 @@
 import type { Band, Locale, Mode } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { newPublicId } from '../../ids';
 import type { Db } from '../client';
+import { pgErrorOf } from '../errors';
 import { users } from '../schema/index';
 
 /** The caller's own row. Never handed to other users. */
@@ -52,6 +53,11 @@ export interface UsersRepository {
    * birth_date in SQL). Never stores anything for u18 or unknown ages (CLAUDE.md invariant 6).
    */
   storeUsernameIfAdult(telegramId: number, username: string | null): Promise<void>;
+  /**
+   * Whether the bot can message the user: false after Telegram answers 403 or the user blocks
+   * the bot, true again once they talk to it. Unreachable users are not matched.
+   */
+  setBotReachable(telegramId: number, reachable: boolean): Promise<void>;
   /** Q16: an ineligible user whose live age reached 14 continues onboarding. */
   reopenIfFourteen(userId: string): Promise<UserRecord | null>;
   confirmLocale(userId: string, locale: Locale, now: Date): Promise<UserRecord>;
@@ -80,11 +86,8 @@ const PUBLIC_ID_CONSTRAINT = 'users_public_id_unique';
 const MAX_ATTEMPTS = 3;
 
 function isPublicIdCollision(error: unknown): boolean {
-  for (let e: unknown = error; e instanceof Error; e = e.cause) {
-    const pgError = e as Error & { code?: string; constraint?: string };
-    if (pgError.code === '23505' && pgError.constraint === PUBLIC_ID_CONSTRAINT) return true;
-  }
-  return false;
+  const pgError = pgErrorOf(error);
+  return pgError?.code === '23505' && pgError.constraint === PUBLIC_ID_CONSTRAINT;
 }
 
 function one<T>(rows: T[]): T {
@@ -143,6 +146,13 @@ export function createUsersRepository(db: Db): UsersRepository {
             sql`${users.username} IS DISTINCT FROM ${username}`,
           ),
         );
+    },
+
+    async setBotReachable(telegramId, reachable) {
+      await db
+        .update(users)
+        .set({ botReachable: reachable })
+        .where(and(eq(users.telegramId, telegramId), ne(users.botReachable, reachable)));
     },
 
     async reopenIfFourteen(userId) {

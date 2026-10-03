@@ -10,7 +10,12 @@ const external = Object.keys(pkg.dependencies ?? {}).filter(
 
 await rm('dist', { recursive: true, force: true });
 await build({
-  entryPoints: { main: 'src/main.ts', migrate: 'scripts/migrate.ts' },
+  entryPoints: {
+    main: 'src/main.ts',
+    migrate: 'scripts/migrate.ts',
+    // Loaded by main.js as a worker thread (src/jobs/matching-planner.ts).
+    'matching-worker': 'src/jobs/matching-worker.ts',
+  },
   outdir: 'dist',
   bundle: true,
   platform: 'node',

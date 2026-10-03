@@ -52,3 +52,6 @@ export const DEFAULT_MATCHING_PARAMS: MatchingParams = {
 
 /** Q14 (decided): u18 partners' birth dates are at most this many calendar years apart. */
 export const U18_MAX_BIRTH_GAP_YEARS = 2;
+
+/** Q2 (decided): the game has 48 hours from the moment the match is created. */
+export const GAME_DEADLINE_HOURS = 48;
