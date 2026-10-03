@@ -25,6 +25,13 @@ const row = async (id: string) =>
       gender: string | null;
     }>('SELECT age_band, mode, username, gender FROM users WHERE id = $1', [id])
   ).rows[0];
+const datingAgeOf = async (id: string) =>
+  (
+    await testDb.ownerPool.query<{ min: number | null; max: number | null }>(
+      'SELECT dating_age_min AS min, dating_age_max AS max FROM users WHERE id = $1',
+      [id],
+    )
+  ).rows[0];
 
 describe('u18 users', () => {
   it('cannot be in dating mode (insert or update)', async () => {
@@ -39,7 +46,7 @@ describe('u18 users', () => {
     const { id } = await insertUser(testDb.appPool, { birthDate: U18(), mode: 'friends' });
     await expect(
       testDb.appPool.query(
-        "UPDATE users SET mode = 'dating', gender = 'g.man', seeking = ARRAY['g.woman'] WHERE id = $1",
+        "UPDATE users SET mode = 'dating', gender = 'g.man', seeking = ARRAY['g.woman'], dating_age_min = 18, dating_age_max = 25 WHERE id = $1",
         [id],
       ),
     ).rejects.toMatchObject(CHECK('users_mode_band'));
@@ -125,6 +132,34 @@ describe('adults', () => {
     ).rejects.toMatchObject(CHECK('users_seeking_not_empty'));
   });
 
+  it('have a partner age range exactly when in dating mode, never reaching below 18 (Q12)', async () => {
+    const dating = { birthDate: ADULT(), mode: 'dating', gender: 'g.man', seeking: ['g.woman'] };
+    const RANGE = CHECK('users_dating_age_range');
+    for (const datingAge of [
+      { min: null, max: null },
+      { min: 20, max: null },
+      { min: 17, max: 30 },
+      { min: 30, max: 25 },
+      { min: 18, max: 121 },
+    ]) {
+      await expect(
+        insertUser(testDb.appPool, { ...dating, datingAge } as never),
+      ).rejects.toMatchObject(RANGE);
+    }
+    await expect(
+      insertUser(testDb.appPool, {
+        birthDate: ADULT(),
+        mode: 'friends',
+        datingAge: { min: 18, max: 30 },
+      }),
+    ).rejects.toMatchObject(RANGE);
+    const { id } = await insertUser(testDb.appPool, {
+      ...dating,
+      datingAge: { min: 18, max: 18 },
+    } as never);
+    expect(await datingAgeOf(id)).toEqual({ min: 18, max: 18 });
+  });
+
   it('can only reference existing dating options', async () => {
     await expect(
       insertUser(testDb.appPool, {
@@ -156,6 +191,7 @@ describe('admin correction to u18', () => {
       username: null,
       gender: null,
     });
+    expect(await datingAgeOf(id)).toEqual({ min: null, max: null });
   });
 });
 

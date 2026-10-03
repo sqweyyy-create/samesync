@@ -6,6 +6,7 @@ import {
   date,
   index,
   pgTable,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -35,10 +36,15 @@ export const users = pgTable(
     mode: modeEnum('mode'),
     gender: text('gender').references(() => datingOptions.id),
     seeking: text('seeking').array(),
+    /** Partner age range in dating mode, in whole years (Q12). */
+    datingAgeMin: smallint('dating_age_min'),
+    datingAgeMax: smallint('dating_age_max'),
     username: text('username'),
     timezone: text('timezone'),
     botReachable: boolean('bot_reachable').notNull().default(true),
     onboardedAt: timestamp('onboarded_at', { withTimezone: true }),
+    /** Created by dev tooling (`pnpm dev:population`). The bot never messages these users. */
+    synthetic: boolean('synthetic').notNull().default(false),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -63,6 +69,13 @@ export const users = pgTable(
       sql`coalesce(${t.mode} = 'dating', false) = (${t.gender} IS NOT NULL AND ${t.seeking} IS NOT NULL)`,
     ),
     check('users_seeking_not_empty', sql`${t.seeking} IS NULL OR cardinality(${t.seeking}) >= 1`),
+    // The partner age range exists exactly when the mode is dating, and never reaches below 18.
+    check(
+      'users_dating_age_range',
+      sql`CASE WHEN coalesce(${t.mode} = 'dating', false)
+        THEN ${t.datingAgeMin} IS NOT NULL AND ${t.datingAgeMax} IS NOT NULL AND ${t.datingAgeMin} >= 18 AND ${t.datingAgeMin} <= ${t.datingAgeMax} AND ${t.datingAgeMax} <= 120
+        ELSE ${t.datingAgeMin} IS NULL AND ${t.datingAgeMax} IS NULL END`,
+    ),
     // Under-14 (Q16): nothing beyond the account itself, the birth date and the status.
     check(
       'users_ineligible_minimal',

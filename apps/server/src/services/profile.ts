@@ -12,6 +12,7 @@ import {
   ageOn,
   bandFor,
   birthDateProblem,
+  defaultDatingAgeRange,
   resolveLocale,
   utcDate,
   type Band,
@@ -142,6 +143,8 @@ export function createProfileService(deps: ProfileServiceDeps): ProfileService {
       mode: user.mode,
       gender: user.gender,
       seeking: user.seeking,
+      datingAgeMin: user.datingAgeMin,
+      datingAgeMax: user.datingAgeMax,
       progress: { answered, interests },
     };
   }
@@ -176,15 +179,18 @@ export function createProfileService(deps: ProfileServiceDeps): ProfileService {
       return present(auth, updated);
     },
 
-    async setMode(auth, { mode, gender, seeking }) {
+    async setMode(auth, { mode, gender, seeking, ageMin, ageMax }) {
       const user = await load(auth);
       assertCanAct(user);
       const band = requireBand(user);
       if (mode === 'friends') {
-        if (gender !== undefined || seeking !== undefined) {
-          throw new ServiceError('invalid', ['friends mode takes no gender or seeking']);
+        if ([gender, seeking, ageMin, ageMax].some((field) => field !== undefined)) {
+          throw new ServiceError('invalid', ['friends mode takes no dating fields']);
         }
-        return present(auth, await users.setMode(user.id, { mode, gender: null, seeking: null }));
+        return present(
+          auth,
+          await users.setMode(user.id, { mode, gender: null, seeking: null, datingAge: null }),
+        );
       }
       if (band !== 'adult') throw new ServiceError('forbidden', ['dating is for adults only']);
       const problems: string[] = [];
@@ -197,10 +203,22 @@ export function createProfileService(deps: ProfileServiceDeps): ProfileService {
       ) {
         problems.push('seeking');
       }
+      // Q12: an explicit range needs both ends; otherwise keep the stored one or use the default.
+      const explicit = ageMin !== undefined || ageMax !== undefined;
+      if (explicit && (ageMin === undefined || ageMax === undefined || ageMin > ageMax)) {
+        problems.push('age_range');
+      }
       if (problems.length > 0) throw new ServiceError('invalid', problems);
+      const stored =
+        user.datingAgeMin !== null && user.datingAgeMax !== null
+          ? { min: user.datingAgeMin, max: user.datingAgeMax }
+          : null;
+      const datingAge = explicit
+        ? { min: ageMin!, max: ageMax! }
+        : (stored ?? defaultDatingAgeRange(ageOn(user.birthDate!, today())));
       return present(
         auth,
-        await users.setMode(user.id, { mode, gender: gender!, seeking: seeking! }),
+        await users.setMode(user.id, { mode, gender: gender!, seeking: seeking!, datingAge }),
       );
     },
 

@@ -35,6 +35,8 @@ export function me(over: Partial<MeResponse> = {}): MeResponse {
     mode: null,
     gender: null,
     seeking: null,
+    datingAgeMin: null,
+    datingAgeMax: null,
     progress: { answered: 0, interests: 0 },
     ...over,
   };

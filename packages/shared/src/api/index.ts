@@ -3,6 +3,7 @@
  * Uses zod/mini to keep the Mini App bundle small.
  */
 import * as z from 'zod/mini';
+import { ADULT_AGE, MAX_AGE } from '../age';
 import { BANDS, MODES } from '../domain';
 import { LOCALES } from '../locale';
 
@@ -60,6 +61,8 @@ const Locale = z.enum(LOCALES);
 const Mode = z.enum(MODES);
 const ContentId = z.string().check(z.maxLength(80));
 const IsoDate = z.string().check(z.regex(/^\d{4}-\d{2}-\d{2}$/));
+/** A partner age in dating mode (Q12): whole years, adults only. */
+const PartnerAge = z.int().check(z.gte(ADULT_AGE), z.lte(MAX_AGE));
 
 export const MeResponse = z.object({
   publicId: z.string(),
@@ -73,6 +76,9 @@ export const MeResponse = z.object({
   mode: z.nullable(Mode),
   gender: z.nullable(z.string()),
   seeking: z.nullable(z.array(z.string())),
+  /** Partner age range in dating mode (Q12); null in friends mode. */
+  datingAgeMin: z.nullable(z.number()),
+  datingAgeMax: z.nullable(z.number()),
   progress: z.object({ answered: z.number(), interests: z.number() }),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
@@ -87,6 +93,9 @@ export const SetModeRequest = z.object({
   mode: Mode,
   gender: z.optional(ContentId),
   seeking: z.optional(z.array(ContentId).check(z.maxLength(10))),
+  /** Dating only (Q12). Left out, the server keeps the stored range or applies the default. */
+  ageMin: z.optional(PartnerAge),
+  ageMax: z.optional(PartnerAge),
 });
 export type SetModeRequest = z.infer<typeof SetModeRequest>;
 

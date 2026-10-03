@@ -18,6 +18,8 @@ export interface UserRecord {
   mode: Mode | null;
   gender: string | null;
   seeking: string[] | null;
+  datingAgeMin: number | null;
+  datingAgeMax: number | null;
   onboardedAt: Date | null;
 }
 
@@ -32,6 +34,8 @@ const columns = {
   mode: users.mode,
   gender: users.gender,
   seeking: users.seeking,
+  datingAgeMin: users.datingAgeMin,
+  datingAgeMax: users.datingAgeMax,
   onboardedAt: users.onboardedAt,
 };
 
@@ -56,9 +60,15 @@ export interface UsersRepository {
     userId: string,
     input: { birthDate: string; status: UserStatus; mode: Mode | null },
   ): Promise<UserRecord | null>;
+  /** Dating fields (gender, seeking, partner age range) are all set, or all null for friends. */
   setMode(
     userId: string,
-    input: { mode: Mode; gender: string | null; seeking: string[] | null },
+    input: {
+      mode: Mode;
+      gender: string | null;
+      seeking: string[] | null;
+      datingAge: { min: number; max: number } | null;
+    },
   ): Promise<UserRecord>;
   complete(
     userId: string,
@@ -169,11 +179,17 @@ export function createUsersRepository(db: Db): UsersRepository {
       return row ?? null;
     },
 
-    async setMode(userId, { mode, gender, seeking }) {
+    async setMode(userId, { mode, gender, seeking, datingAge }) {
       return one(
         await db
           .update(users)
-          .set({ mode, gender, seeking })
+          .set({
+            mode,
+            gender,
+            seeking,
+            datingAgeMin: datingAge?.min ?? null,
+            datingAgeMax: datingAge?.max ?? null,
+          })
           .where(eq(users.id, userId))
           .returning(columns),
       );

@@ -94,6 +94,17 @@ export function birthDatesWithinYears(a: string, b: string, years: number): bool
   return later <= nthBirthday(earlier, years);
 }
 
+/** How far the default partner age range reaches on each side of the user's own age (Q12). */
+export const DATING_AGE_SPREAD = 5;
+
+/** Default partner age range in dating mode (Q12): own age ±5 years, never below 18. */
+export function defaultDatingAgeRange(age: number): { min: number; max: number } {
+  return {
+    min: Math.max(ADULT_AGE, age - DATING_AGE_SPREAD),
+    max: Math.min(MAX_AGE, Math.max(ADULT_AGE, age + DATING_AGE_SPREAD)),
+  };
+}
+
 /** `u18` for 14–17, `adult` for 18+, null below 14 (no profile, no matching). */
 export function bandFor(age: number): Band | null {
   if (age >= ADULT_AGE) return 'adult';

@@ -448,6 +448,53 @@ describe('birth date (Q16) and mode switching (Q10)', () => {
     });
   });
 
+  it('gives dating users a partner age range: own age ±5 by default, never below 18 (Q12)', async () => {
+    const { me } = await onboard(t, newUser(), { birthDate: ADULT(), dating: true });
+    expect(me.age).toBe(24);
+    expect(me).toMatchObject({ datingAgeMin: 19, datingAgeMax: 29 });
+    const young = await onboard(t, newUser(), { birthDate: birthDateYearsAgo(18), dating: true });
+    expect(young.me).toMatchObject({ age: 18, datingAgeMin: 18, datingAgeMax: 23 });
+    const friends = await onboard(t, newUser(), { birthDate: ADULT() });
+    expect(friends.me).toMatchObject({ datingAgeMin: null, datingAgeMax: null });
+  });
+
+  it('lets a dating user change the range in settings, and validates it', async () => {
+    const { as } = await onboard(t, newUser(), { birthDate: ADULT(), dating: true });
+    await json(as.post('/api/onboarding/complete', {}));
+    const dating = { mode: 'dating', gender: 'g.woman', seeking: ['g.man'] };
+    expect(
+      await json<MeResponse>(as.put('/api/profile/mode', { ...dating, ageMin: 30, ageMax: 45 })),
+    ).toMatchObject({ datingAgeMin: 30, datingAgeMax: 45 });
+    // Saving the mode again without a range keeps the stored one.
+    expect(
+      await json<MeResponse>(as.put('/api/profile/mode', { ...dating, seeking: ['g.woman'] })),
+    ).toMatchObject({ seeking: ['g.woman'], datingAgeMin: 30, datingAgeMax: 45 });
+    for (const range of [
+      { ageMin: 31, ageMax: 30 },
+      { ageMin: 17, ageMax: 30 },
+      { ageMin: 25 },
+      { ageMax: 40 },
+      { ageMin: 20, ageMax: 121 },
+      { ageMin: 20.5, ageMax: 30 },
+    ]) {
+      await expectError(as.put('/api/profile/mode', { ...dating, ...range }), 400, 'invalid');
+    }
+    await expectError(
+      as.put('/api/profile/mode', { mode: 'friends', ageMin: 20, ageMax: 30 }),
+      400,
+      'invalid',
+    );
+    // Friends clears the range; coming back to dating starts from the default again.
+    expect(await json<MeResponse>(as.put('/api/profile/mode', { mode: 'friends' }))).toMatchObject({
+      datingAgeMin: null,
+      datingAgeMax: null,
+    });
+    expect(await json<MeResponse>(as.put('/api/profile/mode', dating))).toMatchObject({
+      datingAgeMin: 19,
+      datingAgeMax: 29,
+    });
+  });
+
   it('never lets a u18 user switch to dating or see dating options', async () => {
     const { as } = await onboard(t, newUser(), { birthDate: U18() });
     await expectError(

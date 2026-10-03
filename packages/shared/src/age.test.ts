@@ -4,6 +4,7 @@ import {
   bandFor,
   birthDateProblem,
   birthDatesWithinYears,
+  defaultDatingAgeRange,
   nthBirthday,
   parseIsoDate,
   utcDate,
@@ -144,5 +145,18 @@ describe('birthDatesWithinYears (Q14: at most 2 calendar years apart)', () => {
 
   it('throws on invalid dates instead of guessing', () => {
     expect(() => birthDatesWithinYears('2010-02-30', '2010-06-15', 2)).toThrow(/not a valid/);
+  });
+});
+
+describe('defaultDatingAgeRange (Q12: own age ±5, never below 18)', () => {
+  it.each([
+    [18, { min: 18, max: 23 }],
+    [20, { min: 18, max: 25 }],
+    [23, { min: 18, max: 28 }],
+    [24, { min: 19, max: 29 }],
+    [40, { min: 35, max: 45 }],
+    [118, { min: 113, max: 120 }],
+  ])('age %i → %j', (age, range) => {
+    expect(defaultDatingAgeRange(age)).toEqual(range);
   });
 });

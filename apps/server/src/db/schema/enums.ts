@@ -1,4 +1,4 @@
-import { BANDS, LOCALES, MODES } from '@samesync/shared';
+import { BANDS, LOCALES, MATCH_CLOSE_REASONS, MATCH_STATUSES, MODES } from '@samesync/shared';
 import { DOMAINS, POPULARITY } from '@samesync/content';
 import { pgEnum } from 'drizzle-orm/pg-core';
 
@@ -18,3 +18,10 @@ export const userStatusEnum = pgEnum('user_status', [
   'frozen',
   'deleted',
 ]);
+
+export const matchStatusEnum = pgEnum('match_status', MATCH_STATUSES);
+export const matchCloseReasonEnum = pgEnum('match_close_reason', MATCH_CLOSE_REASONS);
+
+export const outboxStatusEnum = pgEnum('outbox_status', ['pending', 'sent', 'failed', 'cancelled']);
+/** One value per notification type; later phases add theirs. */
+export const outboxKindEnum = pgEnum('outbox_kind', ['match_created']);
