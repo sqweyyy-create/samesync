@@ -1,8 +1,11 @@
-import { readFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MIGRATIONS_DIR, runMigrations } from '../../src/db/migrate';
 import { APP_ROLE, appRolePool, createEmptyDatabase } from '../support/db';
+import { birthDateYearsAgo } from '../support/users';
 
 async function journalEntries(): Promise<number> {
   const journal = JSON.parse(await readFile(`${MIGRATIONS_DIR}/meta/_journal.json`, 'utf8')) as {
@@ -10,6 +13,70 @@ async function journalEntries(): Promise<number> {
   };
   return journal.entries.length;
 }
+
+/** A copy of the migrations folder that stops after `count` migrations. */
+async function migrationsUpTo(count: number): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'samesync-migrations-'));
+  await cp(MIGRATIONS_DIR, dir, { recursive: true });
+  const journalPath = join(dir, 'meta', '_journal.json');
+  const journal = JSON.parse(await readFile(journalPath, 'utf8')) as { entries: unknown[] };
+  journal.entries = journal.entries.slice(0, count);
+  await writeFile(journalPath, JSON.stringify(journal));
+  return dir;
+}
+
+describe('upgrading a Phase 1 database (migration 0004)', () => {
+  let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
+  let owner: pg.Pool;
+  let phase1: string;
+
+  beforeAll(async () => {
+    db = await createEmptyDatabase();
+    owner = new pg.Pool({ connectionString: db.url, max: 1 });
+    phase1 = await migrationsUpTo(4);
+  });
+  afterAll(async () => {
+    await owner.end();
+    await db.drop();
+    await rm(phase1, { recursive: true, force: true });
+  });
+
+  it('gives existing dating users the default partner age range (Q12) and keeps everyone else', async () => {
+    await runMigrations(db.url, phase1);
+    await owner.query(
+      "INSERT INTO dating_options (id, revision, added_in) VALUES ('g.man', 1, 'x'), ('g.woman', 1, 'x')",
+    );
+    const insert = (telegramId: number, years: number, mode: string | null) =>
+      owner.query(
+        `INSERT INTO users (id, telegram_id, public_id, locale, status, birth_date, mode, gender, seeking, last_active_at)
+         VALUES (gen_random_uuid(), $1, $2, 'ru', 'active', $3, $4, $5, $6, now())`,
+        [
+          telegramId,
+          String(telegramId).padStart(10, '0'),
+          birthDateYearsAgo(years),
+          mode,
+          mode === 'dating' ? 'g.woman' : null,
+          mode === 'dating' ? ['g.man'] : null,
+        ],
+      );
+    await insert(1, 26, 'dating');
+    await insert(2, 19, 'dating');
+    await insert(3, 30, 'friends');
+    await insert(4, 16, 'friends');
+
+    await runMigrations(db.url);
+
+    const { rows } = await owner.query(
+      'SELECT telegram_id::int AS id, dating_age_min AS min, dating_age_max AS max, synthetic FROM users ORDER BY telegram_id',
+    );
+    expect(rows).toEqual([
+      { id: 1, min: 21, max: 31, synthetic: false },
+      { id: 2, min: 18, max: 24, synthetic: false },
+      { id: 3, min: null, max: null, synthetic: false },
+      { id: 4, min: null, max: null, synthetic: false },
+    ]);
+  });
+});
 
 describe('migrations', () => {
   let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
