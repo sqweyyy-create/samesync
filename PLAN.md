@@ -1,6 +1,6 @@
 # SameSync — Implementation Plan
 
-Last updated: 2026-10-03. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
+Last updated: 2026-10-04. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
@@ -8,7 +8,7 @@ Last updated: 2026-10-03. Project context and the non-negotiable safety rules ar
 |---|---|---|
 | 0 | Scaffold | done (2026-10-03) |
 | 1 | Onboarding | done (2026-10-03) |
-| 2 | Matching engine | not started |
+| 2 | Matching engine | done (2026-10-04) |
 | 3 | Game | not started |
 | 4 | Anonymous chat | not started |
 | 5 | Safety & admin | not started |
@@ -101,7 +101,7 @@ Pool isolation is enforced in six layers, so a bug in one layer can't break it:
    - `game_predictions` INSERT requires an open match and a predictor who is a participant.
    - `reveal_consents` INSERT requires `matches.band = 'adult'` and both users adult right now.
 3. **State-change triggers:**
-   - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. From Phase 4 it also clears `active_match_id`. The `username` is nulled by `admin_set_birth_date()` when the band becomes `u18`.
+   - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. From Phase 4 it also clears `active_match_id`. The `username` and the dating fields (gender, seeking, partner age range) are nulled by `admin_set_birth_date()` when the band becomes `u18`.
    - `birth_date` is write-once except through `admin_set_birth_date()`.
 4. **Repository API:**
    - Every read of another user's data goes through `getMatchForParticipant(userId, matchId)`. It checks participation, that the match is readable (not closed for `band_change`), and that live bands are equal.
@@ -468,7 +468,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - [x] Ranking: a shared niche item beats a shared mainstream one; a shared minority take beats a shared majority take; a "picked everything" profile doesn't dominate. *(src/domain/matching/score.test.ts)*
 - [x] Fallback: a user with no tier-1 partner gets a tier-2 or tier-3 match once the waiting threshold passes, if one exists. Fallback never crosses band, locale, ±2y or dating compatibility. *(src/domain/matching/tiers.test.ts; test/matching/run.integration.test.ts; the property test covers all three tiers)*
 - [x] Turning 18: when the age-transition job runs, the user's open matches with `u18` users close and cancelled notifications are never sent. Before the job runs, the outbox and the match trigger already refuse cross-band actions based on the live band. *(test/safety/age-transition.test.ts, outbox-recheck.test.ts)*
-- [ ] Each user in a match gets exactly one notification in their locale naming a real shared item or take. A crash or rerun creates no duplicates. *(Automated: test/bot/notify.test.ts and test/matching/run.integration.test.ts against a faked Bot API. Pending: the product owner's check of the real notification in Telegram with `pnpm dev:match-me`.)*
+- [x] Each user in a match gets exactly one notification in their locale naming a real shared item or take. A crash or rerun creates no duplicates. *(Automated: test/bot/notify.test.ts and test/matching/run.integration.test.ts against a faked Bot API. Manual: passed 2026-10-04, product owner, dev bot. `pnpm dev:match-me` delivered exactly one notification in the owner's locale naming a real shared item or take, the button opened the match screen, and the match is listed on the home screen.)*
 - [x] Benchmark: a run on 5,000 synthetic users in one pool finishes in < 60 s, and the main event loop never lags more than 100 ms (manual or nightly benchmark, not a CI gate). *(`pnpm bench:matching`, 2026-10-03, local Mac, Node 24, Docker Postgres 17: 4.9 s for the run, longest event-loop lag 17 ms, 2,134 pairs, none refused by the trigger.)*
 
 **Tests that prove it**
@@ -515,6 +515,15 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - **API and Mini App (ahead of the Phase 3 list):** `GET /api/matches` and `GET /api/matches/:id` return a summary (alias, teaser, status). The home screen lists open matches; the match screen is a placeholder; the notification button opens it through `?match=<id>`. Initial JS is 95.4 KB gzip.
 - **Synthetic users:** `users.synthetic` marks users made by dev tooling. They are matched like anyone else outside production, never messaged, and ignored entirely when `NODE_ENV=production`.
 - **Dev tooling:** `pnpm dev:match-me` lets every tier match immediately (no 24 h / 72 h wait) unless `--strict` is passed, and `--ignore-limits` lifts the free-tier limits for that run. `pnpm bench:matching` is the benchmark.
+- **Mode switching (Q10):** `test/onboarding/flow.test.ts` now asserts that open matches stay open when the mode changes, in both directions. This is the assertion Phase 1 left open.
+- **Safety sign-off (2026-10-04, product owner; CLAUDE.md invariant 11).** It covers every Phase 2 change to the safety triggers and functions and to `test/safety/`. Auth code did not change, and relay and filter code does not exist yet.
+  - Migration 0005: the three triggers and `vc_within_years()`.
+  - Migration 0004 re-creates `admin_set_birth_date()` with two added lines: a correction to a non-adult band now also clears the partner age range (Q12), which the new range CHECK would otherwise reject. Nothing else in the function changed. Checked on a throwaway database before the sign-off: only the owner role can execute it, it refuses a missing or blank reason, it writes one audit row, and a band change closes the open matches and cancels the pending notifications in the same transaction.
+  - Five new safety test files: `age-transition`, `outbox-recheck`, `pool-isolation.db`, `pool-isolation.property` and `pool-isolation.run`.
+  - Existing safety tests, with no assertion removed or weakened:
+    - `auth.test.ts` builds the app through the shared test builder.
+    - `band-constraints.test.ts` supplies an age range in one UPDATE so that it still asserts `users_mode_band`. It also gained a test for the range CHECK and an assertion that a correction to `u18` clears the range.
+    - `age-sql-parity.test.ts` gained the `vc_within_years()` parity tests.
 - **Found during Phase 2:**
   - `test/content/seed.test.ts` hard-coded the next release number, so the content release bump broke it; it now uses far-future versions.
   - Raw `db.execute` results return timestamps as text (Drizzle's parsers); repositories select epoch milliseconds instead.
