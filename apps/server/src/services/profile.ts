@@ -8,12 +8,10 @@
  */
 import { DOMAINS, type Domain } from '@samesync/content';
 import {
-  MIN_AGE,
   ageOn,
   bandFor,
   birthDateProblem,
   defaultDatingAgeRange,
-  resolveLocale,
   utcDate,
   type Band,
   type Locale,
@@ -34,6 +32,7 @@ import type { ProfileRepository } from '../db/repositories/profile';
 import type { UserRecord, UsersRepository } from '../db/repositories/users';
 import { drawDeck, isValidTimezone, nextStep } from '../domain/onboarding';
 import type { ValidatedInitData } from '../http/auth/init-data';
+import { loadCurrentUser } from './current-user';
 import { ServiceError } from './errors';
 
 export interface ProfileServiceDeps {
@@ -72,24 +71,7 @@ export function createProfileService(deps: ProfileServiceDeps): ProfileService {
   const bandOf = (user: UserRecord): Band | null =>
     user.birthDate ? bandFor(ageOn(user.birthDate, today())) : null;
 
-  /** The caller's row, created on first contact, with Q16 and username capture applied. */
-  async function load(auth: ValidatedInitData): Promise<UserRecord> {
-    let user = await users.upsertOnAuth({
-      telegramId: auth.user.id,
-      locale: resolveLocale(auth.user.languageCode),
-      now: clock.now(),
-    });
-    if (
-      user.status === 'ineligible' &&
-      user.birthDate &&
-      ageOn(user.birthDate, today()) >= MIN_AGE
-    ) {
-      user = (await users.reopenIfFourteen(user.id)) ?? user;
-    }
-    // Adults only, checked in SQL against the live age; a no-op for everyone else.
-    await users.storeUsernameIfAdult(auth.user.id, auth.user.username ?? null);
-    return user;
-  }
+  const load = (auth: ValidatedInitData) => loadCurrentUser({ users, clock }, auth);
 
   /** Frozen and deleted accounts can read their own state but change nothing (invariant 9). */
   function assertCanAct(user: UserRecord): void {

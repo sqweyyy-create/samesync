@@ -35,8 +35,9 @@ interface Row extends Record<string, unknown> {
   tier: number;
   teaser: unknown;
   counterpart_alias: string;
-  created_at: Date;
-  game_deadline_at: Date;
+  /** Epoch milliseconds: Drizzle hands raw timestamps back as text, so they are read as numbers. */
+  created_at_ms: number;
+  game_deadline_at_ms: number;
 }
 
 const OPEN = sql.join(
@@ -49,7 +50,8 @@ export function createMatchesRepository(db: Db): MatchesRepository {
     const result = await db.execute<Row>(sql`
       SELECT m.id, m.status, m.locale, m.tier, m.teaser,
         CASE WHEN m.user_a_id = ${userId}::uuid THEN m.alias_b ELSE m.alias_a END AS counterpart_alias,
-        m.created_at, m.game_deadline_at
+        (extract(epoch FROM m.created_at) * 1000)::float8 AS created_at_ms,
+        (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms
       FROM matches m
       JOIN users ua ON ua.id = m.user_a_id
       JOIN users ub ON ub.id = m.user_b_id
@@ -66,8 +68,8 @@ export function createMatchesRepository(db: Db): MatchesRepository {
       tier: r.tier,
       teaser: r.teaser,
       counterpartAlias: r.counterpart_alias,
-      createdAt: r.created_at,
-      gameDeadlineAt: r.game_deadline_at,
+      createdAt: new Date(r.created_at_ms),
+      gameDeadlineAt: new Date(r.game_deadline_at_ms),
     }));
   };
 

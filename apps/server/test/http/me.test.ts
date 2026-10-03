@@ -1,22 +1,8 @@
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createProfileRepository } from '../../src/db/repositories/profile';
-import { createUsersRepository } from '../../src/db/repositories/users';
-import { createHttpApp } from '../../src/http/app';
-import { createProfileService } from '../../src/services/profile';
-import { realContent } from '../support/app';
+import { buildTestApp } from '../support/app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
-import {
-  ANYA,
-  BOB,
-  CLOCK_SKEW_SEC,
-  MAX_AGE_SEC,
-  NOW,
-  TEST_BOT_TOKEN,
-  initDataFor,
-  memoryLogger,
-  testClock,
-} from '../support/fixtures';
+import { ANYA, BOB, NOW, initDataFor, testClock } from '../support/fixtures';
 
 describe('GET /api/me', () => {
   let testDb: TestDatabase;
@@ -25,19 +11,7 @@ describe('GET /api/me', () => {
 
   beforeAll(async () => {
     testDb = await createTestDatabase();
-    app = createHttpApp({
-      botToken: TEST_BOT_TOKEN,
-      initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
-      clock,
-      logger: memoryLogger().logger,
-      profile: createProfileService({
-        users: createUsersRepository(testDb.db),
-        profile: createProfileRepository(testDb.db),
-        content: await realContent(),
-        clock,
-        u18PoolEnabled: false,
-      }),
-    });
+    ({ app } = await buildTestApp(testDb, { clock }));
   });
   afterAll(() => testDb.drop());
 
@@ -110,5 +84,25 @@ describe('GET /api/me', () => {
     const response = await app.request('/nope');
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'not_found' });
+  });
+
+  it('marks a user reachable again when Telegram says the bot may write to them', async () => {
+    const reachable = async () =>
+      (
+        await testDb.ownerPool.query<{ bot_reachable: boolean }>(
+          'select bot_reachable from users where telegram_id = $1',
+          [BOB.id],
+        )
+      ).rows[0]?.bot_reachable;
+    await me(initDataFor(BOB));
+    await testDb.ownerPool.query('update users set bot_reachable = false where telegram_id = $1', [
+      BOB.id,
+    ]);
+    // Without the flag (or with false) nothing changes: we only know the bot was refused.
+    await me(initDataFor(BOB));
+    await me(initDataFor({ ...BOB, allows_write_to_pm: false }));
+    expect(await reachable()).toBe(false);
+    await me(initDataFor({ ...BOB, allows_write_to_pm: true }));
+    expect(await reachable()).toBe(true);
   });
 });

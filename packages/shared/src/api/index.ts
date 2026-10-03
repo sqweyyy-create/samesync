@@ -4,7 +4,7 @@
  */
 import * as z from 'zod/mini';
 import { ADULT_AGE, MAX_AGE } from '../age';
-import { BANDS, MODES } from '../domain';
+import { BANDS, MATCH_STATUSES, MODES } from '../domain';
 import { LOCALES } from '../locale';
 
 /** Authorization header scheme: `Authorization: tma <raw initData>`. */
@@ -137,3 +137,21 @@ export const CompleteRequest = z.object({
   timezone: z.optional(z.string().check(z.maxLength(64))),
 });
 export type CompleteRequest = z.infer<typeof CompleteRequest>;
+
+/**
+ * One of the caller's matches. The other person appears only under their per-match alias: no
+ * name, username or ID of theirs is ever part of an API response.
+ */
+export const MatchSummary = z.object({
+  id: z.string(),
+  alias: z.object({ emoji: z.string(), name: z.string() }),
+  /** What the two share, rendered in the caller's language. */
+  teaser: z.string(),
+  status: z.enum(MATCH_STATUSES),
+  createdAt: z.string(),
+  gameDeadlineAt: z.string(),
+});
+export type MatchSummary = z.infer<typeof MatchSummary>;
+
+export const MatchesResponse = z.object({ matches: z.array(MatchSummary) });
+export type MatchesResponse = z.infer<typeof MatchesResponse>;

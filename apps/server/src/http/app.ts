@@ -14,6 +14,7 @@ import type * as z from 'zod/mini';
 import type { Clock } from '../clock';
 import type { Logger } from '../logger';
 import { ServiceError } from '../services/errors';
+import type { MatchesService } from '../services/matches';
 import type { ProfileService } from '../services/profile';
 import { initDataAuth, type AuthVariables } from './auth/middleware';
 
@@ -23,6 +24,7 @@ export interface HttpAppDeps {
   clock: Clock;
   logger: Logger;
   profile: ProfileService;
+  matches: MatchesService;
 }
 
 const NOT_FOUND: ApiErrorBody = { error: 'not_found' };
@@ -49,7 +51,7 @@ async function body<T extends z.ZodMiniType>(c: Context, schema: T): Promise<z.i
 
 export function createHttpApp(deps: HttpAppDeps): Hono {
   const app = new Hono();
-  const { profile } = deps;
+  const { profile, matches } = deps;
 
   // Request log: method, path without query, status, duration. Never headers or bodies.
   app.use(async (c, next) => {
@@ -127,6 +129,9 @@ export function createHttpApp(deps: HttpAppDeps): Hono {
   api.post('/onboarding/complete', async (c) =>
     c.json(await profile.complete(c.get('auth'), await body(c, CompleteRequest))),
   );
+
+  api.get('/matches', async (c) => c.json(await matches.list(c.get('auth'))));
+  api.get('/matches/:id', async (c) => c.json(await matches.get(c.get('auth'), c.req.param('id'))));
 
   app.route('/api', api);
 

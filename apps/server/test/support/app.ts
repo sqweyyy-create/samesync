@@ -3,10 +3,12 @@ import type { Hono } from 'hono';
 import { fixedClock, type Clock } from '../../src/clock';
 import { DEFAULT_CONTENT_DIR } from '../../src/config';
 import { createContentStore, type ContentStore } from '../../src/content/store';
+import { createMatchesRepository } from '../../src/db/repositories/matches';
 import { createProfileRepository } from '../../src/db/repositories/profile';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { createHttpApp } from '../../src/http/app';
 import type { Logger } from '../../src/logger';
+import { createMatchesService } from '../../src/services/matches';
 import { createProfileService } from '../../src/services/profile';
 import type { TestDatabase } from './db';
 import {
@@ -50,26 +52,38 @@ export interface TestApp {
 }
 
 /**
- * The real HTTP app on a test database. The clock is the real current time: the DB's age triggers
- * use the real date (vc_today()), so the app must agree with them.
+ * The real HTTP app on a test database. The clock is the real current time unless a test passes
+ * its own: the DB's age triggers use the real date (vc_today()), so the app must agree with them.
  */
 export async function buildTestApp(
   testDb: TestDatabase,
-  options: { u18PoolEnabled?: boolean; logger?: Logger; content?: ContentStore } = {},
+  options: {
+    u18PoolEnabled?: boolean;
+    logger?: Logger;
+    content?: ContentStore;
+    clock?: Clock;
+  } = {},
 ): Promise<TestApp> {
   const content = options.content ?? (await realContent());
-  const clock = fixedClock(new Date());
+  const clock = options.clock ?? fixedClock(new Date());
+  const users = createUsersRepository(testDb.db);
   const app = createHttpApp({
     botToken: TEST_BOT_TOKEN,
     initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
     clock,
     logger: options.logger ?? memoryLogger().logger,
     profile: createProfileService({
-      users: createUsersRepository(testDb.db),
+      users,
       profile: createProfileRepository(testDb.db),
       content,
       clock,
       u18PoolEnabled: options.u18PoolEnabled ?? false,
+    }),
+    matches: createMatchesService({
+      users,
+      matches: createMatchesRepository(testDb.db),
+      content,
+      clock,
     }),
   });
   return {

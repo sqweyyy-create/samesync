@@ -10,11 +10,13 @@ import { ConfigError, loadConfig, type Config } from './config';
 import { assertContentSeeded } from './content/seed';
 import { createContentStore, type ContentStore } from './content/store';
 import { createDb, createPool } from './db/client';
+import { createMatchesRepository } from './db/repositories/matches';
 import { createProfileRepository } from './db/repositories/profile';
 import { createUsersRepository } from './db/repositories/users';
 import { createHttpApp } from './http/app';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
+import { createMatchesService } from './services/matches';
 import { createProfileService } from './services/profile';
 
 let config: Config;
@@ -56,6 +58,7 @@ const app = createHttpApp({
   clock,
   logger,
   profile,
+  matches: createMatchesService({ users, matches: createMatchesRepository(db), content, clock }),
 });
 const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger, users });
 const scheduler = createScheduler({ logger, jobs: [] });

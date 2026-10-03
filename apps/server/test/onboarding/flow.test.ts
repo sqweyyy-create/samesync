@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildTestApp, contentWithRetiredTakes, type TestApp } from '../support/app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import type { TestUser } from '../support/fixtures';
+import { insertActiveUser, insertMatch, matchRow } from '../support/matches';
 import { birthDateYearsAgo, insertUser } from '../support/users';
 
 let testDb: TestDatabase;
@@ -493,6 +494,41 @@ describe('birth date (Q16) and mode switching (Q10)', () => {
       datingAgeMin: 19,
       datingAgeMax: 29,
     });
+  });
+
+  it('leaves open matches open when the mode changes, in both directions (Q10)', async () => {
+    const user = newUser();
+    const { as } = await onboard(t, user, { birthDate: ADULT() });
+    await json(as.post('/api/onboarding/complete', {}));
+    const { rows } = await testDb.ownerPool.query<{ id: string }>(
+      'SELECT id FROM users WHERE telegram_id = $1',
+      [user.id],
+    );
+    const me = rows[0]!.id;
+    const statusOf = async (matchId: string) => (await matchRow(testDb.ownerPool, matchId))?.status;
+
+    // An open friends match, then a switch to dating.
+    const friend = await insertActiveUser(testDb.appPool, { birthDate: ADULT() });
+    const friendsMatch = await insertMatch(testDb.appPool, { a: me, b: friend.id });
+    const dating = { mode: 'dating', gender: 'g.woman', seeking: ['g.man'] };
+    await json(as.put('/api/profile/mode', dating));
+    expect(await statusOf(friendsMatch.id)).toBe('pending_game');
+
+    // An open dating match, then a switch back to friends.
+    const date = await insertActiveUser(testDb.appPool, {
+      birthDate: ADULT(),
+      mode: 'dating',
+      gender: 'g.man',
+      seeking: ['g.woman'],
+    });
+    const datingMatch = await insertMatch(testDb.appPool, { a: me, b: date.id, mode: 'dating' });
+    await json(as.put('/api/profile/mode', { mode: 'friends' }));
+    expect(await statusOf(friendsMatch.id)).toBe('pending_game');
+    expect(await statusOf(datingMatch.id)).toBe('pending_game');
+
+    // Both are still listed for the user, and no notification was cancelled along the way.
+    const { matches } = await json<{ matches: Array<{ id: string }> }>(as.get('/api/matches'));
+    expect(matches.map((m) => m.id).sort()).toEqual([friendsMatch.id, datingMatch.id].sort());
   });
 
   it('never lets a u18 user switch to dating or see dating options', async () => {
