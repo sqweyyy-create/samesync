@@ -681,6 +681,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - SDK haptics on swipe and submit;
   - the swipe gesture built on pointer events and CSS transforms (no animation library);
   - empty, loading and error states for every screen;
+  - interest picker, "All" tab: order items so the most commonly picked ones come first, with `mainstream` before `known` before `niche`, and music and games before books. Phase 1 orders by item ID, so the tab starts with books (decided 2026-10-03, product owner; the exact sort key is settled in Phase 6);
   - copy review in ru and en;
   - checks on iOS, Android and Desktop Telegram;
   - CI: a size-limit bundle budget step (moved from Phase 0): ≤ 150 KB gzip of initial JS (Q33, decided).
