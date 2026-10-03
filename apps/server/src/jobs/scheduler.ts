@@ -3,6 +3,8 @@ import type { Logger } from '../logger';
 export interface Job {
   name: string;
   intervalMs: number;
+  /** Also run once right after the scheduler starts, not only after the first interval. */
+  runOnStart?: boolean;
   run(signal: AbortSignal): Promise<void>;
 }
 
@@ -13,8 +15,8 @@ export interface Scheduler {
 }
 
 /**
- * In-process scheduler (PLAN.md §2). Phase 0 registers no jobs. Later phases add jobs that take a
- * Postgres advisory lock, so a second instance never runs the same job concurrently.
+ * In-process scheduler (PLAN.md §2). Jobs take a Postgres advisory lock themselves (see
+ * advisory-lock.ts), so a second instance never runs the same job concurrently.
  * A job never overlaps with itself.
  */
 export function createScheduler(deps: { logger: Logger; jobs: readonly Job[] }): Scheduler {
@@ -33,7 +35,10 @@ export function createScheduler(deps: { logger: Logger; jobs: readonly Job[] }):
 
   return {
     start() {
-      for (const job of deps.jobs) timers.push(setInterval(() => tick(job), job.intervalMs));
+      for (const job of deps.jobs) {
+        timers.push(setInterval(() => tick(job), job.intervalMs));
+        if (job.runOnStart) tick(job);
+      }
       deps.logger.info({ jobs: deps.jobs.map((j) => j.name) }, 'scheduler started');
     },
     async stop() {

@@ -11,12 +11,20 @@ import { assertContentSeeded } from './content/seed';
 import { createContentStore, type ContentStore } from './content/store';
 import { createDb, createPool } from './db/client';
 import { createMatchesRepository } from './db/repositories/matches';
+import { createMatchingRepository } from './db/repositories/matching';
+import { createOutboxRepository } from './db/repositories/outbox';
 import { createProfileRepository } from './db/repositories/profile';
 import { createUsersRepository } from './db/repositories/users';
+import { DEFAULT_MATCHING_PARAMS } from './domain/matching/params';
 import { createHttpApp } from './http/app';
+import { createAgeTransition } from './jobs/age-transition';
+import { createAgeTransitionJob, createMatchingJob, createOutboxJob } from './jobs/jobs';
+import { workerPlanner } from './jobs/matching-planner';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
 import { createMatchesService } from './services/matches';
+import { createMatchingService } from './services/matching';
+import { createOutboxSender } from './services/outbox-sender';
 import { createProfileService } from './services/profile';
 
 let config: Config;
@@ -61,7 +69,52 @@ const app = createHttpApp({
   matches: createMatchesService({ users, matches: createMatchesRepository(db), content, clock }),
 });
 const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger, users });
-const scheduler = createScheduler({ logger, jobs: [] });
+
+const matching = createMatchingService({
+  pool,
+  repo: createMatchingRepository(db),
+  content,
+  planner: workerPlanner,
+  clock,
+  logger,
+  params: {
+    ...DEFAULT_MATCHING_PARAMS,
+    dailyLimit: config.matching.dailyLimit,
+    openLimit: config.matching.openLimit,
+  },
+  u18PoolEnabled: config.u18PoolEnabled,
+  // Synthetic users only exist on development databases; production ignores them regardless.
+  allowSynthetic: config.nodeEnv !== 'production',
+});
+const sender = createOutboxSender({
+  outbox: createOutboxRepository(db),
+  users,
+  content,
+  // New plain-text messages only: no parse_mode, never forwardMessage or copyMessage.
+  telegram: { sendMessage: (chatId, text, options) => bot.api.sendMessage(chatId, text, options) },
+  clock,
+  logger,
+  miniAppUrl: config.miniAppUrl,
+  fallbackTimeZone: {
+    ru: config.matching.drops.ru.timeZone,
+    en: config.matching.drops.en.timeZone,
+  },
+});
+const scheduler = createScheduler({
+  logger,
+  jobs: [
+    createAgeTransitionJob({
+      pool,
+      ageTransition: createAgeTransition({
+        users,
+        u18PoolEnabled: config.u18PoolEnabled,
+        logger,
+      }),
+    }),
+    createMatchingJob({ matching, clock, logger, drops: config.matching.drops }),
+    createOutboxJob({ pool, sender }),
+  ],
+});
 
 let shuttingDown = false;
 async function shutdown(exitCode: number): Promise<void> {

@@ -35,7 +35,39 @@ describe('loadConfig', () => {
       u18PoolEnabled: false,
       adminTelegramIds: [],
       contentDir: DEFAULT_CONTENT_DIR,
+      matching: {
+        drops: {
+          ru: { times: ['13:00', '20:00'], timeZone: 'Europe/Moscow' },
+          en: { times: ['13:00', '20:00'], timeZone: 'UTC' },
+        },
+        dailyLimit: 3,
+        openLimit: 5,
+      },
     });
+  });
+
+  it('reads the matching drops and free-tier limits (Q8, Q27)', () => {
+    const { matching } = loadConfig({
+      ...VALID,
+      MATCH_DROP_TIMES_RU: '09:30,18:00,23:15',
+      MATCH_DROP_TZ_EN: 'America/New_York',
+      MATCH_DAILY_LIMIT: '4',
+      MATCH_OPEN_LIMIT: '7',
+    });
+    expect(matching).toEqual({
+      drops: {
+        ru: { times: ['09:30', '18:00', '23:15'], timeZone: 'Europe/Moscow' },
+        en: { times: ['13:00', '20:00'], timeZone: 'America/New_York' },
+      },
+      dailyLimit: 4,
+      openLimit: 7,
+    });
+    expect(issuesOf({ ...VALID, MATCH_DROP_TIMES_RU: '25:00' })).toEqual(['MATCH_DROP_TIMES_RU']);
+    expect(issuesOf({ ...VALID, MATCH_DROP_TIMES_EN: '13:00;20:00' })).toEqual([
+      'MATCH_DROP_TIMES_EN',
+    ]);
+    expect(issuesOf({ ...VALID, MATCH_DROP_TZ_RU: 'Moscow' })).toEqual(['MATCH_DROP_TZ_RU']);
+    expect(issuesOf({ ...VALID, MATCH_DAILY_LIMIT: '0' })).toEqual(['MATCH_DAILY_LIMIT']);
   });
 
   it('names every missing required variable', () => {

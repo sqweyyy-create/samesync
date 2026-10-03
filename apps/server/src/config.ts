@@ -1,5 +1,8 @@
 import { fileURLToPath } from 'node:url';
+import type { Locale } from '@samesync/shared';
 import { z } from 'zod';
+import type { DropSchedule } from './domain/drops';
+import { isValidTimezone } from './domain/onboarding';
 
 /**
  * The repository's content/ folder. Both src/config.ts and the bundled dist/main.js sit two levels
@@ -8,6 +11,16 @@ import { z } from 'zod';
 export const DEFAULT_CONTENT_DIR = fileURLToPath(new URL('../../../content/', import.meta.url));
 
 const booleanFlag = z.enum(['true', 'false']).transform((v) => v === 'true');
+const TIME = '([01]\\d|2[0-3]):[0-5]\\d';
+/** One to six local times a day, e.g. `13:00,20:00`. */
+const dropTimes = z
+  .string()
+  .regex(new RegExp(`^${TIME}(,${TIME}){0,5}$`), 'must be a comma-separated list of HH:MM times')
+  .transform((v) => v.split(','));
+const timeZone = z
+  .string()
+  .refine(isValidTimezone, 'must be an IANA time zone such as Europe/Moscow');
+const limit = z.coerce.number().int().min(1).max(100);
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -31,6 +44,14 @@ const EnvSchema = z.object({
   INITDATA_CLOCK_SKEW_SEC: z.coerce.number().int().min(0).max(600).default(60),
   U18_POOL_ENABLED: booleanFlag.default(false),
   CONTENT_DIR: z.string().min(1).default(DEFAULT_CONTENT_DIR),
+  // Matching drops (Q8, decided): twice a day per pool, Europe/Moscow for ru and UTC for en.
+  MATCH_DROP_TIMES_RU: dropTimes.default(['13:00', '20:00']),
+  MATCH_DROP_TZ_RU: timeZone.default('Europe/Moscow'),
+  MATCH_DROP_TIMES_EN: dropTimes.default(['13:00', '20:00']),
+  MATCH_DROP_TZ_EN: timeZone.default('UTC'),
+  // Free tier (Q27, decided): new matches per rolling 24 hours, and open matches at once.
+  MATCH_DAILY_LIMIT: limit.default(3),
+  MATCH_OPEN_LIMIT: limit.default(5),
   ADMIN_TELEGRAM_IDS: z
     .string()
     .regex(/^\d+(,\d+)*$/, 'must be a comma-separated list of numeric Telegram user IDs')
@@ -49,6 +70,12 @@ export interface Config {
   u18PoolEnabled: boolean;
   adminTelegramIds: readonly number[];
   contentDir: string;
+  matching: {
+    /** When each locale's pools are matched. */
+    drops: Record<Locale, DropSchedule>;
+    dailyLimit: number;
+    openLimit: number;
+  };
 }
 
 export interface ConfigIssue {
@@ -110,5 +137,13 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     u18PoolEnabled: e.U18_POOL_ENABLED,
     adminTelegramIds: e.ADMIN_TELEGRAM_IDS,
     contentDir: e.CONTENT_DIR,
+    matching: {
+      drops: {
+        ru: { times: e.MATCH_DROP_TIMES_RU, timeZone: e.MATCH_DROP_TZ_RU },
+        en: { times: e.MATCH_DROP_TIMES_EN, timeZone: e.MATCH_DROP_TZ_EN },
+      },
+      dailyLimit: e.MATCH_DAILY_LIMIT,
+      openLimit: e.MATCH_OPEN_LIMIT,
+    },
   };
 }
