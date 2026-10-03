@@ -91,14 +91,17 @@ Pool isolation is enforced in six layers, so a bug in one layer can't break it:
 2. **Write triggers that re-derive bands from `birth_date` at write time** (never from the cached `age_band`):
    - `matches` INSERT requires:
      - both users `active`;
-     - the same live band as `matches.band` and the same locale;
+     - the same live band as `matches.band`, the same locale and the same mode;
      - for `u18`: mode `friends` and birth dates at most 2 calendar years apart (Q14, decided);
-     - no block in either direction.
+     - for dating: each user's gender in the other's `seeking`, and each user's age within the other's partner age range (Q11, Q12);
+     - no block in either direction;
+     - a new match starts as `pending_game`.
+   - `matches` UPDATE: the pair, the pool (band, locale, mode), the teaser and the aliases never change, and a closed match stays closed. The app role can only update the lifecycle columns.
    - `messages` INSERT requires an open match, a sender who is a participant, both live bands equal to `matches.band`, and neither user frozen.
    - `game_predictions` INSERT requires an open match and a predictor who is a participant.
    - `reveal_consents` INSERT requires `matches.band = 'adult'` and both users adult right now.
 3. **State-change triggers:**
-   - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen`, the same transaction closes all their open matches, cancels their pending outbox rows, clears `active_match_id`, and nulls `username` if the band became `u18`.
+   - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. From Phase 4 it also clears `active_match_id`. The `username` is nulled by `admin_set_birth_date()` when the band becomes `u18`.
    - `birth_date` is write-once except through `admin_set_birth_date()`.
 4. **Repository API:**
    - Every read of another user's data goes through `getMatchForParticipant(userId, matchId)`. It checks participation, that the match is readable (not closed for `band_change`), and that live bands are equal.
@@ -123,7 +126,7 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `users` | `id`, `telegram_id` (unique), `public_id` (unique short support code), `locale`, `birth_date` (nullable until set), `age_band` (cache), `status` (`onboarding` / `active` / `waitlisted` / `ineligible` / `frozen` / `deleted`), `mode`, `gender`, `seeking[]`, `dating_age_min`, `dating_age_max` (Q12), `username` (adults only), `timezone`, `bot_reachable`, `active_match_id`, `onboarded_at`, `last_active_at`, `frozen_at`, `created_at` | Write-once trigger on `birth_date`. CHECKs: mode vs band, dating fields null unless `mode = 'dating'`, username vs band. Index on `(age_band, locale, mode, status)`. |
+| `users` | `id`, `telegram_id` (unique), `public_id` (unique short support code), `locale`, `birth_date` (nullable until set), `age_band` (cache), `status` (`onboarding` / `active` / `waitlisted` / `ineligible` / `frozen` / `deleted`), `mode`, `gender`, `seeking[]`, `dating_age_min`, `dating_age_max` (Q12), `username` (adults only), `timezone`, `bot_reachable`, `active_match_id` (Phase 4), `onboarded_at`, `synthetic` (dev tooling only), `last_active_at`, `frozen_at` (Phase 5), `created_at` | Write-once trigger on `birth_date`. CHECKs: mode vs band, dating fields null unless `mode = 'dating'`, username vs band. Index on `(age_band, locale, mode, status)`. |
 | `answers` | PK `(user_id, question_id)`, `value` (`agree` / `disagree` / `skip`), `content_release`, `answered_at` | Index on `(question_id, value)` for rarity stats. |
 | `user_interests` | PK `(user_id, item_id)`, `added_at` | Index on `(item_id)`. |
 
@@ -140,16 +143,16 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `feature_stats` | PK `(band, locale, feature_key)`, `n_users`, `pool_size`, `weight`, `computed_at` | Aggregates per pool, never across bands. |
-| `match_runs` | `id`, `band`, `locale`, `mode`, `started_at`, `finished_at`, `eligible_users`, `pairs_created`, `tier_counts` | Audit and tuning. |
-| `matches` | `id`, `band`, `locale`, `mode`, `user_a_id`, `user_b_id`, `run_id`, `tier`, `score`, `teaser` (content IDs only), `alias_a`, `alias_b`, `status`, `close_reason` (`expired` / `blocked` / `reported` / `frozen` / `band_change` / `left` / `admin` / `deleted`), `created_at`, `game_deadline_at`, `results_ready_at`, `chat_deadline_at`, `first_message_at`, `closed_at` | Insert trigger described in §3. Partial indexes on open matches per user. |
+| `feature_stats` | PK `(band, locale, feature_key)`, `n_users`, `pool_size`, `weight`, `computed_at` | Aggregates per pool, never across bands. `pool_size` is the denominator used: the pool for interests, the people who answered for a take. |
+| `match_runs` | `id`, `band`, `locale`, `mode`, `slot` (the drop), `seed`, `started_at`, `finished_at`, `pool_size`, `eligible_users`, `pairs_created`, `pairs_rejected`, `tier_counts` | Audit and tuning. UNIQUE `(band, locale, mode, slot)`: a drop runs once. |
+| `matches` | `id`, `band`, `locale`, `mode`, `user_a_id`, `user_b_id`, `run_id`, `tier`, `score`, `teaser` (content IDs only), `alias_a`, `alias_b`, `status`, `close_reason` (`expired` / `blocked` / `reported` / `frozen` / `band_change` / `left` / `admin` / `deleted`), `created_at`, `game_deadline_at`, `results_ready_at`, `chat_deadline_at`, `first_message_at`, `closed_at` | Insert and update triggers described in §3. Partial indexes on open matches per user. `run_id` is null only for rows not created by a run (tests). |
 | `blocks` | PK `(blocker_id, blocked_id)`, `match_id`, `created_at` | Checked in both directions by the match trigger. Created in Phase 2, used from Phase 5. |
 
 ### Game
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `games` | `match_id` (PK, FK), `question_ids text[]` (ordered, last = closing split), `closing_question_id`, `a_done_at`, `b_done_at`, `created_at` | Created in the same transaction as the match. |
+| `games` | `match_id` (PK, FK), `question_ids text[]` (ordered, last = closing split), `closing_question_id`, `a_done_at`, `b_done_at`, `created_at` | Created in the same transaction as the match. Phase 2 creates the shell (`match_id`, `created_at`); Phase 3 adds the rest. |
 | `game_predictions` | PK `(match_id, predictor_id, question_id)`, `predicted` (`agree` / `disagree`), `created_at` | Write-once. Participant trigger. |
 
 ### Chat
@@ -171,7 +174,7 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `outbox` | `id`, `user_id`, `kind`, `match_id`, `payload jsonb` (i18n key + params, never rendered text), `dedupe_key` (unique), `status` (`pending` / `sent` / `failed` / `cancelled`), `attempts`, `next_attempt_at`, `sent_at`, `last_error` | Rendered in the recipient's locale at send time. |
+| `outbox` | `id`, `user_id`, `kind`, `match_id`, `payload jsonb` (i18n key + params, never rendered text), `dedupe_key` (unique), `status` (`pending` / `sent` / `failed` / `cancelled`), `attempts`, `next_attempt_at`, `sent_at`, `last_error`, `cancel_reason`, `created_at` | Rendered in the recipient's locale at send time. `cancel_reason` records why a row was dropped without sending. |
 | `payments` | `id`, `user_id`, `product_id`, `stars_amount`, `invoice_payload` (unique, opaque), `telegram_payment_charge_id` (unique), `status` (`pending` / `paid` / `refunded` / `expired`), `created_at`, `paid_at`, `refunded_at` | Idempotency keys are the two unique columns. |
 | `entitlements` | `id`, `user_id`, `kind`, `amount`, `valid_from`, `valid_until`, `source_payment_id`, `revoked_at` | Paid features are still undecided, so this table is generic. |
 
@@ -186,24 +189,26 @@ Products (`content/products.json`) and free-tier limits (config) are versioned f
 - Small pools give noisy counts, so the observed share is blended with a prior. Each catalog item carries a curator-set `popularity_prior` (mainstream ≈ 0.30, known ≈ 0.08, niche ≈ 0.01). A take's prior is its expected agree share (default 0.5). With `α` ≈ 50 pseudo-users:
   `share_f = (n_f + α · prior_f) / (N + α)`
 - The rarity weight is `w_f = −ln(share_f)`. A feature shared by 1% of the pool weighs ≈ 4.6, one shared by 50% ≈ 0.7, and one shared by 90% ≈ 0.1.
-- The statistics use only the pool's own users. They never cross bands.
+- A take's share is measured among the users who answered it (a deck shows each user only part of the question bank), so for takes `N` is the number of people who answered that take.
+- A category or a domain (fallback tiers) uses the same formula. Its prior is the chance of picking at least one of its items, `1 − ∏(1 − prior_item)`, capped at 0.95.
+- The statistics use only the pool's own users, in both modes. They never cross bands.
 
 **Scoring a pair:**
 1. Add up the weights of the interest items both picked.
 2. Add the weights of the takes where both chose the same side, times a factor `β` (provisional 0.5, since interests are the "specific" signal). Skips count for nothing.
 3. In fallback tiers, also add partial credit: both like the same category but different items (tier 2, × `λ_cat` ≈ 0.3), or the same broad domain (tier 3, × `λ_dom` ≈ 0.1). This counts only when they don't already share an item in that category or domain.
 4. Divide by the geometric mean of the two users' own profile weight, √(mass_A · mass_B). Without this, someone who ticks every box would beat everyone. It makes the score behave like a cosine similarity.
-5. Multiply by a waiting bonus `(1 + γ · wait)`, where `wait` grows with hours since the user's last match and is capped. People who have waited longer get served first.
+5. Multiply by a waiting bonus `(1 + γ · wait)`, where `wait` grows with hours since the user's last match and is capped. People who have waited longer get served first. Provisional: `γ` = 0.5; a user's `wait` is their hours waiting ÷ 168, capped at 1, counted from the later of onboarding and their last match; a pair uses the average of its two users.
 
 **Fallback ladder.** Every user starts at tier 1.
 
 | Tier | Counts toward score | Eligibility |
 |---|---|---|
 | 1 Niche | Items + takes | At least one shared item with weight ≥ `ln 20` (shared by ≤ 5% of the pool) |
-| 2 Related | Adds categories | User unmatched ≥ T2 (provisional 24h) |
-| 3 Broad | Adds domains, takes-only pairs allowed | User unmatched ≥ T3 (provisional 72h) |
+| 2 Related | Adds categories | User unmatched ≥ T2 (provisional 24h); the pair has at least one category in common (a shared item that isn't niche counts) |
+| 3 Broad | Adds domains, takes-only pairs allowed | User unmatched ≥ T3 (provisional 72h); the pair has no category in common, but a domain or same-side takes |
 
-A pair can form at tier *t* only if both users have relaxed to at least *t*.
+A pair can form at tier *t* only if both users have relaxed to at least *t*. A pair's tier is the lowest one it qualifies for, and its score counts what that tier allows.
 
 **Hard filters.** These never relax, at any tier:
 - same band, locale and mode;
@@ -211,17 +216,18 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - dating: each user's gender is in the other's `seeking`, and each user's age is within the other's partner age range (Q12, decided);
 - not blocked in either direction, never matched before (Q9, decided);
 - both active, not frozen, bot reachable, active within 14 days (provisional);
-- both under their daily and open-match limits;
+- both under their daily and open-match limits (Q27; "daily" is a rolling 24 hours);
 - at least 5 commonly answered takes, at least one of them a disagreement (the game needs a split to end on).
 
-**Assignment.** For each pool × mode, score the eligible pairs and sort them by score. Then go down the list greedily, accepting a pair only if neither user has already been given a match in this run. With a fixed seed the result is deterministic, so tests are reproducible.
+**Assignment.** For each pool × mode, score the eligible pairs and sort them by tier first (1 before 2 before 3), then by score. Then go down the list greedily, accepting a pair only if neither user has already been given a match in this run. Sorting by tier first is what makes a broader overlap a fallback: without it, two people with similar takes could outrank a pair that shares a rare item. With a fixed seed the result is deterministic, so tests are reproducible; the seed only breaks ties and picks aliases.
 
 **Teaser.**
 - The teaser names the highest-weight shared item (or category, at tier 2) and the highest-weight shared take, e.g. «Кто-то тоже считает, что ананасы на пицце — норм, и слушает Molchat Doma. Сыграем?»
 - Only content IDs are stored, in `matches.teaser`. The text is rendered in the recipient's locale.
-- Each domain has its own verb template ("listens to", "plays", "watches"…).
+- Each domain has its own template ("listens to", "plays", "watches"…), for an item, a category and the domain itself. The Russian templates keep the name in the nominative («У кого-то в плейлисте тоже Молчат Дома.»), because content names are stored in their dictionary form.
+- Until Phase 3 adds stance texts, the take part quotes the statement: «Вы сходитесь во мнении: «…» — вы за.»
 
-**Scale.** The MVP scores every pair within a pool × mode inside a worker thread. That is fine up to a few thousand users per pool. Past that point (a measured threshold), a later optimization finds candidates first through an inverted index on rare features in SQL, then scores only those. That optimization is not in the MVP.
+**Scale.** The MVP scores every pair within a pool × mode inside a worker thread. That is fine up to a few thousand users per pool: 5,000 users (12.5 million pairs) take about 5 seconds for the whole run (Phase 2 benchmark). Memory grows with the number of eligible pairs (8 bytes each), and the planner refuses pools above 20,000 candidates. Past a measured threshold, a later optimization finds candidates first through an inverted index on rare features in SQL, then scores only those. That optimization is not in the MVP.
 
 ---
 
@@ -458,12 +464,12 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 **Out of scope.** Game logic, chat, report/block UI (the `blocks` table only feeds exclusion), paid boosts, ML or embeddings, the candidate index for large pools.
 
 **Acceptance criteria**
-- [ ] Every created match passes all hard filters. This is shown by property tests over random populations and by direct SQL attacks.
-- [ ] Ranking: a shared niche item beats a shared mainstream one; a shared minority take beats a shared majority take; a "picked everything" profile doesn't dominate.
-- [ ] Fallback: a user with no tier-1 partner gets a tier-2 or tier-3 match once the waiting threshold passes, if one exists. Fallback never crosses band, locale, ±2y or dating compatibility.
-- [ ] Turning 18: when the age-transition job runs, the user's open matches with `u18` users close and cancelled notifications are never sent. Before the job runs, the outbox and the match trigger already refuse cross-band actions based on the live band.
-- [ ] Each user in a match gets exactly one notification in their locale naming a real shared item or take. A crash or rerun creates no duplicates.
-- [ ] Benchmark: a run on 5,000 synthetic users in one pool finishes in < 60 s, and the main event loop never lags more than 100 ms (manual or nightly benchmark, not a CI gate).
+- [x] Every created match passes all hard filters. This is shown by property tests over random populations and by direct SQL attacks. *(test/safety/pool-isolation.property.test.ts: 600 random mixed populations, every pair checked against the rules written out independently; pool-isolation.db.test.ts: 23 direct SQL attacks as the app role, including a stale cached `age_band`; pool-isolation.run.test.ts: real runs on a mixed database, every match checked with plain SQL.)*
+- [x] Ranking: a shared niche item beats a shared mainstream one; a shared minority take beats a shared majority take; a "picked everything" profile doesn't dominate. *(src/domain/matching/score.test.ts)*
+- [x] Fallback: a user with no tier-1 partner gets a tier-2 or tier-3 match once the waiting threshold passes, if one exists. Fallback never crosses band, locale, ±2y or dating compatibility. *(src/domain/matching/tiers.test.ts; test/matching/run.integration.test.ts; the property test covers all three tiers)*
+- [x] Turning 18: when the age-transition job runs, the user's open matches with `u18` users close and cancelled notifications are never sent. Before the job runs, the outbox and the match trigger already refuse cross-band actions based on the live band. *(test/safety/age-transition.test.ts, outbox-recheck.test.ts)*
+- [ ] Each user in a match gets exactly one notification in their locale naming a real shared item or take. A crash or rerun creates no duplicates. *(Automated: test/bot/notify.test.ts and test/matching/run.integration.test.ts against a faked Bot API. Pending: the product owner's check of the real notification in Telegram with `pnpm dev:match-me`.)*
+- [x] Benchmark: a run on 5,000 synthetic users in one pool finishes in < 60 s, and the main event loop never lags more than 100 ms (manual or nightly benchmark, not a CI gate). *(`pnpm bench:matching`, 2026-10-03, local Mac, Node 24, Docker Postgres 17: 4.9 s for the run, longest event-loop lag 17 ms, 2,134 pairs, none refused by the trigger.)*
 
 **Tests that prove it**
 - `apps/server/src/domain/matching/rarity.test.ts`: the smoothing formula, the effect of the prior for small N, and the ordering niche > known > mainstream.
@@ -478,6 +484,42 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 - `apps/server/test/matching/run.integration.test.ts`: two concurrent runs → only one does work (advisory lock); unreachable users are excluded; a rerun is idempotent.
 - `apps/server/test/bot/notify.test.ts`: localized teaser and button; a 403 marks the user unreachable.
 
+**Phase 2 implementation notes (2026-10-03).** Deviations from, and additions to, the scope above:
+- **Matching rules (§5 is updated to match):**
+  - Assignment sorts by tier first, then by score, so a broader overlap is used only when no niche one is left.
+  - A take's share is measured among the users who answered it. Categories and domains get a prior derived from their items.
+  - "Daily" in the free-tier limit is a rolling 24 hours. Open matches are counted by status; nothing expires before Phase 3 adds the expiry job, so a user who reaches 5 open matches stays there until then.
+  - The planner is a pure function (`domain/matching/plan.ts`). It re-derives every user's band from the birth date and ignores users of other pools, whatever the query returned.
+  - It refuses pools above 20,000 candidates (all-pairs scoring); see §5 "Scale".
+- **Safety SQL (migration 0005):**
+  - The `matches` insert trigger also checks the mode and, for dating, preferences and the age range (Q12), and share-locks both users so a concurrent freeze or birth-date correction can't slip past.
+  - Added a `matches` update trigger (immutable pair, pool, teaser and aliases; a closed match stays closed) and column-level UPDATE grants.
+  - The state-change trigger also closes matches on status `deleted`, and on a birth-date correction inside the same band (reason `admin`).
+  - `vc_within_years()` is the SQL twin of `birthDatesWithinYears()` (Q14), with a parity property test.
+  - Not in Phase 2: `users.active_match_id` (Phase 4), INSERT on `blocks` for the app role (Phase 5), the grant on `admin_set_birth_date()` (Phase 5), and re-validation when a match moves to `results_ready` or `active` (Phases 3 and 4 own those transitions).
+- **Dating age range (Q12):** stored as absolute ages in `users.dating_age_min` / `dating_age_max`, required exactly in dating mode. Migration 0004 backfills existing dating users with the default. Onboarding applies the default; the range is edited in the mode settings.
+- **Teaser:** takes have no stance texts before Phase 3, so the teaser quotes the statement («Вы сходитесь во мнении: «…» — вы за.»). Russian item templates keep names in the nominative. **Phase 3 should revisit the copy once stance texts exist**, and the product owner should review the teaser strings in `locales/{ru,en}.json`.
+- **Aliases:** `content/aliases` grew from 3 samples to 32, `content:check` requires 2 and `--launch` 12, content release `2026.10.2`. The alias list is new authored content and needs the product owner's review.
+- **Runs:**
+  - A drop is identified by `match_runs.slot`; UNIQUE per pool × mode makes a rerun a no-op, and an interrupted run is resumed with the same seed, skipping users it already matched.
+  - Default drop times are 13:00 and 20:00 local (provisional config defaults; Q8 fixed only the cadence and time zones). After downtime a drop is caught up only if it is less than 3 hours old.
+  - Only planning runs in the worker thread. The pool is loaded page by page and the pairs are inserted on the main thread, one transaction each.
+  - A pair the database refuses (the trigger, a deadlock with a concurrent user update) is skipped and counted in `match_runs.pairs_rejected`.
+  - `u18` pools are never run while `U18_POOL_ENABLED` is false.
+- **Outbox sender:**
+  - Delivery is at-least-once: a row is leased, sent, then marked sent. A crash between Telegram's answer and that write resends it after the lease (60 s). Enqueueing is exactly-once (`dedupe_key`, UNIQUE pair).
+  - Pacing and retries are in-house (about 25 messages a second, 1 a second per chat, backoff from 30 s, 6 attempts); grammY's auto-retry and throttler plugins are not used.
+  - A user without a stored time zone gets their pool's drop time zone for the quiet-hours check (Q22).
+  - A 403, or 400 "chat not found", sets `bot_reachable = false`. It becomes true again when the user writes to the bot, unblocks it, or opens the Mini App with `allows_write_to_pm`.
+- **Age-transition job:** besides reconciling `age_band`, it activates waitlisted users whose pool is open: adults always (someone who turned 18 on the waitlist), `u18` users only while the `u18` pool is enabled. Nobody is notified about this yet.
+- **API and Mini App (ahead of the Phase 3 list):** `GET /api/matches` and `GET /api/matches/:id` return a summary (alias, teaser, status). The home screen lists open matches; the match screen is a placeholder; the notification button opens it through `?match=<id>`. Initial JS is 95.4 KB gzip.
+- **Synthetic users:** `users.synthetic` marks users made by dev tooling. They are matched like anyone else outside production, never messaged, and ignored entirely when `NODE_ENV=production`.
+- **Dev tooling:** `pnpm dev:match-me` lets every tier match immediately (no 24 h / 72 h wait) unless `--strict` is passed, and `--ignore-limits` lifts the free-tier limits for that run. `pnpm bench:matching` is the benchmark.
+- **Found during Phase 2:**
+  - `test/content/seed.test.ts` hard-coded the next release number, so the content release bump broke it; it now uses far-future versions.
+  - Raw `db.execute` results return timestamps as text (Drizzle's parsers); repositories select epoch milliseconds instead.
+- **Local setup after pulling Phase 2:** run `pnpm db:migrate` and `pnpm content:seed` (the content release changed) before `pnpm dev`.
+
 ---
 
 ### Phase 3 — Game
@@ -491,7 +533,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - the other picks mix agreements (preferring rare shared takes) with at most one more disagreement;
   - the closing question always comes last.
 - Tables: `game_predictions` plus `games.a_done_at` / `b_done_at`. A participant-only insert trigger. Predictions are write-once and submitted as one batch.
-- API:
+- API (`GET /api/matches` and `GET /api/matches/:id` exist since Phase 2 as summaries; Phase 3 extends them):
   - `GET /api/matches`;
   - `GET /api/matches/:id`: teaser, aliases, status, deadlines;
   - `GET /api/matches/:id/game`: the questions only, **never the counterpart's answers**;
@@ -507,7 +549,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - "Your match finished — your turn" when the other user finishes first;
   - "Results are ready" to both;
   - one reminder before the game deadline (Q2, decided).
-- Expiry job: a `pending_game` match past `game_deadline_at` (created + 48h, Q2, decided) becomes `expired`, and both users get a neutral notification.
+- Expiry job: a `pending_game` match past `game_deadline_at` (created + 48h, Q2, decided) becomes `expired`, and both users get a neutral notification. Until this job exists, open matches never expire and keep counting toward the open-match limit.
+- Stance texts for takes (docs/content-format.md), and a review of the teaser copy that Phase 2 built without them.
 - Mini App: match intro (teaser), prediction cards, a waiting screen (refetches on `visibilitychange` or focus; no WebSockets), results.
 
 **Out of scope.** Sending messages (Phase 4), LLM-generated text, score history or leaderboards, rematches.
@@ -746,7 +789,7 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? ✅ **Decided (2026-10-03, product owner):** 35 takes drawn per band × mode, skip allowed (≥ 25 non-skip answers required), answers editable later with effect on future matches only.
 - **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? ✅ **Decided (2026-10-03, product owner):** catalog-only (no free-text entries), 5–30 picks per user, a curated catalog maintained by the team (format: `docs/content-format.md`). ✅ **Decided (2026-10-03, product owner):** `content:check --launch` keeps counting items per locale for now (≥ 150 each; the launch content has 187 ru / 157 en). Counting per band × locale must be revisited before G3: `u18:en` currently sees only 127 items. **Still open:** how big the ru catalog must be at launch. *Needed by:* G2 (catalog size), G3 (per-band count).
 - **Q7. Are photos in the product at all?** ✅ **Decided (2026-10-02, product owner):** no photos anywhere in the MVP.
-- **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? ✅ **Decided (2026-10-03, product owner):** scheduled drops, twice a day per pool, at times in Europe/Moscow for ru and UTC for en. The times are config values.
+- **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? ✅ **Decided (2026-10-03, product owner):** scheduled drops, twice a day per pool, at times in Europe/Moscow for ru and UTC for en. The times are config values. The defaults, 13:00 and 20:00 local, are provisional (set in Phase 2).
 - **Q9. Rematch policy.** Can an expired pair ever be matched again? ✅ **Decided (2026-10-03, product owner):** never. A pair is matched at most once (UNIQUE pair).
 - **Q10. Adult modes.** Can an adult be in friends and dating at once? What happens to open matches when they switch? ✅ **Decided (2026-10-03, product owner):** one mode at a time, switchable in settings; open matches stay open when the mode changes.
 - **Q11. Dating gender and preference model.** Which gender options, and is "seeking" multi-select? ✅ **Decided (2026-10-03, product owner):** dating mode asks **"You are"** (man / woman, single choice) and **"Looking for"** (men / women, multi-select, at least one). A match requires mutual compatibility: each user's gender is in the other's "looking for". The option list lives in `content/` so it can be extended later; `users.gender` and `users.seeking` store option IDs (format: `docs/content-format.md`). The two extra fields are accepted as part of onboarding. Legal review of dating features is still covered by Q28.
