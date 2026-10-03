@@ -17,6 +17,7 @@ import {
   outboxRow,
   withoutTriggers,
 } from '../support/matches';
+import { buildSender } from '../support/notify';
 import { birthDateYearsAgo, insertUser } from '../support/users';
 
 let testDb: TestDatabase;
@@ -182,6 +183,14 @@ describe('an 18th birthday', () => {
     }
     // Nothing left to do on the next run.
     expect((await job().run()).reconciled).toBe(0);
+
+    // The cancelled notifications are never sent, to either side.
+    const { sender, calls } = await buildSender(testDb, { now: new Date(Date.now() + 60_000) });
+    for (let round = 0; round < 20; round++) await sender.tick();
+    const messaged = calls.map((c) => c.payload.chat_id);
+    for (const telegramId of [user.telegramId, ...matches.map((m) => m.friend.telegramId)]) {
+      expect(messaged).not.toContain(telegramId);
+    }
   });
 
   it('any other write to the user has the same effect as the job', async () => {
