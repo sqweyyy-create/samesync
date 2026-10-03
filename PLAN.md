@@ -123,7 +123,7 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `users` | `id`, `telegram_id` (unique), `public_id` (unique short support code), `locale`, `birth_date` (nullable until set), `age_band` (cache), `status` (`onboarding` / `active` / `waitlisted` / `ineligible` / `frozen` / `deleted`), `mode`, `gender`, `seeking[]`, `username` (adults only), `timezone`, `bot_reachable`, `active_match_id`, `onboarded_at`, `last_active_at`, `frozen_at`, `created_at` | Write-once trigger on `birth_date`. CHECKs: mode vs band, dating fields null unless `mode = 'dating'`, username vs band. Index on `(age_band, locale, mode, status)`. |
+| `users` | `id`, `telegram_id` (unique), `public_id` (unique short support code), `locale`, `birth_date` (nullable until set), `age_band` (cache), `status` (`onboarding` / `active` / `waitlisted` / `ineligible` / `frozen` / `deleted`), `mode`, `gender`, `seeking[]`, `dating_age_min`, `dating_age_max` (Q12), `username` (adults only), `timezone`, `bot_reachable`, `active_match_id`, `onboarded_at`, `last_active_at`, `frozen_at`, `created_at` | Write-once trigger on `birth_date`. CHECKs: mode vs band, dating fields null unless `mode = 'dating'`, username vs band. Index on `(age_band, locale, mode, status)`. |
 | `answers` | PK `(user_id, question_id)`, `value` (`agree` / `disagree` / `skip`), `content_release`, `answered_at` | Index on `(question_id, value)` for rarity stats. |
 | `user_interests` | PK `(user_id, item_id)`, `added_at` | Index on `(item_id)`. |
 
@@ -208,8 +208,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 **Hard filters.** These never relax, at any tier:
 - same band, locale and mode;
 - `u18`: birth dates at most 2 calendar years apart (Q14);
-- dating: each user's gender is in the other's `seeking` (and the age range from Q12);
-- not blocked in either direction, never matched before (Q9);
+- dating: each user's gender is in the other's `seeking`, and each user's age is within the other's partner age range (Q12, decided);
+- not blocked in either direction, never matched before (Q9, decided);
 - both active, not frozen, bot reachable, active within 14 days (provisional);
 - both under their daily and open-match limits;
 - at least 5 commonly answered takes, at least one of them a disagreement (the game needs a split to end on).
@@ -434,12 +434,13 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - the age-transition job (hourly). It reconciles the `age_band` cache from `birth_date`, which fires the closing trigger. A user who has just turned 18 lands in the adult pool in `friends` mode and can opt into dating.
 - `domain/matching/`, all pure: rarity, scoring, tiers, eligibility, greedy assignment, teaser selection, alias generation (from the localized `content/aliases`).
 - Matching run:
-  - scheduled per pool × mode (Q8; provisional twice a day per pool, configurable);
+  - scheduled per pool × mode as drops (Q8, decided): twice a day per pool, at configurable times in Europe/Moscow for ru and UTC for en;
   - holds an advisory lock;
   - recomputes stats, then scores in a worker thread;
   - inserts matches and outbox rows in one transaction per pair;
   - logs `match_runs`.
-- Limits: provisional free tier of 3 new matches/day and 5 open matches (config; Q27). They are applied as eligibility filters.
+- Limits (Q27, decided): a free tier of 3 new matches a day and 5 open matches, both config values. They are applied as eligibility filters.
+- Dating age range (Q12, decided): `users.dating_age_min` / `dating_age_max`, set when a user enters dating mode (default: own age ±5, clamped to 18+) and editable in settings. Matching and the `matches` insert trigger require each user's age to be within the other's range. Friends mode has no age-gap limit in the adult pool.
 - Outbox sender:
   - stays under Telegram's bulk limit (~30 msg/s overall, 1 msg/s per chat);
   - exponential backoff;
@@ -447,9 +448,12 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
   - a 403 ("bot blocked by user") sets `bot_reachable = false`;
   - **re-checks match state, both live bands and freeze status before every send**;
   - renders in the recipient's locale;
-  - holds non-urgent notifications during the recipient's local quiet hours (Q22).
+  - never holds notifications: between 23:00 and 08:00 in the recipient's local time it sends them silently (`disable_notification: true`), otherwise normally (Q22, decided).
 - Notification: the teaser text plus a `web_app` button that deep-links to the match in the Mini App. The Mini App home lists the user's matches; the match screen is a placeholder until Phase 3.
-- Dev tooling: `pnpm dev:population --pool adult:ru --mode friends --n 500` builds a synthetic population. It refuses to run when `NODE_ENV=production`.
+- Dev tooling (both refuse to run when `NODE_ENV=production`):
+  - `pnpm dev:population --pool adult:ru --mode friends --n 500` builds a synthetic population;
+  - `pnpm dev:match-me <public_id>` creates synthetic users compatible with a real dev user (same pool and mode, dating compatibility), runs one matching run for that pool, and lets the real user receive the bot notification with the teaser. Notifications to synthetic users are skipped, never sent.
+- Mode switching (Q10): the test left open by Phase 1. Switching mode leaves existing open matches open.
 
 **Out of scope.** Game logic, chat, report/block UI (the `blocks` table only feeds exclusion), paid boosts, ML or embeddings, the candidate index for large pools.
 
@@ -742,11 +746,11 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? ✅ **Decided (2026-10-03, product owner):** 35 takes drawn per band × mode, skip allowed (≥ 25 non-skip answers required), answers editable later with effect on future matches only.
 - **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? ✅ **Decided (2026-10-03, product owner):** catalog-only (no free-text entries), 5–30 picks per user, a curated catalog maintained by the team (format: `docs/content-format.md`). ✅ **Decided (2026-10-03, product owner):** `content:check --launch` keeps counting items per locale for now (≥ 150 each; the launch content has 187 ru / 157 en). Counting per band × locale must be revisited before G3: `u18:en` currently sees only 127 items. **Still open:** how big the ru catalog must be at launch. *Needed by:* G2 (catalog size), G3 (per-band count).
 - **Q7. Are photos in the product at all?** ✅ **Decided (2026-10-02, product owner):** no photos anywhere in the MVP.
-- **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? *Provisional:* configurable cron, twice daily per pool, times in Europe/Moscow for ru and UTC for en. *Needed by:* Phase 2.
-- **Q9. Rematch policy.** Can an expired pair ever be matched again? *Provisional:* never (UNIQUE pair). *Needed by:* Phase 2.
+- **Q8. Matching cadence.** Continuous small runs, or scheduled "drops" (which concentrate activity and help cold start)? Drops in which timezone? ✅ **Decided (2026-10-03, product owner):** scheduled drops, twice a day per pool, at times in Europe/Moscow for ru and UTC for en. The times are config values.
+- **Q9. Rematch policy.** Can an expired pair ever be matched again? ✅ **Decided (2026-10-03, product owner):** never. A pair is matched at most once (UNIQUE pair).
 - **Q10. Adult modes.** Can an adult be in friends and dating at once? What happens to open matches when they switch? ✅ **Decided (2026-10-03, product owner):** one mode at a time, switchable in settings; open matches stay open when the mode changes.
 - **Q11. Dating gender and preference model.** Which gender options, and is "seeking" multi-select? ✅ **Decided (2026-10-03, product owner):** dating mode asks **"You are"** (man / woman, single choice) and **"Looking for"** (men / women, multi-select, at least one). A match requires mutual compatibility: each user's gender is in the other's "looking for". The option list lives in `content/` so it can be extended later; `users.gender` and `users.seeking` store option IDs (format: `docs/content-format.md`). The two extra fields are accepted as part of onboarding. Legal review of dating features is still covered by Q28.
-- **Q12. Age gaps in the adult pool.** The spec limits age gaps only for `u18`. Should an 18-year-old be matched with a 45-year-old, especially in dating? *Provisional:* dating gets a user-set age range defaulting to ±5 years; friends has no limit. Product decision needed. *Needed by:* Phase 2.
+- **Q12. Age gaps in the adult pool.** The spec limits age gaps only for `u18`. Should an 18-year-old be matched with a 45-year-old, especially in dating? ✅ **Decided (2026-10-03, product owner):** dating has a user-set partner age range. It defaults to ±5 years from the user's own age, clamped to 18+, and can be changed in settings. Two users match only if each one's age is within the other's range. Friends mode has no age-gap limit (in the adult pool; the `u18` rule from Q14 is unchanged).
 - **Q13. Choosing and switching language.** Picked by the user or taken from `language_code`? Where do `uk`/`be`/`kk`… go? Does switching move pools and close open matches? Can bilingual users join both pools? ✅ **Decided (2026-10-03, product owner):** preselected from `language_code` (`ru` → ru, otherwise en), then stored in `users.locale`; changeable only in SameSync's settings; a change affects future matches only; one language pool per user. Consequence: after the first use, changing the Telegram client's language does **not** change SameSync's language. Phase 1 makes the bot and the Mini App read the stored locale (Phase 0 still follows the live `language_code`).
 
 **Age & safety**
@@ -758,7 +762,7 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q19. 18+ chat content.** The spec restricts media only for `u18`. Is adult chat text-only too? Should contacts be filtered in adult chat before a reveal? *Provisional:* text-only in both pools, no contact filter for adults. *Needed by:* Phase 4.
 - **Q20. Retention.** How long are message bodies, report evidence and filtered (blocked) message bodies kept? Moderation needs evidence, and privacy argues for less. *Provisional:* messages 30 days; evidence until the report is resolved + 90 days; filtered bodies stored with the same retention and shown to admins only inside reports. *Needed by:* Phase 4.
 - **Q21. Age verification beyond self-declaration.** Adults posing as minors is the biggest residual risk (§9). *Provisional:* none in the MVP; the risk is accepted, documented and reduced as §9 describes. *Needed by:* G3.
-- **Q22. Quiet hours.** Should there be no notifications at night, especially for minors? That needs the user's timezone, which Telegram doesn't provide. *Provisional:* capture the IANA timezone from the Mini App (`Intl`) and hold notifications 23:00–08:00 local. *Needed by:* Phase 2.
+- **Q22. Quiet hours.** Should there be no notifications at night, especially for minors? That needs the user's timezone, which Telegram doesn't provide. ✅ **Decided (2026-10-03, product owner), differently from the provisional answer:** notifications are never held. Between 23:00 and 08:00 in the user's local time they are sent immediately but silently (`disable_notification: true`); at other times they are sent normally. The local time comes from the IANA timezone the Mini App reports (`Intl`).
 - **Q23. Account deletion and data export.** Not in the spec, but likely legally required. *Provisional:* `/delete` in Phase 5 (anonymize, keep only safety and audit records); export postponed. *Needed by:* Phase 5.
 
 **Chat**
@@ -767,7 +771,7 @@ Each question lists a *provisional* default used until it is answered (implement
 
 **Monetization**
 - **Q26. Are purchases allowed in the under-18 pool?** (Raised in the spec.) *Provisional:* off, through a per-band `bands_allowed` on each product. *Needed by:* G4.
-- **Q27. Paid features, prices, free-tier numbers, one-off vs subscription.** *Provisional:* 3 new matches a day, 5 open matches, one-off purchases only, a placeholder product outside production. *Needed by:* G4.
+- **Q27. Paid features, prices, free-tier numbers, one-off vs subscription.** ✅ **Free tier decided (2026-10-03, product owner):** 3 new matches a day and 5 open matches, both config values. **Still open:** paid features, prices, and one-off vs subscription. *Provisional:* one-off purchases only, a placeholder product outside production. *Needed by:* G4.
 
 **Legal & operations**
 - **Q28. Legal review (blocks public launch).** Topics:
