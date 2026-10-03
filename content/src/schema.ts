@@ -12,6 +12,7 @@ export const SCHEMA_VERSION = 1;
 export const DOMAINS = ['music', 'games', 'shows', 'movies', 'books', 'memes'] as const;
 export type Domain = (typeof DOMAINS)[number];
 export const POPULARITY = ['mainstream', 'known', 'niche'] as const;
+export type Popularity = (typeof POPULARITY)[number];
 
 /** Release versions look like `2026.10.1`: year, month, then a counter within the month. */
 export const RELEASE_VERSION = /^(\d{4})\.(0[1-9]|1[0-2])\.(\d+)$/;
