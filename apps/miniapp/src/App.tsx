@@ -114,6 +114,7 @@ export function App({
         api={api}
         me={me}
         busy={busy}
+        editing
         onSave={(request) =>
           void run(() => api.setMode(request)).then((ok) => ok && backToSettings())
         }

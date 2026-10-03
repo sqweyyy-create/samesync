@@ -93,6 +93,88 @@ describe('<App> routing by onboarding step', () => {
   });
 });
 
+describe('<App> settings: dating age range (Q12)', () => {
+  const dating = me({
+    step: 'done',
+    status: 'active',
+    band: 'adult',
+    birthDate: '2000-01-01',
+    age: 26,
+    mode: 'dating',
+    gender: 'g.woman',
+    seeking: ['g.man'],
+    datingAgeMin: 21,
+    datingAgeMax: 31,
+  });
+
+  async function openModeSettings(api: ReturnType<typeof fakeApi>) {
+    renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Режим' }));
+    return { from: await screen.findByLabelText('от'), to: screen.getByLabelText('до') };
+  }
+
+  it('shows the stored range and saves a changed one', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() => ok(dating)),
+      setMode: vi.fn(() => ok({ ...dating, datingAgeMin: 24, datingAgeMax: 35 })),
+    });
+    const { from, to } = await openModeSettings(api);
+    expect([(from as HTMLInputElement).value, (to as HTMLInputElement).value]).toEqual([
+      '21',
+      '31',
+    ]);
+    fireEvent.change(from, { target: { value: '24' } });
+    fireEvent.change(to, { target: { value: '35' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Дальше' }));
+    await waitFor(() =>
+      expect(api.setMode).toHaveBeenCalledWith({
+        mode: 'dating',
+        gender: 'g.woman',
+        seeking: ['g.man'],
+        ageMin: 24,
+        ageMax: 35,
+      }),
+    );
+  });
+
+  it('does not let an invalid range through (below 18, or from above to)', async () => {
+    const api = fakeApi({ getMe: vi.fn(() => ok(dating)) });
+    const { from, to } = await openModeSettings(api);
+    const next = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Дальше' });
+    fireEvent.change(from, { target: { value: '17' } });
+    expect(next().disabled).toBe(true);
+    fireEvent.change(from, { target: { value: '40' } });
+    expect(next().disabled).toBe(true);
+    fireEvent.change(to, { target: { value: '45' } });
+    expect(next().disabled).toBe(false);
+  });
+
+  it('offers own age ±5 (never below 18) when switching from friends to dating', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() =>
+        ok(
+          me({
+            ...dating,
+            age: 20,
+            mode: 'friends',
+            gender: null,
+            seeking: null,
+            datingAgeMin: null,
+            datingAgeMax: null,
+          }),
+        ),
+      ),
+    });
+    renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Режим' }));
+    fireEvent.click(screen.getByRole('button', { name: /Отношения/ }));
+    expect((await screen.findByLabelText<HTMLInputElement>('от')).value).toBe('18');
+    expect(screen.getByLabelText<HTMLInputElement>('до').value).toBe('25');
+  });
+});
+
 describe('<App> done screen and write access', () => {
   it('requests write access when the bot may not message the user yet', async () => {
     const platform = fakePlatform({ allowsWriteToPm: () => false });
