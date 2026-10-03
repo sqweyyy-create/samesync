@@ -9,6 +9,9 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @samesync/server --filter @samesync/miniapp run dev",
     "dev:initdata": "pnpm --filter @samesync/server run dev:initdata",
+    "dev:population": "pnpm --filter @samesync/server run dev:population",
+    "dev:match-me": "pnpm --filter @samesync/server run dev:match-me",
+    "bench:matching": "pnpm --filter @samesync/server run bench:matching",
     "db:migrate": "pnpm --filter @samesync/server run db:migrate",
     "db:generate": "pnpm --filter @samesync/server run db:generate",
     "build": "pnpm --recursive run build",
