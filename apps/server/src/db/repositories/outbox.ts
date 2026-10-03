@@ -64,15 +64,17 @@ export function createOutboxRepository(db: Db): OutboxRepository {
         match_id: string | null;
         attempts: number;
       }>(sql`
-        UPDATE outbox o
-        SET attempts = o.attempts + 1, next_attempt_at = ${leaseUntil}::timestamptz
-        WHERE o.id IN (
+        WITH due AS MATERIALIZED (
           SELECT id FROM outbox
           WHERE status = 'pending' AND next_attempt_at <= ${nowIso}::timestamptz
           ORDER BY next_attempt_at, id
           LIMIT ${limit}
           FOR UPDATE SKIP LOCKED
         )
+        UPDATE outbox o
+        SET attempts = o.attempts + 1, next_attempt_at = ${leaseUntil}::timestamptz
+        FROM due
+        WHERE o.id = due.id
         RETURNING o.id, o.user_id, o.kind, o.match_id, o.attempts`);
       return result.rows
         .map((r) => ({

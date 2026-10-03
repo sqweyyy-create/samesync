@@ -288,6 +288,23 @@ describe('who gets matched', () => {
     );
   });
 
+  it('never plans a blocked pair, whoever blocked whom', async () => {
+    const [a, b] = await insertPair(niche[0]!);
+    const [c, d] = await insertPair(niche[1]!);
+    await testDb.ownerPool.query(
+      'INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2), ($3, $4)',
+      [a.id, b.id, d.id, c.id],
+    );
+    const { service } = await buildMatching(testDb);
+    // Excluded by the engine itself: the database trigger never had to refuse anything.
+    expect(await run(service)).toMatchObject({
+      status: 'done',
+      eligibleUsers: 4,
+      pairsCreated: 0,
+      pairsRejected: 0,
+    });
+  });
+
   it('applies the free-tier limits: 5 open matches, 3 new matches in 24 hours', async () => {
     const [busy, partner] = await insertPair(niche[0]!);
     const others = await Promise.all(

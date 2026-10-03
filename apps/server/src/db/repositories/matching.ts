@@ -15,7 +15,7 @@ import type {
   Tier,
 } from '../../domain/matching/types';
 import type { Db } from '../client';
-import { blocks, featureStats, games, matchRuns, matches, outbox } from '../schema/index';
+import { featureStats, games, matchRuns, matches, outbox } from '../schema/index';
 
 export interface RunRecord {
   id: string;
@@ -236,18 +236,15 @@ export function createMatchingRepository(db: Db): MatchingRepository {
 
     async loadExcludedPairs(userIds) {
       if (userIds.length < 2) return [];
-      const ids = [...userIds];
-      const [matched, blocked] = await Promise.all([
-        db
-          .select({ a: matches.userAId, b: matches.userBId })
-          .from(matches)
-          .where(and(inArray(matches.userAId, ids), inArray(matches.userBId, ids))),
-        db
-          .select({ a: blocks.blockerId, b: blocks.blockedId })
-          .from(blocks)
-          .where(and(inArray(blocks.blockerId, ids), inArray(blocks.blockedId, ids))),
-      ]);
-      return [...matched, ...blocked].map((r) => [r.a, r.b]);
+      // One array parameter, however large the pool is.
+      const ids = sql`${`{${userIds.join(',')}}`}::uuid[]`;
+      const result = await db.execute<{ a: string; b: string }>(sql`
+        SELECT user_a_id AS a, user_b_id AS b FROM matches
+        WHERE user_a_id = ANY(${ids}) AND user_b_id = ANY(${ids})
+        UNION ALL
+        SELECT blocker_id, blocked_id FROM blocks
+        WHERE blocker_id = ANY(${ids}) AND blocked_id = ANY(${ids})`);
+      return result.rows.map((r) => [r.a, r.b]);
     },
 
     async saveFeatureStats(pool, stats, now) {
