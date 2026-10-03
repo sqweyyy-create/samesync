@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** Phase 0 (scaffold) and Phase 1 (onboarding) are done; Phase 2 (matching engine) is next. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phase 0 (scaffold) and Phase 1 (onboarding) are done. Phase 2 (matching engine) is implemented and waiting for the product owner's manual check of the bot notification in Telegram; see the status table. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -41,6 +41,7 @@ apps/
       bot/                # grammY: commands, relay, admin, payments
       jobs/               # scheduler, matching run, expiry, age transition, outbox sender, purge
       content/            # loads + validates /content at startup
+    scripts/              # CLIs: migrate, content:seed, dev:* tooling, bench:matching
     test/
       safety/             # pool isolation and minor-safety suites. NEVER skipped
   miniapp/                # Vite + React
@@ -111,6 +112,12 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - Migrations create `samesync_app` NOLOGIN and grant per table (least privilege, no DELETE unless needed). Passwords never go in migrations: the login is set by `infra/postgres/init` locally and by the hosting provider in production.
   - Every new table needs explicit grants to `samesync_app` in its migration, plus a test that the app role can do exactly what it needs.
   - Tests run app code as `samesync_app` (`appRolePool()` in `apps/server/test/support/db.ts`), never as the owner.
+  - Raw `db.execute(sql…)` results come back with timestamps as text (Drizzle's parsers). Select epoch milliseconds (`(extract(epoch FROM x) * 1000)::float8`) when a repository needs a time.
+- **Matching (Phase 2):**
+  - `domain/matching/plan.ts` is pure and runs in a worker thread (`jobs/matching-worker.ts`); keep it free of I/O and of runtime imports beyond `@samesync/shared`.
+  - A run only proposes pairs. Each match is inserted in its own transaction and the `matches` trigger decides; a refused pair is skipped and counted, never forced.
+  - Scheduled jobs take a Postgres advisory lock (`jobs/advisory-lock.ts`).
+  - `users.synthetic` marks dev-tooling users: never messaged, and ignored when `NODE_ENV=production`.
 - **Bot:**
   - Relayed text goes out as plain text with no `parse_mode`.
   - Proactive messages go through the outbox (throttled, retried, de-duplicated). Direct replies to a user's own command can be sent inline.
@@ -135,6 +142,9 @@ pnpm db:migrate                 # as the owner role (MIGRATION_DATABASE_URL)
 pnpm content:seed               # content IDs + release into the DB (owner role); the server won't start without it
 pnpm dev                        # server (bot long-polling + API + jobs) and Vite dev server
 pnpm dev:initdata               # signed initData + a URL to open the Mini App in a plain browser
+pnpm dev:population --pool adult:ru --mode friends --n 500   # synthetic users for one pool × mode
+pnpm dev:match-me <public_id>   # match a real dev user with synthetic ones and send them the bot notification
+pnpm bench:matching             # 5,000-user matching run on a throwaway database (manual benchmark)
 pnpm lint && pnpm typecheck && pnpm test
 pnpm test:safety                # pool isolation and minor-safety suites only
 pnpm content:check              # add --launch for the launch coverage minimums
@@ -143,7 +153,9 @@ pnpm build
 pnpm format                     # Prettier --write (pnpm lint runs --check)
 ```
 
-After any content change: bump `content/release.json`, run `pnpm content:lock`, then `pnpm content:seed`. The server checks at startup that the seeded release matches the files.
+After any content change: bump `content/release.json`, run `pnpm content:lock`, then `pnpm content:seed`. The server checks at startup that the seeded release matches the files. After pulling changes, run `pnpm db:migrate` and `pnpm content:seed` again.
+
+The dev tooling (`dev:*`, `bench:matching`) refuses to run with `NODE_ENV=production`. `<public_id>` is the support code shown in the Mini App settings.
 
 Tests need Postgres: they read `TEST_DATABASE_URL` (owner connection to the `postgres` maintenance DB) from the environment or the root `.env`. They create and drop their own throwaway databases.
 
