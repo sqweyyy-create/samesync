@@ -12,7 +12,7 @@ export interface BotDeps {
   token: string;
   miniAppUrl: string;
   logger: Logger;
-  users: Pick<UsersRepository, 'localeOf' | 'storeUsernameIfAdult'>;
+  users: Pick<UsersRepository, 'localeOf' | 'storeUsernameIfAdult' | 'setBotReachable'>;
   /** Skips the getMe call; used by tests. */
   botInfo?: UserFromGetMe;
 }
@@ -29,6 +29,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     ctx.t = translatorFor(stored ?? resolveLocale(from?.language_code)).t;
     if (from && ctx.chat?.type === 'private') {
       await deps.users.storeUsernameIfAdult(from.id, from.username ?? null);
+      // Whoever writes to the bot can be written to again (after a 403 marked them unreachable).
+      if (ctx.message) await deps.users.setBotReachable(from.id, true);
     }
     await next();
   });
@@ -44,6 +46,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
   dm.command('help', async (ctx) => {
     await ctx.reply(ctx.t('bot.help'));
+  });
+
+  // Blocking the bot arrives as "kicked", unblocking as "member". Unreachable users are not
+  // matched, so nobody gets a match whose notification can't be delivered.
+  dm.on('my_chat_member', async (ctx) => {
+    const status = ctx.myChatMember.new_chat_member.status;
+    if (status === 'kicked') await deps.users.setBotReachable(ctx.from.id, false);
+    if (status === 'member') await deps.users.setBotReachable(ctx.from.id, true);
   });
 
   bot.catch((error) => {

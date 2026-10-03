@@ -16,8 +16,13 @@ interface ApiCall {
  * the locale of users who already have a row (Q13). Username capture against a real DB is in
  * test/safety/username-capture.test.ts.
  */
-function harness(stored: Record<number, Locale> = {}): { bot: Bot<BotContext>; calls: ApiCall[] } {
+function harness(stored: Record<number, Locale> = {}): {
+  bot: Bot<BotContext>;
+  calls: ApiCall[];
+  reachable: Array<[number, boolean]>;
+} {
   const calls: ApiCall[] = [];
+  const reachable: Array<[number, boolean]> = [];
   const bot = createBot({
     token: TEST_BOT_TOKEN,
     miniAppUrl: TEST_MINIAPP_URL,
@@ -26,6 +31,10 @@ function harness(stored: Record<number, Locale> = {}): { bot: Bot<BotContext>; c
     users: {
       localeOf: (telegramId) => Promise.resolve(stored[telegramId] ?? null),
       storeUsernameIfAdult: () => Promise.resolve(),
+      setBotReachable: (telegramId, value) => {
+        reachable.push([telegramId, value]);
+        return Promise.resolve();
+      },
     },
   });
   bot.api.config.use((_prev, method, payload) => {
@@ -33,7 +42,30 @@ function harness(stored: Record<number, Locale> = {}): { bot: Bot<BotContext>; c
     const result = { message_id: calls.length, date: 0, chat: { id: 1, type: 'private' } };
     return Promise.resolve({ ok: true, result } as never);
   });
-  return { bot, calls };
+  return { bot, calls, reachable };
+}
+
+/** The user blocked ("kicked") or unblocked ("member") the bot in their private chat. */
+function blockUpdate(userId: number, status: 'kicked' | 'member'): Update {
+  const user = { id: userId, is_bot: false, first_name: 'Аня' };
+  const bot = { id: 1234567890, is_bot: true, first_name: 'SameSync' };
+  return {
+    update_id: ++updateId,
+    my_chat_member: {
+      chat: { id: userId, type: 'private', first_name: 'Аня' },
+      from: user,
+      date: 1_790_000_000,
+      old_chat_member: {
+        status: status === 'kicked' ? 'member' : 'kicked',
+        user: bot,
+        until_date: 0,
+      },
+      new_chat_member:
+        status === 'kicked'
+          ? { status: 'kicked', user: bot, until_date: 0 }
+          : { status: 'member', user: bot },
+    },
+  };
 }
 
 let updateId = 0;
@@ -139,5 +171,32 @@ describe('bot /start and /help', () => {
       command('/help', { id: 42, first_name: 'Аня', language_code: 'ru' }, 'group'),
     );
     expect(h.calls).toEqual([]);
+  });
+});
+
+describe('bot reachability (unreachable users are not matched)', () => {
+  it('marks a user reachable when they write to the bot', async () => {
+    const h = harness();
+    await h.bot.handleUpdate(command('/start', { id: 42, first_name: 'Аня', language_code: 'ru' }));
+    expect(h.reachable).toEqual([[42, true]]);
+  });
+
+  it('marks a user unreachable when they block the bot, and reachable when they unblock it', async () => {
+    const h = harness();
+    await h.bot.handleUpdate(blockUpdate(42, 'kicked'));
+    await h.bot.handleUpdate(blockUpdate(42, 'member'));
+    expect(h.reachable).toEqual([
+      [42, false],
+      [42, true],
+    ]);
+    expect(h.calls).toEqual([]);
+  });
+
+  it('does nothing for group chats', async () => {
+    const h = harness();
+    await h.bot.handleUpdate(
+      command('/start', { id: 42, first_name: 'Аня', language_code: 'ru' }, 'group'),
+    );
+    expect(h.reachable).toEqual([]);
   });
 });

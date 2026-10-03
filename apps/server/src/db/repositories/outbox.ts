@@ -6,6 +6,7 @@
 import type { Band, Locale, MatchStatus } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
 import { and, eq, sql } from 'drizzle-orm';
+import type { SendContext } from '../../domain/notifications';
 import type { Db } from '../client';
 import { outbox } from '../schema/index';
 
@@ -15,30 +16,6 @@ export interface ClaimedMessage {
   kind: 'match_created';
   matchId: string | null;
   attempts: number;
-}
-
-/** Everything the sender re-checks right before a Telegram call, read in one query. */
-export interface SendContext {
-  recipient: {
-    telegramId: number;
-    locale: Locale;
-    status: UserStatus;
-    botReachable: boolean;
-    synthetic: boolean;
-    timezone: string | null;
-    /** From `birth_date` right now, not the cached column. */
-    liveBand: Band | null;
-  } | null;
-  match: {
-    id: string;
-    status: MatchStatus;
-    band: Band;
-    teaser: unknown;
-    /** The alias the recipient sees for the other user; null if the recipient isn't in the match. */
-    counterpartAlias: string | null;
-    counterpartStatus: UserStatus | null;
-    counterpartLiveBand: Band | null;
-  } | null;
 }
 
 export interface OutboxRepository {
