@@ -43,6 +43,31 @@ describe('createApiClient', () => {
     );
   });
 
+  it('reads the matches list and one match by ID', async () => {
+    const match = {
+      id: '01a10238-d68a-76a8-87cc-960f650dd8c3',
+      alias: { emoji: '🦊', name: 'Лиса' },
+      teaser: 'У кого-то в плейлисте тоже Молчат Дома.',
+      status: 'pending_game',
+      createdAt: '2026-10-03T10:00:00.000Z',
+      gameDeadlineAt: '2026-10-05T10:00:00.000Z',
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ matches: [match] }))
+      .mockResolvedValueOnce(json(match))
+      .mockResolvedValueOnce(json({ error: 'not_found' }, 404));
+    const api = createApiClient({ getInitData: () => 'x', fetch: fetchMock });
+    expect(await api.matches()).toEqual({ kind: 'ok', data: { matches: [match] } });
+    expect(await api.match(match.id)).toEqual({ kind: 'ok', data: match });
+    expect(await api.match('../me')).toEqual({ kind: 'error', code: 'not_found', details: [] });
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      '/api/matches',
+      `/api/matches/${match.id}`,
+      '/api/matches/..%2Fme',
+    ]);
+  });
+
   it('maps 401 to unauthorized and does not call fetch without initData', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json({}, 401));
     expect(await createApiClient({ getInitData: () => 'x', fetch: fetchMock }).getMe()).toEqual({

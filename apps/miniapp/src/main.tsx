@@ -16,13 +16,20 @@ const translator = createTranslator(initialLocale, await loadCatalog(initialLoca
 const api = createApiClient({ getInitData: () => platform.initDataRaw() });
 
 document.documentElement.lang = initialLocale;
+// The bot's "new match" button opens the Mini App with ?match=<id>.
+const initialMatchId = new URLSearchParams(window.location.search).get('match') ?? undefined;
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('#root element missing from index.html');
 
 createRoot(rootElement).render(
   <StrictMode>
     <I18nProvider translator={translator} loadCatalog={loadCatalog}>
-      <App api={api} platform={platform} today={utcDate(new Date())} />
+      <App
+        api={api}
+        platform={platform}
+        today={utcDate(new Date())}
+        initialMatchId={initialMatchId}
+      />
     </I18nProvider>
   </StrictMode>,
 );

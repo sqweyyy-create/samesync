@@ -228,3 +228,84 @@ describe('<App> done screen and write access', () => {
     expect(screen.queryByRole('button', { name: 'Режим' })).toBeNull();
   });
 });
+
+describe('<App> matches', () => {
+  const active = me({ step: 'done', status: 'active', band: 'adult', mode: 'friends' });
+  const match = {
+    id: '01a10238-d68a-76a8-87cc-960f650dd8c3',
+    alias: { emoji: '🦊', name: 'Лиса' },
+    teaser: 'У кого-то в плейлисте тоже Молчат Дома.',
+    status: 'pending_game' as const,
+    createdAt: '2026-10-03T10:00:00.000Z',
+    gameDeadlineAt: '2026-10-05T10:00:00.000Z',
+  };
+
+  it('lists the matches on the home screen and opens the placeholder match screen', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() => ok(active)),
+      matches: vi.fn(() => ok({ matches: [match] })),
+    });
+    renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} />);
+    expect(await screen.findByText('Знакомства')).toBeTruthy();
+    expect(screen.getByText('У кого-то в плейлисте тоже Молчат Дома.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Лиса/ }));
+    expect(screen.getByRole('heading', { name: '🦊 Лиса' })).toBeTruthy();
+    expect(
+      screen.getByText('Скоро здесь появится игра: вы попробуете угадать ответы друг друга.'),
+    ).toBeTruthy();
+    // Already loaded with the list: no second request for the same match.
+    expect(api.match).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Назад' }));
+    expect(await screen.findByText('Профиль готов!')).toBeTruthy();
+  });
+
+  it('shows no matches section while there are none', async () => {
+    const api = fakeApi({ getMe: vi.fn(() => ok(active)) });
+    renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} />);
+    expect(await screen.findByText('Профиль готов!')).toBeTruthy();
+    await waitFor(() => expect(api.matches).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Знакомства')).toBeNull();
+  });
+
+  it('opens the match from the bot notification link, loading it by ID', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() => ok(active)),
+      match: vi.fn(() => ok({ ...match, status: 'closed' as const })),
+    });
+    renderWithI18n(
+      <App api={api} platform={fakePlatform()} today={TODAY} initialMatchId={match.id} />,
+    );
+    expect(await screen.findByRole('heading', { name: '🦊 Лиса' })).toBeTruthy();
+    expect(api.match).toHaveBeenCalledWith(match.id);
+    expect(screen.getByText('Это знакомство завершено.')).toBeTruthy();
+  });
+
+  it('says so when the linked match is not available, and goes back home', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() => ok(active)),
+      match: vi.fn(() =>
+        Promise.resolve({ kind: 'error' as const, code: 'not_found' as const, details: [] }),
+      ),
+    });
+    renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} initialMatchId="gone" />);
+    expect(await screen.findByText('Это знакомство недоступно.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Назад' }));
+    expect(await screen.findByText('Профиль готов!')).toBeTruthy();
+  });
+
+  it('asks for no matches while the user is waitlisted or still onboarding', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() => ok(me({ step: 'done', status: 'waitlisted', band: 'u18' }))),
+    });
+    renderWithI18n(
+      <App api={api} platform={fakePlatform()} today={TODAY} initialMatchId={match.id} />,
+    );
+    expect(
+      await screen.findByText(
+        'Скоро мы откроем SameSync для твоего возраста и сразу напишем в боте.',
+      ),
+    ).toBeTruthy();
+    expect(api.matches).not.toHaveBeenCalled();
+    expect(api.match).not.toHaveBeenCalled();
+  });
+});

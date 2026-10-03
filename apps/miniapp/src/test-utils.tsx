@@ -63,6 +63,8 @@ export function fakeApi(over: Partial<{ [K in keyof ApiClient]: ApiClient[K] }> 
     interests: vi.fn(unused),
     saveInterests: vi.fn(unused),
     complete: vi.fn(unused),
+    matches: vi.fn(() => ok({ matches: [] })),
+    match: vi.fn(unused),
     ...over,
   };
 }

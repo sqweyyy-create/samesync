@@ -1,4 +1,4 @@
-import type { MeResponse } from '@samesync/shared/api';
+import type { MatchSummary, MeResponse } from '@samesync/shared/api';
 import type { MessageKey } from '@samesync/shared/i18n';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient, ApiResult } from './api/client';
@@ -9,6 +9,7 @@ import { Deck } from './screens/Deck';
 import { Done, Finish } from './screens/Done';
 import { Interests } from './screens/Interests';
 import { Language } from './screens/Language';
+import { Match } from './screens/Match';
 import { Mode } from './screens/Mode';
 import { Settings, type SettingsTarget } from './screens/Settings';
 import { Screen } from './ui/Screen';
@@ -29,10 +30,13 @@ export function App({
   api,
   platform,
   today,
+  initialMatchId,
 }: {
   api: ApiClient;
   platform: Platform;
   today: string;
+  /** From the bot notification button (`?match=<id>`): open this match first. */
+  initialMatchId?: string | undefined;
 }) {
   const t = useT();
   const { switchTo } = useLocale();
@@ -40,6 +44,9 @@ export function App({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<'flow' | 'settings' | SettingsTarget>('flow');
+  const [openMatch, setOpenMatch] = useState<{ id: string; match?: MatchSummary } | null>(
+    initialMatchId ? { id: initialMatchId } : null,
+  );
 
   const accept = useCallback(
     (next: MeResponse) => {
@@ -182,6 +189,24 @@ export function App({
     case 'finish':
       return <Finish api={api} onError={fail} onDone={accept} />;
     case 'done':
-      return <Done me={me} platform={platform} onSettings={() => setView('settings')} />;
+      if (openMatch && me.status === 'active') {
+        return (
+          <Match
+            api={api}
+            matchId={openMatch.id}
+            match={openMatch.match}
+            onBack={() => setOpenMatch(null)}
+          />
+        );
+      }
+      return (
+        <Done
+          api={api}
+          me={me}
+          platform={platform}
+          onSettings={() => setView('settings')}
+          onOpenMatch={(match) => setOpenMatch({ id: match.id, match })}
+        />
+      );
   }
 }

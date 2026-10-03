@@ -5,6 +5,8 @@ import {
   DatingOptionsResponse,
   DeckResponse,
   InterestsResponse,
+  MatchSummary,
+  MatchesResponse,
   MeResponse,
   type AnswerValue,
   type ApiErrorCode,
@@ -38,6 +40,8 @@ export interface ApiClient {
   }) => Promise<ApiResult<InterestsResponse>>;
   readonly saveInterests: (itemIds: string[]) => Promise<ApiResult<MeResponse>>;
   readonly complete: (timezone: string | undefined) => Promise<ApiResult<MeResponse>>;
+  readonly matches: () => Promise<ApiResult<MatchesResponse>>;
+  readonly match: (id: string) => Promise<ApiResult<MatchSummary>>;
 }
 
 export interface ApiClientDeps {
@@ -109,5 +113,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     saveInterests: (itemIds) => call(MeResponse, 'PUT', '/api/profile/interests', { itemIds }),
     complete: (timezone) =>
       call(MeResponse, 'POST', '/api/onboarding/complete', timezone ? { timezone } : {}),
+    matches: () => call(MatchesResponse, 'GET', '/api/matches'),
+    match: (id) => call(MatchSummary, 'GET', `/api/matches/${encodeURIComponent(id)}`),
   };
 }

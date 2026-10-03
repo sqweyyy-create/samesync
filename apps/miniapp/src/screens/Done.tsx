@@ -1,9 +1,10 @@
-import type { MeResponse } from '@samesync/shared/api';
+import type { MatchSummary, MeResponse } from '@samesync/shared/api';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
 import type { Platform } from '../platform/types';
 import { Screen } from '../ui/Screen';
+import { MatchList } from './Match';
 
 /** Completes onboarding once all minimums are met, sending the device time zone (Q22). */
 export function Finish({
@@ -29,17 +30,22 @@ export function Finish({
 }
 
 /**
- * Profile done. If the bot may not message the user yet (`allows_write_to_pm` is false), asks
- * Telegram for write access so match notifications can reach them later.
+ * The home screen once the profile is done: the user's matches, and settings. If the bot may not
+ * message the user yet (`allows_write_to_pm` is false), asks Telegram for write access so match
+ * notifications can reach them.
  */
 export function Done({
+  api,
   me,
   platform,
   onSettings,
+  onOpenMatch,
 }: {
+  api: ApiClient;
   me: MeResponse;
   platform: Platform;
   onSettings: () => void;
+  onOpenMatch: (match: MatchSummary) => void;
 }) {
   const t = useT();
   const [needsAccess, setNeedsAccess] = useState(platform.allowsWriteToPm() === false);
@@ -67,6 +73,7 @@ export function Done({
           </button>
         </>
       )}
+      {me.status === 'active' && <MatchList api={api} onOpen={onOpenMatch} />}
       <button type="button" className="secondary" onClick={onSettings}>
         {t('miniapp.done.settings')}
       </button>
