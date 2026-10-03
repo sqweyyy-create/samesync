@@ -7,7 +7,7 @@ Last updated: 2026-10-03. Project context and the non-negotiable safety rules ar
 | Phase | Title | Status |
 |---|---|---|
 | 0 | Scaffold | done (2026-10-03) |
-| 1 | Onboarding | not started |
+| 1 | Onboarding | done (2026-10-03) |
 | 2 | Matching engine | not started |
 | 3 | Game | not started |
 | 4 | Anonymous chat | not started |
@@ -364,7 +364,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*.
 **Out of scope.** Matching. Any way for a user to edit their birth date (never planned). The admin bot command (Phase 5). Photos, bios, avatars (Q7).
 
 **Acceptance criteria**
-- [ ] A manual run in Telegram completes onboarding in ≤ 3 minutes in both locales. *(Pending the product owner. A browser run with dev initData completed the whole flow in en, including settings and a switch to ru.)*
+- [x] A manual run in Telegram completes onboarding in ≤ 3 minutes in both locales. *(Passed 2026-10-03, product owner, dev bot. The ru dating-mode run took about 2 minutes. Settings showed the birth date read-only with the support code. Switching the language to English changed the UI at once, and `/start` then replied in English. The en friends-mode run showed no dating-only takes.)*
 - [x] Birth date: a second submission gets 409; a direct `UPDATE` as `samesync_app` raises; `admin_set_birth_date()` succeeds only with a reason and writes an audit row. *(test/safety/birth-date-immutable.test.ts)*
 - [x] `ageOn()` and `vc_age_years()` agree on all tested dates. *(test/safety/age-sql-parity.test.ts: 1,500 random pairs plus birthday, Feb 29 and fixed edge cases)*
 - [x] A `u18` user can't be put in dating mode or have a username stored, through either the API or SQL. *(test/safety/band-constraints.test.ts, username-capture.test.ts)*
