@@ -122,7 +122,11 @@ try {
   }
 
   if (result.status === 'not_matched' || !result.match) {
-    const why = result.ineligible ? INELIGIBLE_HINT[result.ineligible] : 'no partner was found';
+    const why = result.ineligible
+      ? INELIGIBLE_HINT[result.ineligible]
+      : values.strict
+        ? 'no partner was found under the real waiting thresholds (try without --strict)'
+        : 'no partner was found';
     console.log(`No match for ${publicId}: ${why}.`);
   } else {
     const { match } = result;
