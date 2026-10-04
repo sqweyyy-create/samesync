@@ -18,6 +18,1194 @@
         "ru": "Ананасам на пицце не место. Чем они тебе нравятся?",
         "en": "Pineapple doesn't belong on pizza. What do you like about it?"
       }
+    },
+    {
+      "id": "o.long_voice_messages.agree",
+      "questionId": "q.long_voice_messages",
+      "side": "agree",
+      "text": {
+        "ru": "Голосовые дольше минуты — это пытка. Как ты их вообще слушаешь?",
+        "en": "Voice messages over a minute are torture. How do you even listen to them?"
+      }
+    },
+    {
+      "id": "o.long_voice_messages.disagree",
+      "questionId": "q.long_voice_messages",
+      "side": "disagree",
+      "text": {
+        "ru": "Длинные голосовые — лучший формат. Чем они тебя так бесят?",
+        "en": "Long voice messages are the best format. Why do they bug you so much?"
+      }
+    },
+    {
+      "id": "o.remakes_worse.agree",
+      "questionId": "q.remakes_worse",
+      "side": "agree",
+      "text": {
+        "ru": "Ремейки почти всегда проигрывают оригиналу. Какой ремейк тебя всё-таки зацепил?",
+        "en": "Remakes almost always lose to the original. Which one won you over?"
+      }
+    },
+    {
+      "id": "o.remakes_worse.disagree",
+      "questionId": "q.remakes_worse",
+      "side": "disagree",
+      "text": {
+        "ru": "Бывают ремейки лучше оригинала. Какой, по-твоему, самый провальный?",
+        "en": "Some remakes beat the original. Which one is the worst, in your view?"
+      }
+    },
+    {
+      "id": "o.slow_replies_ok.agree",
+      "questionId": "q.slow_replies_ok",
+      "side": "agree",
+      "text": {
+        "ru": "Ответить через три часа — это нормально. Почему тебя это задевает?",
+        "en": "Replying three hours later is totally fine. Why does it bother you?"
+      }
+    },
+    {
+      "id": "o.slow_replies_ok.disagree",
+      "questionId": "q.slow_replies_ok",
+      "side": "disagree",
+      "text": {
+        "ru": "Три часа без ответа — это долго. Как ты так спокойно ждёшь?",
+        "en": "Three hours without a reply is a lot. How are you so calm about it?"
+      }
+    },
+    {
+      "id": "o.calls_without_warning.agree",
+      "questionId": "q.calls_without_warning",
+      "side": "agree",
+      "text": {
+        "ru": "Звонок без предупреждения — сразу тревога. Тебе правда нормально, когда так звонят?",
+        "en": "An unannounced call instantly means panic. Are you really fine with it?"
+      }
+    },
+    {
+      "id": "o.calls_without_warning.disagree",
+      "questionId": "q.calls_without_warning",
+      "side": "disagree",
+      "text": {
+        "ru": "Просто позвонить быстрее любой переписки. Что пугает в звонках?",
+        "en": "Just calling is faster than any chat. What's scary about calls?"
+      }
+    },
+    {
+      "id": "o.night_thinking.agree",
+      "questionId": "q.night_thinking",
+      "side": "agree",
+      "text": {
+        "ru": "Лучшие мысли приходят ночью. Как тебе удаётся думать по утрам?",
+        "en": "My best ideas show up at night. How do you think in the morning?"
+      }
+    },
+    {
+      "id": "o.night_thinking.disagree",
+      "questionId": "q.night_thinking",
+      "side": "disagree",
+      "text": {
+        "ru": "Утром голова свежая, а ночью только залипать. Что в ночи такого особенного?",
+        "en": "Mornings are for thinking, nights are for scrolling. What's so special about night?"
+      }
+    },
+    {
+      "id": "o.breakfast_overrated.agree",
+      "questionId": "q.breakfast_overrated",
+      "side": "agree",
+      "text": {
+        "ru": "Завтрак переоценён, кофе хватает. Что у тебя на завтрак, раз он так важен?",
+        "en": "Breakfast is overrated, coffee is enough. What do you eat that makes it worth it?"
+      }
+    },
+    {
+      "id": "o.breakfast_overrated.disagree",
+      "questionId": "q.breakfast_overrated",
+      "side": "disagree",
+      "text": {
+        "ru": "Без завтрака день не начинается. Как ты вообще живёшь до обеда?",
+        "en": "A day doesn't start without breakfast. How do you survive until lunch?"
+      }
+    },
+    {
+      "id": "o.cats_over_dogs.agree",
+      "questionId": "q.cats_over_dogs",
+      "side": "agree",
+      "text": {
+        "ru": "Кошки лучше собак, тут без вариантов. Чем тебя покорили собаки?",
+        "en": "Cats beat dogs, no contest. What won you over with dogs?"
+      }
+    },
+    {
+      "id": "o.cats_over_dogs.disagree",
+      "questionId": "q.cats_over_dogs",
+      "side": "disagree",
+      "text": {
+        "ru": "Собаки лучше кошек. Чем кошки лучше, по-твоему?",
+        "en": "Dogs beat cats. What makes cats better for you?"
+      }
+    },
+    {
+      "id": "o.winter_over_summer.agree",
+      "questionId": "q.winter_over_summer",
+      "side": "agree",
+      "text": {
+        "ru": "Зима лучше лета: свитера, снег, уют. Что такого в лете?",
+        "en": "Winter beats summer: sweaters, snow, coziness. What's so great about summer?"
+      }
+    },
+    {
+      "id": "o.winter_over_summer.disagree",
+      "questionId": "q.winter_over_summer",
+      "side": "disagree",
+      "text": {
+        "ru": "Лето лучше зимы, даже спорить странно. Что ты любишь в зиме?",
+        "en": "Summer beats winter, it's not even close. What do you love about winter?"
+      }
+    },
+    {
+      "id": "o.rain_best_weather.agree",
+      "questionId": "q.rain_best_weather",
+      "side": "agree",
+      "text": {
+        "ru": "Дождь за окном — идеальная погода. Почему он тебе не заходит?",
+        "en": "Rain outside is perfect weather. Why doesn't it work for you?"
+      }
+    },
+    {
+      "id": "o.rain_best_weather.disagree",
+      "questionId": "q.rain_best_weather",
+      "side": "disagree",
+      "text": {
+        "ru": "Дождь — это мокро и грустно. Что в нём уютного?",
+        "en": "Rain is wet and gloomy. What's cozy about it?"
+      }
+    },
+    {
+      "id": "o.spoilers_ok.agree",
+      "questionId": "q.spoilers_ok",
+      "side": "agree",
+      "text": {
+        "ru": "Спойлеры ничего не портят, так даже интереснее. Тебе правда так обидно?",
+        "en": "Spoilers don't ruin anything, they even make it more fun. Do they really upset you?"
+      }
+    },
+    {
+      "id": "o.spoilers_ok.disagree",
+      "questionId": "q.spoilers_ok",
+      "side": "disagree",
+      "text": {
+        "ru": "Спойлеры портят всё. Как можно знать концовку и смотреть дальше?",
+        "en": "Spoilers ruin everything. How can you know the ending and keep watching?"
+      }
+    },
+    {
+      "id": "o.rewatch_comfort.agree",
+      "questionId": "q.rewatch_comfort",
+      "side": "agree",
+      "text": {
+        "ru": "Пересматривать любимое — лучший отдых. Не надоедает вечно искать новое?",
+        "en": "Rewatching a favorite is the best way to unwind. Don't you get tired of hunting for new stuff?"
+      }
+    },
+    {
+      "id": "o.rewatch_comfort.disagree",
+      "questionId": "q.rewatch_comfort",
+      "side": "disagree",
+      "text": {
+        "ru": "Зачем пересматривать, когда столько нового? Что ты пересматриваешь чаще всего?",
+        "en": "Why rewatch when there's so much new stuff? What do you rewatch the most?"
+      }
+    },
+    {
+      "id": "o.book_better.agree",
+      "questionId": "q.book_better",
+      "side": "agree",
+      "text": {
+        "ru": "Книга почти всегда сильнее фильма. Какая экранизация, по-твоему, лучше книги?",
+        "en": "The book almost always beats the movie. Which adaptation beats the book for you?"
+      }
+    },
+    {
+      "id": "o.book_better.disagree",
+      "questionId": "q.book_better",
+      "side": "disagree",
+      "text": {
+        "ru": "Бывает, фильм лучше книги. Какую экранизацию ты никогда не простишь?",
+        "en": "Sometimes the movie beats the book. Which adaptation will you never forgive?"
+      }
+    },
+    {
+      "id": "o.original_with_subs.agree",
+      "questionId": "q.original_with_subs",
+      "side": "agree",
+      "text": {
+        "ru": "Только оригинал с субтитрами, озвучка убивает половину. Тебе правда нормально с дубляжом?",
+        "en": "Original with subtitles only, dubbing kills half of it. Are you really fine with dubs?"
+      }
+    },
+    {
+      "id": "o.original_with_subs.disagree",
+      "questionId": "q.original_with_subs",
+      "side": "disagree",
+      "text": {
+        "ru": "С озвучкой удобнее, не надо читать. Субтитры не отвлекают?",
+        "en": "Dubbed is easier, no reading needed. Don't subtitles distract you?"
+      }
+    },
+    {
+      "id": "o.anime_is_art.agree",
+      "questionId": "q.anime_is_art",
+      "side": "agree",
+      "text": {
+        "ru": "Аниме — полноценное искусство. Что в нём тебе не заходит?",
+        "en": "Anime is real art. What doesn't click for you?"
+      }
+    },
+    {
+      "id": "o.anime_is_art.disagree",
+      "questionId": "q.anime_is_art",
+      "side": "disagree",
+      "text": {
+        "ru": "Для меня аниме — просто мультики. Какой тайтл может это изменить?",
+        "en": "To me anime is just cartoons. Which show could change my mind?"
+      }
+    },
+    {
+      "id": "o.albums_no_shuffle.agree",
+      "questionId": "q.albums_no_shuffle",
+      "side": "agree",
+      "text": {
+        "ru": "Альбом — это история, его слушают целиком. Ты правда всё на шаффле?",
+        "en": "An album is a story, you play it start to finish. Do you really shuffle everything?"
+      }
+    },
+    {
+      "id": "o.albums_no_shuffle.disagree",
+      "questionId": "q.albums_no_shuffle",
+      "side": "disagree",
+      "text": {
+        "ru": "Шаффл — лучший режим. Какой альбом, по-твоему, нельзя слушать вразнобой?",
+        "en": "Shuffle is the best mode. Which album would you never shuffle?"
+      }
+    },
+    {
+      "id": "o.old_music_better.agree",
+      "questionId": "q.old_music_better",
+      "side": "agree",
+      "text": {
+        "ru": "Раньше музыка была лучше. Кто из новых, по-твоему, это опровергает?",
+        "en": "Music used to be better. Who's new that proves me wrong?"
+      }
+    },
+    {
+      "id": "o.old_music_better.disagree",
+      "questionId": "q.old_music_better",
+      "side": "disagree",
+      "text": {
+        "ru": "Сейчас музыка не хуже старой. Какую старую музыку, по-твоему, нечем заменить?",
+        "en": "Music today is just as good. What old music do you think can't be replaced?"
+      }
+    },
+    {
+      "id": "o.live_over_studio.agree",
+      "questionId": "q.live_over_studio",
+      "side": "agree",
+      "text": {
+        "ru": "Живой концерт важнее любой записи. Чем студийная версия лучше?",
+        "en": "A live show beats any recording. What makes the studio version better?"
+      }
+    },
+    {
+      "id": "o.live_over_studio.disagree",
+      "questionId": "q.live_over_studio",
+      "side": "disagree",
+      "text": {
+        "ru": "Студийная запись — это и есть песня. Что даёт живое выступление?",
+        "en": "The studio version is the song. What does a live show add?"
+      }
+    },
+    {
+      "id": "o.headphones_always.agree",
+      "questionId": "q.headphones_always",
+      "side": "agree",
+      "text": {
+        "ru": "Без наушников на улицу — никак. Как ты ходишь в тишине?",
+        "en": "Leaving without headphones? Never. How do you walk in silence?"
+      }
+    },
+    {
+      "id": "o.headphones_always.disagree",
+      "questionId": "q.headphones_always",
+      "side": "disagree",
+      "text": {
+        "ru": "Без наушников мир слышнее. Что ты включаешь, когда выходишь?",
+        "en": "Without headphones you actually hear the world. What do you put on when you go out?"
+      }
+    },
+    {
+      "id": "o.single_player_better.agree",
+      "questionId": "q.single_player_better",
+      "side": "agree",
+      "text": {
+        "ru": "Одиночные игры лучше: история, атмосфера, никаких токсиков. Во что ты играешь онлайн?",
+        "en": "Single-player is better: story, atmosphere, no toxic randoms. What do you play online?"
+      }
+    },
+    {
+      "id": "o.single_player_better.disagree",
+      "questionId": "q.single_player_better",
+      "side": "disagree",
+      "text": {
+        "ru": "Онлайн-игры лучше, с людьми веселее. Какая одиночная игра тебя зацепила?",
+        "en": "Online games are better, people make it fun. Which single-player game hooked you?"
+      }
+    },
+    {
+      "id": "o.mobile_games_real.agree",
+      "questionId": "q.mobile_games_real",
+      "side": "agree",
+      "text": {
+        "ru": "Мобильные игры — тоже настоящие игры. Чего тебе в них не хватает?",
+        "en": "Mobile games are real games too. What do they lack for you?"
+      }
+    },
+    {
+      "id": "o.mobile_games_real.disagree",
+      "questionId": "q.mobile_games_real",
+      "side": "disagree",
+      "text": {
+        "ru": "Мобилки — это не настоящие игры. Какая мобилка может меня переубедить?",
+        "en": "Mobile games aren't real games. Which one could change my mind?"
+      }
+    },
+    {
+      "id": "o.easy_mode_ok.agree",
+      "questionId": "q.easy_mode_ok",
+      "side": "agree",
+      "text": {
+        "ru": "Играть на лёгком не стыдно, я играю ради истории. Почему для тебя это не считается?",
+        "en": "Easy mode is nothing to be ashamed of, I play for the story. Why doesn't it count for you?"
+      }
+    },
+    {
+      "id": "o.easy_mode_ok.disagree",
+      "questionId": "q.easy_mode_ok",
+      "side": "disagree",
+      "text": {
+        "ru": "Лёгкий режим — это не игра. Зачем тогда вообще играть?",
+        "en": "Easy mode isn't really playing. Why play at all then?"
+      }
+    },
+    {
+      "id": "o.absurd_humor.agree",
+      "questionId": "q.absurd_humor",
+      "side": "agree",
+      "text": {
+        "ru": "Абсурдный юмор — лучший. Что тогда смешит тебя?",
+        "en": "Absurd humor is the best. What makes you laugh, then?"
+      }
+    },
+    {
+      "id": "o.absurd_humor.disagree",
+      "questionId": "q.absurd_humor",
+      "side": "disagree",
+      "text": {
+        "ru": "Абсурд — это не смешно, это просто странно. Покажешь мем, который меня переубедит?",
+        "en": "Absurd humor isn't funny, it's just weird. Got a meme that could change my mind?"
+      }
+    },
+    {
+      "id": "o.stickers_over_emoji.agree",
+      "questionId": "q.stickers_over_emoji",
+      "side": "agree",
+      "text": {
+        "ru": "Стикеры говорят больше любых эмодзи. Каким эмодзи ты отвечаешь чаще всего?",
+        "en": "Stickers say more than any emoji. Which emoji do you use the most?"
+      }
+    },
+    {
+      "id": "o.stickers_over_emoji.disagree",
+      "questionId": "q.stickers_over_emoji",
+      "side": "disagree",
+      "text": {
+        "ru": "Эмодзи лучше: быстро и понятно. Какой у тебя главный стикер?",
+        "en": "Emoji win: quick and clear. What's your go-to sticker?"
+      }
+    },
+    {
+      "id": "o.light_mode_monsters.agree",
+      "questionId": "q.light_mode_monsters",
+      "side": "agree",
+      "text": {
+        "ru": "Светлая тема жестока к глазам. Как ты так живёшь?",
+        "en": "Light mode is cruel to your eyes. How do you live like that?"
+      }
+    },
+    {
+      "id": "o.light_mode_monsters.disagree",
+      "questionId": "q.light_mode_monsters",
+      "side": "disagree",
+      "text": {
+        "ru": "Светлая тема удобнее, всё видно. Чем тебя пугает белый экран?",
+        "en": "Light mode is easier to read. What scares you about a white screen?"
+      }
+    },
+    {
+      "id": "o.phone_on_table.agree",
+      "questionId": "q.phone_on_table",
+      "side": "agree",
+      "text": {
+        "ru": "Телефон на столе во время встречи — это неуважение. Тебе правда не мешает?",
+        "en": "A phone on the table during a hangout is disrespectful. Doesn't it bother you?"
+      }
+    },
+    {
+      "id": "o.phone_on_table.disagree",
+      "questionId": "q.phone_on_table",
+      "side": "disagree",
+      "text": {
+        "ru": "Телефон на столе — это нормально, мало ли что. Что тебя в этом задевает?",
+        "en": "A phone on the table is fine, things come up. Why does it bother you?"
+      }
+    },
+    {
+      "id": "o.short_videos_waste.agree",
+      "questionId": "q.short_videos_waste",
+      "side": "agree",
+      "text": {
+        "ru": "Короткие видео съедают время впустую. Что ты в них находишь?",
+        "en": "Short videos just eat your time. What do you get out of them?"
+      }
+    },
+    {
+      "id": "o.short_videos_waste.disagree",
+      "questionId": "q.short_videos_waste",
+      "side": "disagree",
+      "text": {
+        "ru": "Короткие видео — нормальный отдых. Как ты отдыхаешь вместо них?",
+        "en": "Short videos are a fine way to unwind. What do you do instead?"
+      }
+    },
+    {
+      "id": "o.social_media_detox.agree",
+      "questionId": "q.social_media_detox",
+      "side": "agree",
+      "text": {
+        "ru": "Месяц без соцсетей стоит попробовать каждому. Что тебя останавливает?",
+        "en": "Everyone should try a month without social media. What's stopping you?"
+      }
+    },
+    {
+      "id": "o.social_media_detox.disagree",
+      "questionId": "q.social_media_detox",
+      "side": "disagree",
+      "text": {
+        "ru": "Удалять соцсети незачем, это просто инструмент. Что даёт такой детокс?",
+        "en": "No point quitting social media, it's just a tool. What does a detox even give you?"
+      }
+    },
+    {
+      "id": "o.weekend_at_home.agree",
+      "questionId": "q.weekend_at_home",
+      "side": "agree",
+      "text": {
+        "ru": "Идеальные выходные — дома, в тишине. Куда ты обычно выбираешься?",
+        "en": "The perfect weekend is at home, quiet. Where do you usually go out?"
+      }
+    },
+    {
+      "id": "o.weekend_at_home.disagree",
+      "questionId": "q.weekend_at_home",
+      "side": "disagree",
+      "text": {
+        "ru": "Выходные дома — потерянные выходные. Чем ты занимаешься, когда сидишь дома?",
+        "en": "A weekend at home is a wasted weekend. What do you even do at home?"
+      }
+    },
+    {
+      "id": "o.spontaneous_plans.agree",
+      "questionId": "q.spontaneous_plans",
+      "side": "agree",
+      "text": {
+        "ru": "Лучшие вечера случаются спонтанно. Как ты всё успеваешь планировать?",
+        "en": "The best nights happen spontaneously. How do you plan everything?"
+      }
+    },
+    {
+      "id": "o.spontaneous_plans.disagree",
+      "questionId": "q.spontaneous_plans",
+      "side": "disagree",
+      "text": {
+        "ru": "Без плана всё разваливается. Какая спонтанная идея у тебя удалась лучше всего?",
+        "en": "Without a plan everything falls apart. What's the best spontaneous thing you've done?"
+      }
+    },
+    {
+      "id": "o.small_talk_pointless.agree",
+      "questionId": "q.small_talk_pointless",
+      "side": "agree",
+      "text": {
+        "ru": "Разговоры ни о чём — пустая трата времени. Тогда сразу о важном: что тебя сейчас занимает?",
+        "en": "Small talk is pointless. So let's skip it: what's on your mind lately?"
+      }
+    },
+    {
+      "id": "o.small_talk_pointless.disagree",
+      "questionId": "q.small_talk_pointless",
+      "side": "disagree",
+      "text": {
+        "ru": "Лёгкая болтовня — нормальный вход в разговор. Что тебе в ней не так?",
+        "en": "Small talk is a fine way in. What's wrong with it for you?"
+      }
+    },
+    {
+      "id": "o.online_friends_real.agree",
+      "questionId": "q.online_friends_real",
+      "side": "agree",
+      "text": {
+        "ru": "Друзья из интернета — такие же настоящие. Что для тебя настоящая дружба?",
+        "en": "Internet friends are real friends. What makes a friendship real for you?"
+      }
+    },
+    {
+      "id": "o.online_friends_real.disagree",
+      "questionId": "q.online_friends_real",
+      "side": "disagree",
+      "text": {
+        "ru": "Без встреч вживую дружба не та. Тебе правда хватает онлайна?",
+        "en": "Without meeting in person it's not the same. Is online really enough for you?"
+      }
+    },
+    {
+      "id": "o.texting_over_calls.agree",
+      "questionId": "q.texting_over_calls",
+      "side": "agree",
+      "text": {
+        "ru": "Переписка лучше звонков: можно подумать. Почему тебе проще позвонить?",
+        "en": "Texting beats calling: you get time to think. Why is calling easier for you?"
+      }
+    },
+    {
+      "id": "o.texting_over_calls.disagree",
+      "questionId": "q.texting_over_calls",
+      "side": "disagree",
+      "text": {
+        "ru": "Один звонок лучше десяти сообщений. Чем тебя так пугают звонки?",
+        "en": "One call beats ten messages. Why do calls bug you?"
+      }
+    },
+    {
+      "id": "o.big_city_better.agree",
+      "questionId": "q.big_city_better",
+      "side": "agree",
+      "text": {
+        "ru": "Большой город — это жизнь. Что тебя тянет за город?",
+        "en": "Big city life is where it's at. What draws you out of town?"
+      }
+    },
+    {
+      "id": "o.big_city_better.disagree",
+      "questionId": "q.big_city_better",
+      "side": "disagree",
+      "text": {
+        "ru": "За городом спокойнее и воздух чище. Что тебя держит в городе?",
+        "en": "Life outside the city is calmer. What keeps you in the city?"
+      }
+    },
+    {
+      "id": "o.solo_travel.agree",
+      "questionId": "q.solo_travel",
+      "side": "agree",
+      "text": {
+        "ru": "Путешествие в одиночку — лучший опыт. С кем ты обычно ездишь?",
+        "en": "Traveling solo is the best experience. Who do you usually travel with?"
+      }
+    },
+    {
+      "id": "o.solo_travel.disagree",
+      "questionId": "q.solo_travel",
+      "side": "disagree",
+      "text": {
+        "ru": "Путешествовать лучше с компанией. Не скучно в одиночку?",
+        "en": "Travel is better with people. Don't you get bored on your own?"
+      }
+    },
+    {
+      "id": "o.mountains_over_sea.agree",
+      "questionId": "q.mountains_over_sea",
+      "side": "agree",
+      "text": {
+        "ru": "Горы лучше моря. Чем тебя так тянет на пляж?",
+        "en": "Mountains beat the beach. What draws you to the sea?"
+      }
+    },
+    {
+      "id": "o.mountains_over_sea.disagree",
+      "questionId": "q.mountains_over_sea",
+      "side": "disagree",
+      "text": {
+        "ru": "Море лучше гор, тут и спорить нечего. Что такого в горах?",
+        "en": "The beach beats mountains, easy. What's so great about mountains?"
+      }
+    },
+    {
+      "id": "o.fast_food_comfort.agree",
+      "questionId": "q.fast_food_comfort",
+      "side": "agree",
+      "text": {
+        "ru": "После тяжёлого дня спасает только фастфуд. А что спасает тебя?",
+        "en": "After a rough day only fast food helps. What helps you?"
+      }
+    },
+    {
+      "id": "o.fast_food_comfort.disagree",
+      "questionId": "q.fast_food_comfort",
+      "side": "disagree",
+      "text": {
+        "ru": "Фастфуд после тяжёлого дня только хуже. Что ты заказываешь в такие вечера?",
+        "en": "Fast food after a rough day just makes it worse. What do you order on nights like that?"
+      }
+    },
+    {
+      "id": "o.spicier_better.agree",
+      "questionId": "q.spicier_better",
+      "side": "agree",
+      "text": {
+        "ru": "Чем острее, тем вкуснее. Какой у тебя предел?",
+        "en": "The spicier the better. What's your limit?"
+      }
+    },
+    {
+      "id": "o.spicier_better.disagree",
+      "questionId": "q.spicier_better",
+      "side": "disagree",
+      "text": {
+        "ru": "Острое — это больно, а не вкусно. Зачем ты это ешь?",
+        "en": "Spicy is pain, not flavor. Why do you eat it?"
+      }
+    },
+    {
+      "id": "o.milk_before_cereal.agree",
+      "questionId": "q.milk_before_cereal",
+      "side": "agree",
+      "text": {
+        "ru": "Сначала молоко, потом хлопья — так они не размокают. Что тебя смущает?",
+        "en": "Milk first, then cereal, so it doesn't get soggy. What's the problem?"
+      }
+    },
+    {
+      "id": "o.milk_before_cereal.disagree",
+      "questionId": "q.milk_before_cereal",
+      "side": "disagree",
+      "text": {
+        "ru": "Сначала хлопья, потом молоко, по-другому нельзя. Как такое вообще приходит в голову?",
+        "en": "Cereal first, then milk, no other way. How did you even come up with that?"
+      }
+    },
+    {
+      "id": "o.tea_over_coffee.agree",
+      "questionId": "q.tea_over_coffee",
+      "side": "agree",
+      "text": {
+        "ru": "Чай лучше кофе. Какой кофе может меня переубедить?",
+        "en": "Tea beats coffee. Which coffee could change my mind?"
+      }
+    },
+    {
+      "id": "o.tea_over_coffee.disagree",
+      "questionId": "q.tea_over_coffee",
+      "side": "disagree",
+      "text": {
+        "ru": "Кофе лучше чая. Какой чай ты вообще пьёшь?",
+        "en": "Coffee beats tea. What tea do you even drink?"
+      }
+    },
+    {
+      "id": "o.cooking_relaxing.agree",
+      "questionId": "q.cooking_relaxing",
+      "side": "agree",
+      "text": {
+        "ru": "Готовить — это отдых. Что тебе больше всего не нравится в готовке?",
+        "en": "Cooking is relaxing. What do you hate about it?"
+      }
+    },
+    {
+      "id": "o.cooking_relaxing.disagree",
+      "questionId": "q.cooking_relaxing",
+      "side": "disagree",
+      "text": {
+        "ru": "Готовка — это обязанность, а не хобби. Что ты любишь готовить?",
+        "en": "Cooking is a chore, not a hobby. What do you love making?"
+      }
+    },
+    {
+      "id": "o.school_useless.agree",
+      "questionId": "q.school_useless",
+      "side": "agree",
+      "text": {
+        "ru": "Большая часть школьного в жизни не нужна. Что из школы тебе реально пригодилось?",
+        "en": "Most of school is useless in real life. What actually turned out useful for you?"
+      }
+    },
+    {
+      "id": "o.school_useless.disagree",
+      "questionId": "q.school_useless",
+      "side": "disagree",
+      "text": {
+        "ru": "Из школы пригождается больше, чем кажется. Какой предмет, по-твоему, точно лишний?",
+        "en": "School turns out more useful than it seems. Which subject do you think is pointless?"
+      }
+    },
+    {
+      "id": "o.youtube_teaches.agree",
+      "questionId": "q.youtube_teaches",
+      "side": "agree",
+      "text": {
+        "ru": "На YouTube можно узнать больше, чем на уроках. Чему учат уроки, чего нет на YouTube?",
+        "en": "I learn more on YouTube than in class. What did class teach you that YouTube can't?"
+      }
+    },
+    {
+      "id": "o.youtube_teaches.disagree",
+      "questionId": "q.youtube_teaches",
+      "side": "disagree",
+      "text": {
+        "ru": "Уроки дают больше, чем YouTube. Что полезного ты там смотришь?",
+        "en": "Class gives you more than YouTube. What useful stuff do you watch there?"
+      }
+    },
+    {
+      "id": "o.ai_study_ok.agree",
+      "questionId": "q.ai_study_ok",
+      "side": "agree",
+      "text": {
+        "ru": "Нейросети — нормальный помощник в учёбе. Где для тебя граница?",
+        "en": "AI is a fine study helper. Where's the line for you?"
+      }
+    },
+    {
+      "id": "o.ai_study_ok.disagree",
+      "questionId": "q.ai_study_ok",
+      "side": "disagree",
+      "text": {
+        "ru": "Нейросети в учёбе — это читерство. Как ты ими пользуешься?",
+        "en": "Using AI for studying is cheating. How do you use it?"
+      }
+    },
+    {
+      "id": "o.money_happiness.agree",
+      "questionId": "q.money_happiness",
+      "side": "agree",
+      "text": {
+        "ru": "Деньги всё-таки покупают счастье. Что для тебя счастье, если не деньги?",
+        "en": "Money does buy happiness. What's happiness for you, if not money?"
+      }
+    },
+    {
+      "id": "o.money_happiness.disagree",
+      "questionId": "q.money_happiness",
+      "side": "disagree",
+      "text": {
+        "ru": "Счастье за деньги не купишь. Что, по-твоему, деньги могут дать?",
+        "en": "Money can't buy happiness. What do you think money does give you?"
+      }
+    },
+    {
+      "id": "o.dream_job_over_salary.agree",
+      "questionId": "q.dream_job_over_salary",
+      "side": "agree",
+      "text": {
+        "ru": "Любимая работа важнее зарплаты. Сколько, по-твоему, стоит нелюбимая работа?",
+        "en": "A job you love beats a big salary. How much money is a job you hate worth?"
+      }
+    },
+    {
+      "id": "o.dream_job_over_salary.disagree",
+      "questionId": "q.dream_job_over_salary",
+      "side": "disagree",
+      "text": {
+        "ru": "Высокая зарплата важнее. Какая работа, по-твоему, стоит того, чтобы получать меньше?",
+        "en": "A big salary matters more. What job is worth earning less for?"
+      }
+    },
+    {
+      "id": "o.comfort_over_style.agree",
+      "questionId": "q.comfort_over_style",
+      "side": "agree",
+      "text": {
+        "ru": "Удобство важнее стиля, всегда. Ради какой вещи ты терпишь неудобство?",
+        "en": "Comfort beats style, always. What item do you suffer through for the look?"
+      }
+    },
+    {
+      "id": "o.comfort_over_style.disagree",
+      "questionId": "q.comfort_over_style",
+      "side": "disagree",
+      "text": {
+        "ru": "Стиль важнее удобства. Насколько тебе важно, как ты выглядишь?",
+        "en": "Style beats comfort. How much do you care about how you look?"
+      }
+    },
+    {
+      "id": "o.horoscopes_fun.agree",
+      "questionId": "q.horoscopes_fun",
+      "side": "agree",
+      "text": {
+        "ru": "Гороскопы — это хотя бы весело. Кто ты по знаку?",
+        "en": "Horoscopes are at least fun. What's your sign?"
+      }
+    },
+    {
+      "id": "o.horoscopes_fun.disagree",
+      "questionId": "q.horoscopes_fun",
+      "side": "disagree",
+      "text": {
+        "ru": "Гороскопы — полная ерунда. Ты правда их читаешь?",
+        "en": "Horoscopes are nonsense. Do you actually read them?"
+      }
+    },
+    {
+      "id": "o.alien_life.agree",
+      "questionId": "q.alien_life",
+      "side": "agree",
+      "text": {
+        "ru": "Жизнь во Вселенной точно есть. Почему ты думаешь, что мы одни?",
+        "en": "There's definitely life out there. Why do you think we're alone?"
+      }
+    },
+    {
+      "id": "o.alien_life.disagree",
+      "questionId": "q.alien_life",
+      "side": "disagree",
+      "text": {
+        "ru": "Скорее всего, мы одни. Что убеждает тебя в обратном?",
+        "en": "We're probably alone. What convinces you otherwise?"
+      }
+    },
+    {
+      "id": "o.past_over_future.agree",
+      "questionId": "q.past_over_future",
+      "side": "agree",
+      "text": {
+        "ru": "В прошлое интереснее. В какой год будущего тебе хочется?",
+        "en": "The past is way more interesting. What year in the future would you visit?"
+      }
+    },
+    {
+      "id": "o.past_over_future.disagree",
+      "questionId": "q.past_over_future",
+      "side": "disagree",
+      "text": {
+        "ru": "В будущее интереснее. В какую эпоху прошлого тебе хочется?",
+        "en": "The future is way more interesting. Which era would you visit in the past?"
+      }
+    },
+    {
+      "id": "o.teleportation_best.agree",
+      "questionId": "q.teleportation_best",
+      "side": "agree",
+      "text": {
+        "ru": "Телепортация — лучшая суперсила. Что может быть лучше?",
+        "en": "Teleportation is the best superpower. What could beat it?"
+      }
+    },
+    {
+      "id": "o.teleportation_best.disagree",
+      "questionId": "q.teleportation_best",
+      "side": "disagree",
+      "text": {
+        "ru": "Телепортация — скучная суперсила. Зачем она тебе?",
+        "en": "Teleportation is a boring superpower. What would you use it for?"
+      }
+    },
+    {
+      "id": "o.messy_room_ok.agree",
+      "questionId": "q.messy_room_ok",
+      "side": "agree",
+      "text": {
+        "ru": "Беспорядок — это нормально, если всё находится. Тебя правда бесит хаос?",
+        "en": "A messy room is fine if you can find stuff. Does chaos really bug you?"
+      }
+    },
+    {
+      "id": "o.messy_room_ok.disagree",
+      "questionId": "q.messy_room_ok",
+      "side": "disagree",
+      "text": {
+        "ru": "В комнате должен быть порядок, иначе и в голове бардак. Как ты что-то находишь?",
+        "en": "A tidy room means a tidy head. How do you find anything?"
+      }
+    },
+    {
+      "id": "o.birthdays_overrated.agree",
+      "questionId": "q.birthdays_overrated",
+      "side": "agree",
+      "text": {
+        "ru": "День рождения переоценён. Как ты обычно его отмечаешь?",
+        "en": "Birthdays are overrated. How do you usually celebrate yours?"
+      }
+    },
+    {
+      "id": "o.birthdays_overrated.disagree",
+      "questionId": "q.birthdays_overrated",
+      "side": "disagree",
+      "text": {
+        "ru": "День рождения — главный личный праздник. Почему он тебе не заходит?",
+        "en": "Your birthday is the most personal holiday. Why doesn't it work for you?"
+      }
+    },
+    {
+      "id": "o.new_year_best.agree",
+      "questionId": "q.new_year_best",
+      "side": "agree",
+      "text": {
+        "ru": "Новый год — лучший праздник в году. Какой праздник, по-твоему, лучше?",
+        "en": "New Year's is the best holiday. Which one beats it for you?"
+      }
+    },
+    {
+      "id": "o.new_year_best.disagree",
+      "questionId": "q.new_year_best",
+      "side": "disagree",
+      "text": {
+        "ru": "Новый год переоценён. Что в нём такого волшебного?",
+        "en": "New Year's is overrated. What's so magical about it?"
+      }
+    },
+    {
+      "id": "o.money_best_gift.agree",
+      "questionId": "q.money_best_gift",
+      "side": "agree",
+      "text": {
+        "ru": "Лучший подарок — деньги, без вариантов. Какой подарок тебя реально удивил?",
+        "en": "Money is the best gift, period. What gift ever really surprised you?"
+      }
+    },
+    {
+      "id": "o.money_best_gift.disagree",
+      "questionId": "q.money_best_gift",
+      "side": "disagree",
+      "text": {
+        "ru": "Деньги — скучный подарок. Какой подарок, по-твоему, лучше денег?",
+        "en": "Money is a boring gift. What gift beats it for you?"
+      }
+    },
+    {
+      "id": "o.dating.split_first_date.agree",
+      "questionId": "q.dating.split_first_date",
+      "side": "agree",
+      "text": {
+        "ru": "На первом свидании честнее делить счёт. Почему тебе так не нравится?",
+        "en": "Splitting the bill on a first date is fairer. Why don't you like it?"
+      }
+    },
+    {
+      "id": "o.dating.split_first_date.disagree",
+      "questionId": "q.dating.split_first_date",
+      "side": "disagree",
+      "text": {
+        "ru": "На первом свидании платит кто-то один. Почему для тебя важно делить?",
+        "en": "On a first date one person pays. Why does splitting matter to you?"
+      }
+    },
+    {
+      "id": "o.dating.who_texts_first.agree",
+      "questionId": "q.dating.who_texts_first",
+      "side": "agree",
+      "text": {
+        "ru": "Неважно, кто пишет первым. Почему для тебя это важно?",
+        "en": "It doesn't matter who texts first. Why does it matter to you?"
+      }
+    },
+    {
+      "id": "o.dating.who_texts_first.disagree",
+      "questionId": "q.dating.who_texts_first",
+      "side": "disagree",
+      "text": {
+        "ru": "Кто пишет первым — это важно. Тебе правда всё равно?",
+        "en": "Who texts first matters. Is it really all the same to you?"
+      }
+    },
+    {
+      "id": "o.dating.little_jealousy.agree",
+      "questionId": "q.dating.little_jealousy",
+      "side": "agree",
+      "text": {
+        "ru": "Немного ревности — это нормально, значит, не всё равно. Где для тебя грань?",
+        "en": "A little jealousy is normal, it means you care. Where's the line for you?"
+      }
+    },
+    {
+      "id": "o.dating.little_jealousy.disagree",
+      "questionId": "q.dating.little_jealousy",
+      "side": "disagree",
+      "text": {
+        "ru": "Ревность — плохой знак. Почему ты считаешь её нормой?",
+        "en": "Jealousy is a bad sign. Why do you think it's normal?"
+      }
+    },
+    {
+      "id": "o.dating.no_shared_passwords.agree",
+      "questionId": "q.dating.no_shared_passwords",
+      "side": "agree",
+      "text": {
+        "ru": "Пароли — это личное, даже в паре. Зачем тебе знать чужие?",
+        "en": "Passwords are private, even in a couple. Why would you want to know them?"
+      }
+    },
+    {
+      "id": "o.dating.no_shared_passwords.disagree",
+      "questionId": "q.dating.no_shared_passwords",
+      "side": "disagree",
+      "text": {
+        "ru": "В паре нечего скрывать, пароли можно знать. Почему тебе это кажется лишним?",
+        "en": "Couples have nothing to hide, sharing passwords is fine. Why does it feel like too much to you?"
+      }
+    },
+    {
+      "id": "o.dating.friends_with_ex.agree",
+      "questionId": "q.dating.friends_with_ex",
+      "side": "agree",
+      "text": {
+        "ru": "С бывшими вполне можно дружить. Почему ты считаешь, что нельзя?",
+        "en": "You can totally stay friends with an ex. Why do you think you can't?"
+      }
+    },
+    {
+      "id": "o.dating.friends_with_ex.disagree",
+      "questionId": "q.dating.friends_with_ex",
+      "side": "disagree",
+      "text": {
+        "ru": "Дружить с бывшими не получается. Как это вообще работает?",
+        "en": "Being friends with an ex doesn't work. How would that even go?"
+      }
+    },
+    {
+      "id": "o.dating.love_at_first_sight.agree",
+      "questionId": "q.dating.love_at_first_sight",
+      "side": "agree",
+      "text": {
+        "ru": "Любовь с первого взгляда существует. Почему ты в неё не веришь?",
+        "en": "Love at first sight is real. Why don't you believe in it?"
+      }
+    },
+    {
+      "id": "o.dating.love_at_first_sight.disagree",
+      "questionId": "q.dating.love_at_first_sight",
+      "side": "disagree",
+      "text": {
+        "ru": "С первого взгляда бывает только симпатия. Что убеждает тебя в обратном?",
+        "en": "At first sight it's only a crush. What convinces you otherwise?"
+      }
+    },
+    {
+      "id": "o.dating.long_distance.agree",
+      "questionId": "q.dating.long_distance",
+      "side": "agree",
+      "text": {
+        "ru": "Отношения на расстоянии могут работать. Что тебя в них пугает?",
+        "en": "Long-distance can work. What scares you about it?"
+      }
+    },
+    {
+      "id": "o.dating.long_distance.disagree",
+      "questionId": "q.dating.long_distance",
+      "side": "disagree",
+      "text": {
+        "ru": "На расстоянии отношения не выживают. Как, по-твоему, это может работать?",
+        "en": "Long-distance doesn't survive. How do you think it can work?"
+      }
+    },
+    {
+      "id": "o.dating.no_shared_hobbies.agree",
+      "questionId": "q.dating.no_shared_hobbies",
+      "side": "agree",
+      "text": {
+        "ru": "Общие увлечения паре не обязательны. Почему для тебя это важно?",
+        "en": "A couple doesn't need shared hobbies. Why do they matter to you?"
+      }
+    },
+    {
+      "id": "o.dating.no_shared_hobbies.disagree",
+      "questionId": "q.dating.no_shared_hobbies",
+      "side": "disagree",
+      "text": {
+        "ru": "Без общих увлечений паре скучно. Что тогда будет связывать?",
+        "en": "Without shared hobbies a couple gets bored. What would hold it together?"
+      }
+    },
+    {
+      "id": "o.dating.pda_cute.agree",
+      "questionId": "q.dating.pda_cute",
+      "side": "agree",
+      "text": {
+        "ru": "Нежности на публике — это мило. Что тебя смущает?",
+        "en": "PDA is cute. What makes it awkward for you?"
+      }
+    },
+    {
+      "id": "o.dating.pda_cute.disagree",
+      "questionId": "q.dating.pda_cute",
+      "side": "disagree",
+      "text": {
+        "ru": "Нежности на публике — это кринж. Тебе правда нормально?",
+        "en": "PDA is cringe. Are you really fine with it?"
+      }
+    },
+    {
+      "id": "o.dating.not_on_social.agree",
+      "questionId": "q.dating.not_on_social",
+      "side": "agree",
+      "text": {
+        "ru": "Отношения не обязательно выкладывать. Зачем это тебе?",
+        "en": "Relationships don't need to be posted. Why does it matter to you?"
+      }
+    },
+    {
+      "id": "o.dating.not_on_social.disagree",
+      "questionId": "q.dating.not_on_social",
+      "side": "disagree",
+      "text": {
+        "ru": "Если вы вместе, это можно и показать. Почему ты против?",
+        "en": "If you're together, why not show it? Why are you against it?"
+      }
+    },
+    {
+      "id": "o.dating.move_in_six_months.agree",
+      "questionId": "q.dating.move_in_six_months",
+      "side": "agree",
+      "text": {
+        "ru": "Через полгода вполне можно съехаться. Сколько, по-твоему, надо ждать?",
+        "en": "Moving in after six months is reasonable. How long would you wait?"
+      }
+    },
+    {
+      "id": "o.dating.move_in_six_months.disagree",
+      "questionId": "q.dating.move_in_six_months",
+      "side": "disagree",
+      "text": {
+        "ru": "Полгода — слишком рано, чтобы съезжаться. Почему тебе так не кажется?",
+        "en": "Six months is way too early to move in. Why doesn't it seem that way to you?"
+      }
+    },
+    {
+      "id": "o.dating.alone_time.agree",
+      "questionId": "q.dating.alone_time",
+      "side": "agree",
+      "text": {
+        "ru": "Даже в отношениях нужно время для себя. Тебе правда оно не нужно?",
+        "en": "Even in a relationship you need time alone. Don't you need that?"
+      }
+    },
+    {
+      "id": "o.dating.alone_time.disagree",
+      "questionId": "q.dating.alone_time",
+      "side": "disagree",
+      "text": {
+        "ru": "В отношениях хочется быть вместе как можно больше. Зачем тебе столько времени отдельно?",
+        "en": "In a relationship I want as much time together as possible. Why do you need so much time apart?"
+      }
     }
   ]
 }

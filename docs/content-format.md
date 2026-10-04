@@ -537,7 +537,7 @@ Set `"retiredIn": "<current release version>"` on the entry and keep it in the f
 Run it from the repository root. It needs Node 24 and pnpm 12 (see `CLAUDE.md`). When everything is valid it prints one summary line (after pnpm's own command echo):
 
 ```
-content:check OK (release 2026.10.2): 67 questions, 0 stances, 31 categories, 187 items, 2 dating options, 2 openers, 32 aliases, 1 products
+content:check OK (release 2026.10.3): 67 questions, 67 stances, 31 categories, 187 items, 2 dating options, 134 openers, 32 aliases, 1 products
 ```
 
 Otherwise it exits with an error and prints one line per problem, named by file (for format errors) or by content ID (for cross-file errors):

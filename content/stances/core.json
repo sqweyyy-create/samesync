@@ -1,0 +1,809 @@
+{
+  "schemaVersion": 1,
+  "stances": [
+    {
+      "id": "s.pineapple_pizza",
+      "questionId": "q.pineapple_pizza",
+      "agree": {
+        "ru": "ананасы на пицце — это нормально",
+        "en": "pineapple on pizza is fine"
+      },
+      "disagree": {
+        "ru": "ананасам не место на пицце",
+        "en": "pineapple doesn't belong on pizza"
+      }
+    },
+    {
+      "id": "s.long_voice_messages",
+      "questionId": "q.long_voice_messages",
+      "agree": {
+        "ru": "голосовые длиннее минуты — преступление",
+        "en": "voice messages over a minute are a crime"
+      },
+      "disagree": {
+        "ru": "длинные голосовые — это нормально",
+        "en": "long voice messages are fine"
+      }
+    },
+    {
+      "id": "s.remakes_worse",
+      "questionId": "q.remakes_worse",
+      "agree": {
+        "ru": "ремейки почти всегда хуже оригинала",
+        "en": "remakes are almost always worse than the original"
+      },
+      "disagree": {
+        "ru": "ремейки бывают лучше оригинала",
+        "en": "remakes can beat the original"
+      }
+    },
+    {
+      "id": "s.slow_replies_ok",
+      "questionId": "q.slow_replies_ok",
+      "agree": {
+        "ru": "ответить через три часа — это нормально",
+        "en": "replying three hours later is fine"
+      },
+      "disagree": {
+        "ru": "три часа — слишком долго для ответа",
+        "en": "three hours is too long to reply"
+      }
+    },
+    {
+      "id": "s.calls_without_warning",
+      "questionId": "q.calls_without_warning",
+      "agree": {
+        "ru": "звонить без предупреждения — это слишком",
+        "en": "calling without texting first is too much"
+      },
+      "disagree": {
+        "ru": "звонить без предупреждения — нормально",
+        "en": "calling out of the blue is fine"
+      }
+    },
+    {
+      "id": "s.night_thinking",
+      "questionId": "q.night_thinking",
+      "agree": {
+        "ru": "ночью думается лучше, чем утром",
+        "en": "your brain works better at night"
+      },
+      "disagree": {
+        "ru": "утром голова работает лучше",
+        "en": "mornings are better for thinking"
+      }
+    },
+    {
+      "id": "s.breakfast_overrated",
+      "questionId": "q.breakfast_overrated",
+      "agree": {
+        "ru": "завтрак переоценён",
+        "en": "breakfast is overrated"
+      },
+      "disagree": {
+        "ru": "завтрак — самый важный приём пищи",
+        "en": "breakfast is the most important meal"
+      }
+    },
+    {
+      "id": "s.cats_over_dogs",
+      "questionId": "q.cats_over_dogs",
+      "agree": {
+        "ru": "кошки лучше собак",
+        "en": "cats are better than dogs"
+      },
+      "disagree": {
+        "ru": "собаки лучше кошек",
+        "en": "dogs are better than cats"
+      }
+    },
+    {
+      "id": "s.winter_over_summer",
+      "questionId": "q.winter_over_summer",
+      "agree": {
+        "ru": "зима лучше лета",
+        "en": "winter is better than summer"
+      },
+      "disagree": {
+        "ru": "лето лучше зимы",
+        "en": "summer is better than winter"
+      }
+    },
+    {
+      "id": "s.rain_best_weather",
+      "questionId": "q.rain_best_weather",
+      "agree": {
+        "ru": "дождь — лучшая погода",
+        "en": "rain is the best weather"
+      },
+      "disagree": {
+        "ru": "дождь — так себе погода",
+        "en": "rain is pretty bad weather"
+      }
+    },
+    {
+      "id": "s.spoilers_ok",
+      "questionId": "q.spoilers_ok",
+      "agree": {
+        "ru": "спойлеры ничего не портят",
+        "en": "spoilers don't ruin anything"
+      },
+      "disagree": {
+        "ru": "спойлеры портят всё",
+        "en": "spoilers ruin everything"
+      }
+    },
+    {
+      "id": "s.rewatch_comfort",
+      "questionId": "q.rewatch_comfort",
+      "agree": {
+        "ru": "пересматривать любимое лучше, чем начинать новое",
+        "en": "rewatching a favorite beats starting something new"
+      },
+      "disagree": {
+        "ru": "новые сериалы лучше пересмотров",
+        "en": "new shows beat rewatches"
+      }
+    },
+    {
+      "id": "s.book_better",
+      "questionId": "q.book_better",
+      "agree": {
+        "ru": "книга почти всегда лучше экранизации",
+        "en": "the book is almost always better than the movie"
+      },
+      "disagree": {
+        "ru": "экранизация бывает лучше книги",
+        "en": "the movie can beat the book"
+      }
+    },
+    {
+      "id": "s.original_with_subs",
+      "questionId": "q.original_with_subs",
+      "agree": {
+        "ru": "фильмы лучше смотреть в оригинале с субтитрами",
+        "en": "movies are better in the original with subtitles"
+      },
+      "disagree": {
+        "ru": "с озвучкой смотреть удобнее",
+        "en": "dubbed movies are more comfortable"
+      }
+    },
+    {
+      "id": "s.anime_is_art",
+      "questionId": "q.anime_is_art",
+      "agree": {
+        "ru": "аниме — это настоящее искусство",
+        "en": "anime is real art"
+      },
+      "disagree": {
+        "ru": "аниме — это просто мультики",
+        "en": "anime is just cartoons"
+      }
+    },
+    {
+      "id": "s.albums_no_shuffle",
+      "questionId": "q.albums_no_shuffle",
+      "agree": {
+        "ru": "альбомы надо слушать целиком",
+        "en": "albums should be played start to finish"
+      },
+      "disagree": {
+        "ru": "слушать вперемешку — нормально",
+        "en": "shuffle is totally fine"
+      }
+    },
+    {
+      "id": "s.old_music_better",
+      "questionId": "q.old_music_better",
+      "agree": {
+        "ru": "раньше музыка была лучше",
+        "en": "music used to be better"
+      },
+      "disagree": {
+        "ru": "сейчас музыка не хуже, чем раньше",
+        "en": "music today is just as good"
+      }
+    },
+    {
+      "id": "s.live_over_studio",
+      "questionId": "q.live_over_studio",
+      "agree": {
+        "ru": "живое выступление важнее студийной записи",
+        "en": "live performance beats the studio version"
+      },
+      "disagree": {
+        "ru": "студийная запись важнее живого выступления",
+        "en": "the studio version is what matters"
+      }
+    },
+    {
+      "id": "s.headphones_always",
+      "questionId": "q.headphones_always",
+      "agree": {
+        "ru": "без наушников из дома не выйти",
+        "en": "you can't leave home without headphones"
+      },
+      "disagree": {
+        "ru": "без наушников гулять даже лучше",
+        "en": "walking without headphones is better"
+      }
+    },
+    {
+      "id": "s.single_player_better",
+      "questionId": "q.single_player_better",
+      "agree": {
+        "ru": "одиночные игры лучше онлайновых",
+        "en": "single-player games beat online games"
+      },
+      "disagree": {
+        "ru": "онлайновые игры лучше одиночных",
+        "en": "online games beat single-player"
+      }
+    },
+    {
+      "id": "s.mobile_games_real",
+      "questionId": "q.mobile_games_real",
+      "agree": {
+        "ru": "мобильные игры — тоже настоящие игры",
+        "en": "mobile games are real games"
+      },
+      "disagree": {
+        "ru": "мобильные игры — не настоящие игры",
+        "en": "mobile games aren't real games"
+      }
+    },
+    {
+      "id": "s.easy_mode_ok",
+      "questionId": "q.easy_mode_ok",
+      "agree": {
+        "ru": "играть на лёгком уровне не стыдно",
+        "en": "playing on easy mode is fine"
+      },
+      "disagree": {
+        "ru": "лёгкий уровень — это не игра",
+        "en": "easy mode isn't really playing"
+      }
+    },
+    {
+      "id": "s.absurd_humor",
+      "questionId": "q.absurd_humor",
+      "agree": {
+        "ru": "лучший юмор — абсурдный",
+        "en": "absurd humor is the best"
+      },
+      "disagree": {
+        "ru": "абсурдный юмор — это не смешно",
+        "en": "absurd humor isn't funny"
+      }
+    },
+    {
+      "id": "s.stickers_over_emoji",
+      "questionId": "q.stickers_over_emoji",
+      "agree": {
+        "ru": "стикеры выразительнее эмодзи",
+        "en": "stickers say more than emoji"
+      },
+      "disagree": {
+        "ru": "эмодзи лучше стикеров",
+        "en": "emoji beat stickers"
+      }
+    },
+    {
+      "id": "s.light_mode_monsters",
+      "questionId": "q.light_mode_monsters",
+      "agree": {
+        "ru": "светлая тема — для монстров",
+        "en": "light mode is for monsters"
+      },
+      "disagree": {
+        "ru": "светлая тема — это нормально",
+        "en": "light mode is fine"
+      }
+    },
+    {
+      "id": "s.phone_on_table",
+      "questionId": "q.phone_on_table",
+      "agree": {
+        "ru": "телефон на столе во время встречи — это неуважение",
+        "en": "a phone on the table during a hangout is disrespectful"
+      },
+      "disagree": {
+        "ru": "телефон на столе — это нормально",
+        "en": "a phone on the table is fine"
+      }
+    },
+    {
+      "id": "s.short_videos_waste",
+      "questionId": "q.short_videos_waste",
+      "agree": {
+        "ru": "короткие видео — пустая трата времени",
+        "en": "short videos are a waste of time"
+      },
+      "disagree": {
+        "ru": "короткие видео — нормальный отдых",
+        "en": "short videos are a fine way to unwind"
+      }
+    },
+    {
+      "id": "s.social_media_detox",
+      "questionId": "q.social_media_detox",
+      "agree": {
+        "ru": "каждому стоит хоть раз удалить соцсети на месяц",
+        "en": "everyone should quit social media for a month at least once"
+      },
+      "disagree": {
+        "ru": "удалять соцсети незачем",
+        "en": "there's no point quitting social media"
+      }
+    },
+    {
+      "id": "s.weekend_at_home",
+      "questionId": "q.weekend_at_home",
+      "agree": {
+        "ru": "идеальные выходные — дома",
+        "en": "the perfect weekend is at home"
+      },
+      "disagree": {
+        "ru": "идеальные выходные — на тусовке",
+        "en": "the perfect weekend is out with people"
+      }
+    },
+    {
+      "id": "s.spontaneous_plans",
+      "questionId": "q.spontaneous_plans",
+      "agree": {
+        "ru": "спонтанные планы лучше запланированных",
+        "en": "spontaneous plans beat planned ones"
+      },
+      "disagree": {
+        "ru": "запланированное лучше спонтанного",
+        "en": "planned beats spontaneous"
+      }
+    },
+    {
+      "id": "s.small_talk_pointless",
+      "questionId": "q.small_talk_pointless",
+      "agree": {
+        "ru": "разговоры ни о чём — пустая трата времени",
+        "en": "small talk is pointless"
+      },
+      "disagree": {
+        "ru": "лёгкая болтовня — это важно",
+        "en": "small talk matters"
+      }
+    },
+    {
+      "id": "s.online_friends_real",
+      "questionId": "q.online_friends_real",
+      "agree": {
+        "ru": "друзья из интернета — настоящие друзья",
+        "en": "internet friends are real friends"
+      },
+      "disagree": {
+        "ru": "друзья из интернета — не совсем настоящие",
+        "en": "internet friends aren't quite real friends"
+      }
+    },
+    {
+      "id": "s.texting_over_calls",
+      "questionId": "q.texting_over_calls",
+      "agree": {
+        "ru": "переписка лучше звонков",
+        "en": "texting beats calling"
+      },
+      "disagree": {
+        "ru": "звонки лучше переписки",
+        "en": "calling beats texting"
+      }
+    },
+    {
+      "id": "s.big_city_better",
+      "questionId": "q.big_city_better",
+      "agree": {
+        "ru": "жить в большом городе лучше",
+        "en": "big city life is better"
+      },
+      "disagree": {
+        "ru": "за городом жить лучше",
+        "en": "life outside the city is better"
+      }
+    },
+    {
+      "id": "s.solo_travel",
+      "questionId": "q.solo_travel",
+      "agree": {
+        "ru": "путешествовать в одиночку — лучший опыт",
+        "en": "traveling solo is the best"
+      },
+      "disagree": {
+        "ru": "путешествовать лучше с компанией",
+        "en": "travel is better with company"
+      }
+    },
+    {
+      "id": "s.mountains_over_sea",
+      "questionId": "q.mountains_over_sea",
+      "agree": {
+        "ru": "горы лучше моря",
+        "en": "mountains are better than the beach"
+      },
+      "disagree": {
+        "ru": "море лучше гор",
+        "en": "the beach is better than mountains"
+      }
+    },
+    {
+      "id": "s.fast_food_comfort",
+      "questionId": "q.fast_food_comfort",
+      "agree": {
+        "ru": "фастфуд — лучшая еда после тяжёлого дня",
+        "en": "fast food is the best after a rough day"
+      },
+      "disagree": {
+        "ru": "после тяжёлого дня нужна нормальная еда",
+        "en": "after a rough day you need real food"
+      }
+    },
+    {
+      "id": "s.spicier_better",
+      "questionId": "q.spicier_better",
+      "agree": {
+        "ru": "чем острее, тем вкуснее",
+        "en": "the spicier the better"
+      },
+      "disagree": {
+        "ru": "острое переоценено",
+        "en": "spicy food is overrated"
+      }
+    },
+    {
+      "id": "s.milk_before_cereal",
+      "questionId": "q.milk_before_cereal",
+      "agree": {
+        "ru": "молоко наливают раньше хлопьев",
+        "en": "milk goes in before the cereal"
+      },
+      "disagree": {
+        "ru": "сначала хлопья, потом молоко",
+        "en": "cereal goes in before the milk"
+      }
+    },
+    {
+      "id": "s.tea_over_coffee",
+      "questionId": "q.tea_over_coffee",
+      "agree": {
+        "ru": "чай лучше кофе",
+        "en": "tea is better than coffee"
+      },
+      "disagree": {
+        "ru": "кофе лучше чая",
+        "en": "coffee is better than tea"
+      }
+    },
+    {
+      "id": "s.cooking_relaxing",
+      "questionId": "q.cooking_relaxing",
+      "agree": {
+        "ru": "готовить — это отдых",
+        "en": "cooking is relaxing"
+      },
+      "disagree": {
+        "ru": "готовить — это обязанность",
+        "en": "cooking is a chore"
+      }
+    },
+    {
+      "id": "s.school_useless",
+      "questionId": "q.school_useless",
+      "agree": {
+        "ru": "большая часть школьной программы в жизни не пригодится",
+        "en": "most of what school teaches is useless"
+      },
+      "disagree": {
+        "ru": "школьная программа пригождается больше, чем кажется",
+        "en": "school turns out more useful than it seems"
+      }
+    },
+    {
+      "id": "s.youtube_teaches",
+      "questionId": "q.youtube_teaches",
+      "agree": {
+        "ru": "на YouTube можно научиться большему, чем на уроках",
+        "en": "you learn more on YouTube than in class"
+      },
+      "disagree": {
+        "ru": "уроки дают больше, чем YouTube",
+        "en": "class teaches more than YouTube"
+      }
+    },
+    {
+      "id": "s.ai_study_ok",
+      "questionId": "q.ai_study_ok",
+      "agree": {
+        "ru": "нейросети — нормальный помощник в учёбе",
+        "en": "AI is a fine study helper"
+      },
+      "disagree": {
+        "ru": "нейросети в учёбе — это читерство",
+        "en": "using AI for studying is cheating"
+      }
+    },
+    {
+      "id": "s.money_happiness",
+      "questionId": "q.money_happiness",
+      "agree": {
+        "ru": "деньги всё-таки покупают счастье",
+        "en": "money does buy happiness"
+      },
+      "disagree": {
+        "ru": "счастье за деньги не купишь",
+        "en": "money can't buy happiness"
+      }
+    },
+    {
+      "id": "s.dream_job_over_salary",
+      "questionId": "q.dream_job_over_salary",
+      "agree": {
+        "ru": "любимая работа лучше высокой зарплаты",
+        "en": "a job you love beats a high salary"
+      },
+      "disagree": {
+        "ru": "высокая зарплата важнее любимой работы",
+        "en": "a high salary matters more than loving your job"
+      }
+    },
+    {
+      "id": "s.comfort_over_style",
+      "questionId": "q.comfort_over_style",
+      "agree": {
+        "ru": "удобство в одежде важнее стиля",
+        "en": "comfort matters more than style"
+      },
+      "disagree": {
+        "ru": "стиль важнее удобства",
+        "en": "style matters more than comfort"
+      }
+    },
+    {
+      "id": "s.horoscopes_fun",
+      "questionId": "q.horoscopes_fun",
+      "agree": {
+        "ru": "гороскопы — это хотя бы весело",
+        "en": "horoscopes are at least fun"
+      },
+      "disagree": {
+        "ru": "гороскопы — ерунда",
+        "en": "horoscopes are nonsense"
+      }
+    },
+    {
+      "id": "s.alien_life",
+      "questionId": "q.alien_life",
+      "agree": {
+        "ru": "где-то во Вселенной точно есть жизнь",
+        "en": "there's definitely life out there"
+      },
+      "disagree": {
+        "ru": "мы во Вселенной, скорее всего, одни",
+        "en": "we're probably alone in the universe"
+      }
+    },
+    {
+      "id": "s.past_over_future",
+      "questionId": "q.past_over_future",
+      "agree": {
+        "ru": "путешествие в прошлое интереснее, чем в будущее",
+        "en": "traveling to the past is more interesting"
+      },
+      "disagree": {
+        "ru": "путешествие в будущее интереснее, чем в прошлое",
+        "en": "traveling to the future is more interesting"
+      }
+    },
+    {
+      "id": "s.teleportation_best",
+      "questionId": "q.teleportation_best",
+      "agree": {
+        "ru": "телепортация — лучшая суперсила",
+        "en": "teleportation is the best superpower"
+      },
+      "disagree": {
+        "ru": "есть суперсилы лучше телепортации",
+        "en": "there are better superpowers than teleportation"
+      }
+    },
+    {
+      "id": "s.messy_room_ok",
+      "questionId": "q.messy_room_ok",
+      "agree": {
+        "ru": "беспорядок в комнате — это нормально",
+        "en": "a messy room is fine"
+      },
+      "disagree": {
+        "ru": "в комнате должен быть порядок",
+        "en": "a room should be tidy"
+      }
+    },
+    {
+      "id": "s.birthdays_overrated",
+      "questionId": "q.birthdays_overrated",
+      "agree": {
+        "ru": "день рождения — переоценённый праздник",
+        "en": "birthdays are overrated"
+      },
+      "disagree": {
+        "ru": "день рождения — важный праздник",
+        "en": "birthdays matter"
+      }
+    },
+    {
+      "id": "s.new_year_best",
+      "questionId": "q.new_year_best",
+      "agree": {
+        "ru": "Новый год — лучший праздник в году",
+        "en": "New Year's is the best holiday"
+      },
+      "disagree": {
+        "ru": "Новый год переоценён",
+        "en": "New Year's is overrated"
+      }
+    },
+    {
+      "id": "s.money_best_gift",
+      "questionId": "q.money_best_gift",
+      "agree": {
+        "ru": "лучший подарок — деньги",
+        "en": "money is the best gift"
+      },
+      "disagree": {
+        "ru": "деньги — скучный подарок",
+        "en": "money is a boring gift"
+      }
+    },
+    {
+      "id": "s.dating.split_first_date",
+      "questionId": "q.dating.split_first_date",
+      "agree": {
+        "ru": "на первом свидании счёт лучше делить пополам",
+        "en": "you should split the bill on a first date"
+      },
+      "disagree": {
+        "ru": "на первом свидании платит кто-то один",
+        "en": "one person should pay on a first date"
+      }
+    },
+    {
+      "id": "s.dating.who_texts_first",
+      "questionId": "q.dating.who_texts_first",
+      "agree": {
+        "ru": "неважно, кто напишет первым",
+        "en": "it doesn't matter who texts first"
+      },
+      "disagree": {
+        "ru": "важно, кто напишет первым",
+        "en": "it matters who texts first"
+      }
+    },
+    {
+      "id": "s.dating.little_jealousy",
+      "questionId": "q.dating.little_jealousy",
+      "agree": {
+        "ru": "немного ревности в отношениях — это нормально",
+        "en": "a little jealousy is normal"
+      },
+      "disagree": {
+        "ru": "ревность — плохой знак",
+        "en": "jealousy is a bad sign"
+      }
+    },
+    {
+      "id": "s.dating.no_shared_passwords",
+      "questionId": "q.dating.no_shared_passwords",
+      "agree": {
+        "ru": "партнёрам не нужно знать пароли друг друга",
+        "en": "partners don't need each other's passwords"
+      },
+      "disagree": {
+        "ru": "в паре нормально знать пароли друг друга",
+        "en": "it's fine for partners to share passwords"
+      }
+    },
+    {
+      "id": "s.dating.friends_with_ex",
+      "questionId": "q.dating.friends_with_ex",
+      "agree": {
+        "ru": "с бывшими можно оставаться друзьями",
+        "en": "you can stay friends with an ex"
+      },
+      "disagree": {
+        "ru": "с бывшими дружить не получается",
+        "en": "you can't be friends with an ex"
+      }
+    },
+    {
+      "id": "s.dating.love_at_first_sight",
+      "questionId": "q.dating.love_at_first_sight",
+      "agree": {
+        "ru": "любовь с первого взгляда существует",
+        "en": "love at first sight is real"
+      },
+      "disagree": {
+        "ru": "любви с первого взгляда не бывает",
+        "en": "there's no such thing as love at first sight"
+      }
+    },
+    {
+      "id": "s.dating.long_distance",
+      "questionId": "q.dating.long_distance",
+      "agree": {
+        "ru": "отношения на расстоянии могут работать",
+        "en": "long-distance relationships can work"
+      },
+      "disagree": {
+        "ru": "отношения на расстоянии не работают",
+        "en": "long-distance relationships don't work"
+      }
+    },
+    {
+      "id": "s.dating.no_shared_hobbies",
+      "questionId": "q.dating.no_shared_hobbies",
+      "agree": {
+        "ru": "паре не обязательно иметь общие увлечения",
+        "en": "a couple doesn't need shared hobbies"
+      },
+      "disagree": {
+        "ru": "паре нужны общие увлечения",
+        "en": "a couple needs shared hobbies"
+      }
+    },
+    {
+      "id": "s.dating.pda_cute",
+      "questionId": "q.dating.pda_cute",
+      "agree": {
+        "ru": "нежности на публике — это мило",
+        "en": "public displays of affection are cute"
+      },
+      "disagree": {
+        "ru": "нежности на публике — это кринж",
+        "en": "public displays of affection are cringe"
+      }
+    },
+    {
+      "id": "s.dating.not_on_social",
+      "questionId": "q.dating.not_on_social",
+      "agree": {
+        "ru": "отношения не обязательно показывать в соцсетях",
+        "en": "relationships don't need to be on social media"
+      },
+      "disagree": {
+        "ru": "отношения стоит показывать в соцсетях",
+        "en": "relationships are worth showing on social media"
+      }
+    },
+    {
+      "id": "s.dating.move_in_six_months",
+      "questionId": "q.dating.move_in_six_months",
+      "agree": {
+        "ru": "съехаться через полгода — нормально",
+        "en": "moving in after six months is reasonable"
+      },
+      "disagree": {
+        "ru": "через полгода съезжаться рано",
+        "en": "six months is too early to move in"
+      }
+    },
+    {
+      "id": "s.dating.alone_time",
+      "questionId": "q.dating.alone_time",
+      "agree": {
+        "ru": "даже в отношениях нужно время для себя",
+        "en": "even in a relationship you need time alone"
+      },
+      "disagree": {
+        "ru": "в отношениях лучше проводить время вместе",
+        "en": "in a relationship time is better spent together"
+      }
+    }
+  ]
+}
