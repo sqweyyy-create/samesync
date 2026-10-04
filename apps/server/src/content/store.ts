@@ -14,6 +14,7 @@ import {
   type Question,
 } from '@samesync/content';
 import type { Band, Locale, Mode } from '@samesync/shared';
+import type { OpenerContent } from '../domain/game/opener';
 import type { TeaserContent } from '../domain/matching/teaser';
 import type { PoolScope } from '../domain/matching/types';
 
@@ -49,6 +50,8 @@ export interface ContentStore {
   matchScope(scope: DeckScope): PoolScope;
   /** Lookups for rendering teasers. Retired entries still resolve, so old matches keep their text. */
   readonly teaser: TeaserContent;
+  /** Take texts and openers for the game. Retired takes still resolve: a game in flight keeps them. */
+  readonly game: OpenerContent;
   alias(id: string): Alias | undefined;
 }
 
@@ -79,7 +82,9 @@ export function createContentStore(bundle: ContentBundle, checksum: string): Con
   // Everything ever published, for rendering what existing matches refer to.
   const allCategories = new Map(bundle.categories.map((c) => [c.id, c]));
   const allItems = new Map(bundle.items.map((i) => [i.id, i]));
+  const allQuestions = new Map(bundle.questions.map((q) => [q.id, q]));
   const stances = new Map(bundle.stances.map((s) => [s.questionId, s]));
+  const openers = new Map(bundle.openers.map((o) => [`${o.questionId}:${o.side}`, o.text]));
 
   const inDeck = (q: Question, s: DeckScope) =>
     q.audiences.includes(s.band) && q.modes.includes(s.mode) && q.locales.includes(s.locale);
@@ -136,6 +141,10 @@ export function createContentStore(bundle: ContentBundle, checksum: string): Con
       },
       stance: (questionId) => stances.get(questionId),
       isDomain: (id): id is Domain => (DOMAINS as readonly string[]).includes(id),
+    },
+    game: {
+      question: (id) => allQuestions.get(id),
+      opener: (questionId, side) => openers.get(`${questionId}:${side}`),
     },
     alias: (id) => aliases.get(id),
   };
