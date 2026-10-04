@@ -3,11 +3,13 @@ import type { Hono } from 'hono';
 import { fixedClock, type Clock } from '../../src/clock';
 import { DEFAULT_CONTENT_DIR } from '../../src/config';
 import { createContentStore, type ContentStore } from '../../src/content/store';
+import { createGamesRepository } from '../../src/db/repositories/games';
 import { createMatchesRepository } from '../../src/db/repositories/matches';
 import { createProfileRepository } from '../../src/db/repositories/profile';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { createHttpApp } from '../../src/http/app';
 import type { Logger } from '../../src/logger';
+import { createGameService } from '../../src/services/game';
 import { createMatchesService } from '../../src/services/matches';
 import { createProfileService } from '../../src/services/profile';
 import type { TestDatabase } from './db';
@@ -67,6 +69,7 @@ export async function buildTestApp(
   const content = options.content ?? (await realContent());
   const clock = options.clock ?? fixedClock(new Date());
   const users = createUsersRepository(testDb.db);
+  const matches = createMatchesRepository(testDb.db);
   const app = createHttpApp({
     botToken: TEST_BOT_TOKEN,
     initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
@@ -79,9 +82,11 @@ export async function buildTestApp(
       clock,
       u18PoolEnabled: options.u18PoolEnabled ?? false,
     }),
-    matches: createMatchesService({
+    matches: createMatchesService({ users, matches, content, clock }),
+    game: createGameService({
       users,
-      matches: createMatchesRepository(testDb.db),
+      matches,
+      games: createGamesRepository(testDb.db),
       content,
       clock,
     }),

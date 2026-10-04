@@ -10,6 +10,7 @@ import { ConfigError, loadConfig, type Config } from './config';
 import { assertContentSeeded } from './content/seed';
 import { createContentStore, type ContentStore } from './content/store';
 import { createDb, createPool } from './db/client';
+import { createGamesRepository } from './db/repositories/games';
 import { createMatchesRepository } from './db/repositories/matches';
 import { createMatchingRepository } from './db/repositories/matching';
 import { createOutboxRepository } from './db/repositories/outbox';
@@ -22,6 +23,7 @@ import { createAgeTransitionJob, createMatchingJob, createOutboxJob } from './jo
 import { workerPlanner } from './jobs/matching-planner';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
+import { createGameService } from './services/game';
 import { createMatchesService } from './services/matches';
 import { createMatchingService } from './services/matching';
 import { createOutboxSender } from './services/outbox-sender';
@@ -52,6 +54,8 @@ const pool = createPool(config.databaseUrl);
 const clock = systemClock;
 const db = createDb(pool);
 const users = createUsersRepository(db);
+const matches = createMatchesRepository(db);
+const games = createGamesRepository(db);
 
 const profile = createProfileService({
   users,
@@ -66,7 +70,8 @@ const app = createHttpApp({
   clock,
   logger,
   profile,
-  matches: createMatchesService({ users, matches: createMatchesRepository(db), content, clock }),
+  matches: createMatchesService({ users, matches, content, clock }),
+  game: createGameService({ users, matches, games, content, clock }),
 });
 const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger, users });
 

@@ -51,6 +51,9 @@ describe('createApiClient', () => {
       status: 'pending_game',
       createdAt: '2026-10-03T10:00:00.000Z',
       gameDeadlineAt: '2026-10-05T10:00:00.000Z',
+      resultsReadyAt: null,
+      chatDeadlineAt: null,
+      game: { questions: 5, youDone: false, theyDone: true },
     };
     const fetchMock = vi
       .fn<typeof fetch>()

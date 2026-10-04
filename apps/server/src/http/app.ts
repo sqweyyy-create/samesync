@@ -1,6 +1,7 @@
 import {
   CompleteRequest,
   MeResponse,
+  PredictionsRequest,
   SaveAnswersRequest,
   SaveInterestsRequest,
   SetBirthDateRequest,
@@ -14,6 +15,7 @@ import type * as z from 'zod/mini';
 import type { Clock } from '../clock';
 import type { Logger } from '../logger';
 import { ServiceError } from '../services/errors';
+import type { GameService } from '../services/game';
 import type { MatchesService } from '../services/matches';
 import type { ProfileService } from '../services/profile';
 import { initDataAuth, type AuthVariables } from './auth/middleware';
@@ -25,6 +27,7 @@ export interface HttpAppDeps {
   logger: Logger;
   profile: ProfileService;
   matches: MatchesService;
+  game: GameService;
 }
 
 const NOT_FOUND: ApiErrorBody = { error: 'not_found' };
@@ -51,7 +54,7 @@ async function body<T extends z.ZodMiniType>(c: Context, schema: T): Promise<z.i
 
 export function createHttpApp(deps: HttpAppDeps): Hono {
   const app = new Hono();
-  const { profile, matches } = deps;
+  const { profile, matches, game } = deps;
 
   // Request log: method, path without query, status, duration. Never headers or bodies.
   app.use(async (c, next) => {
@@ -132,6 +135,17 @@ export function createHttpApp(deps: HttpAppDeps): Hono {
 
   api.get('/matches', async (c) => c.json(await matches.list(c.get('auth'))));
   api.get('/matches/:id', async (c) => c.json(await matches.get(c.get('auth'), c.req.param('id'))));
+
+  // The game of a match: the questions, the caller's guesses (once), and the results.
+  api.get('/matches/:id/game', async (c) =>
+    c.json(await game.game(c.get('auth'), c.req.param('id'))),
+  );
+  api.put('/matches/:id/predictions', async (c) =>
+    c.json(await game.submit(c.get('auth'), c.req.param('id'), await body(c, PredictionsRequest))),
+  );
+  api.get('/matches/:id/results', async (c) =>
+    c.json(await game.results(c.get('auth'), c.req.param('id'))),
+  );
 
   app.route('/api', api);
 

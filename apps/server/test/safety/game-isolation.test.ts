@@ -5,8 +5,12 @@
  * of a match that is still being played can predict, both live bands must equal the match band
  * even when the cached `age_band` is stale, a game's content never changes, and results become
  * ready only for two players who both finished and are still in the same band.
+ * The last part checks the reads: the other person's answers and guesses leave the database only
+ * through the participant-scoped repository, only once both have finished, and never after a
+ * band change.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createGamesRepository } from '../../src/db/repositories/games';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import {
   GAME_QUESTIONS,
@@ -383,5 +387,157 @@ describe('results become ready', () => {
     await expect(toResultsReady(testDb.appPool, matchId)).rejects.toMatchObject(
       statusRefused('not_pending_game'),
     );
+  });
+});
+
+describe('reading a game: participants only, answers only once both have finished', () => {
+  const repo = () => createGamesRepository(testDb.db);
+  /** Both players have predicted and results are ready. */
+  async function withResults(years = 25, band: 'adult' | 'u18' = 'adult') {
+    const game = await playing(years, band);
+    await predict(game.matchId, game.a, 'AAAAD');
+    await predict(game.matchId, game.b, 'DDAAA');
+    await markDone(testDb.appPool, game.matchId, 'a');
+    await markDone(testDb.appPool, game.matchId, 'b');
+    await toResultsReady(testDb.appPool, game.matchId);
+    return game;
+  }
+
+  it('gives a player the questions and who has finished, and not one answer', async () => {
+    const { matchId, a, b } = await playing();
+    await predict(matchId, a);
+    await markDone(testDb.appPool, matchId, 'a');
+    const forA = await repo().getForPlayer(a, matchId);
+    const forB = await repo().getForPlayer(b, matchId);
+    expect(forA).toMatchObject({
+      questionIds: [...GAME_QUESTIONS],
+      youDone: true,
+      theyDone: false,
+    });
+    expect(forB).toMatchObject({ youDone: false, theyDone: true });
+    // The view has no field that could hold an answer or a guess.
+    expect(Object.keys(forB ?? {}).sort()).toEqual(
+      ['gameDeadlineAt', 'matchId', 'questionIds', 'status', 'theyDone', 'youDone'].sort(),
+    );
+    expect(JSON.stringify([forA, forB])).not.toMatch(/agree/);
+  });
+
+  it('holds back every answer and guess until both players have finished', async () => {
+    const { matchId, a, b } = await playing();
+    await predict(matchId, a, 'DDDDD');
+    await markDone(testDb.appPool, matchId, 'a');
+    // One has finished, the other has not: neither of them gets anything.
+    for (const who of [a, b]) {
+      const view = await repo().getResultsForParticipant(who, matchId);
+      expect(view).toEqual({ ready: false, status: 'pending_game' });
+    }
+  });
+
+  it('shows a finished game to its two participants, each from their own side', async () => {
+    const { matchId, a, b } = await withResults();
+    const forA = await repo().getResultsForParticipant(a, matchId);
+    const forB = await repo().getResultsForParticipant(b, matchId);
+    if (!forA?.ready || !forB?.ready) throw new Error('results must be ready');
+    // User A agreed with everything; user B disagreed with the last question.
+    expect(forA.yourAnswers).toEqual(['agree', 'agree', 'agree', 'agree', 'agree']);
+    expect(forA.theirAnswers).toEqual(['agree', 'agree', 'agree', 'agree', 'disagree']);
+    expect(forB.yourAnswers).toEqual(forA.theirAnswers);
+    expect(forB.theirAnswers).toEqual(forA.yourAnswers);
+    expect(forA.yourGuesses.get(GAME_QUESTIONS[4])).toBe('disagree');
+    expect(forA.theirGuesses.get(GAME_QUESTIONS[0])).toBe('disagree');
+    expect(forB.yourGuesses).toEqual(forA.theirGuesses);
+  });
+
+  it('gives nothing to anyone outside the match', async () => {
+    const { matchId } = await withResults();
+    const stranger = await born(25);
+    const other = await withResults();
+    for (const who of [stranger.id, other.a, other.b]) {
+      expect(await repo().getForPlayer(who, matchId)).toBeNull();
+      expect(await repo().getResultsForParticipant(who, matchId)).toBeNull();
+      expect(
+        await repo().submitPredictions({
+          userId: who,
+          matchId,
+          predictions: GAME_QUESTIONS.map((questionId) => ({ questionId, value: 'agree' })),
+          now: new Date(),
+          chatDeadline: new Date(Date.now() + 48 * 3_600_000),
+        }),
+      ).toEqual({ status: 'not_found' });
+    }
+  });
+
+  it('after a band change, neither former participant can read the game or the results', async () => {
+    const played = await withResults(17, 'u18');
+    const playing17 = await playing(17, 'u18');
+    for (const { matchId, a } of [played, playing17]) {
+      await testDb.ownerPool.query(
+        "SELECT admin_set_birth_date($1, $2::date, 777, 'age correction')",
+        [a, birthDateYearsAgo(18)],
+      );
+      expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+        status: 'closed',
+        close_reason: 'band_change',
+      });
+    }
+    for (const { matchId, a, b } of [played, playing17]) {
+      for (const who of [a, b]) {
+        expect(await repo().getForPlayer(who, matchId)).toBeNull();
+        expect(await repo().getResultsForParticipant(who, matchId)).toBeNull();
+      }
+    }
+  });
+
+  it('hides the game and the results the moment a live band differs, with a stale cache and an open match', async () => {
+    const played = await withResults(17, 'u18');
+    const open = await playing(17, 'u18');
+    for (const { a } of [played, open]) {
+      // The 18th birthday is today: no trigger has run, the cache says u18, the match is open.
+      await withoutTriggers(testDb.ownerPool, (c) =>
+        c.query('UPDATE users SET birth_date = $1 WHERE id = $2', [birthDateYearsAgo(18), a]),
+      );
+    }
+    expect((await matchRow(testDb.ownerPool, played.matchId))?.status).toBe('results_ready');
+    for (const { matchId, a, b } of [played, open]) {
+      for (const who of [a, b]) {
+        expect(await repo().getForPlayer(who, matchId)).toBeNull();
+        expect(await repo().getResultsForParticipant(who, matchId)).toBeNull();
+      }
+    }
+    // And nothing can be submitted into the open game, by either side.
+    for (const who of [open.a, open.b]) {
+      expect(
+        await repo().submitPredictions({
+          userId: who,
+          matchId: open.matchId,
+          predictions: GAME_QUESTIONS.map((questionId) => ({ questionId, value: 'agree' })),
+          now: new Date(),
+          chatDeadline: new Date(Date.now() + 48 * 3_600_000),
+        }),
+      ).toEqual({ status: 'not_found' });
+    }
+    expect(await predictionCount(open.matchId)).toBe(0);
+  });
+
+  it('refuses a submission the trigger refuses, without storing a part of it', async () => {
+    // The counterpart is frozen with the triggers off: the match is still open and readable.
+    const { matchId, a, b } = await playing();
+    await withoutTriggers(testDb.ownerPool, (c) =>
+      c.query("UPDATE users SET status = 'frozen' WHERE id = $1", [b]),
+    );
+    expect(
+      await repo().submitPredictions({
+        userId: a,
+        matchId,
+        predictions: GAME_QUESTIONS.map((questionId) => ({ questionId, value: 'agree' })),
+        now: new Date(),
+        chatDeadline: new Date(Date.now() + 48 * 3_600_000),
+      }),
+    ).toEqual({ status: 'not_playable' });
+    expect(await predictionCount(matchId)).toBe(0);
+    expect(await gameRow(testDb.ownerPool, matchId)).toMatchObject({
+      a_done: false,
+      b_done: false,
+    });
   });
 });

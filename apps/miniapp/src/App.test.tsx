@@ -238,6 +238,9 @@ describe('<App> matches', () => {
     status: 'pending_game' as const,
     createdAt: '2026-10-03T10:00:00.000Z',
     gameDeadlineAt: '2026-10-05T10:00:00.000Z',
+    resultsReadyAt: null,
+    chatDeadlineAt: null,
+    game: null,
   };
 
   it('lists the matches on the home screen and opens the placeholder match screen', async () => {

@@ -19,6 +19,13 @@ export interface MatchView {
   counterpartAlias: string;
   createdAt: Date;
   gameDeadlineAt: Date;
+  resultsReadyAt: Date | null;
+  chatDeadlineAt: Date | null;
+  /**
+   * How far the game is, from the caller's side. Never an answer or a guess of anyone.
+   * Null for a match that has no game (made before games existed).
+   */
+  game: { questions: number; youDone: boolean; theyDone: boolean } | null;
 }
 
 export interface MatchesRepository {
@@ -27,6 +34,26 @@ export interface MatchesRepository {
   /** One match of the caller, open or ended; null if it isn't theirs or isn't readable. */
   getForParticipant(userId: string, matchId: string): Promise<MatchView | null>;
 }
+
+/**
+ * The tables every participant-scoped read starts from: the match as `m`, and both of its users as
+ * `ua` and `ub`, whose birth dates decide whether the match is still readable.
+ */
+export const READABLE_MATCH = sql`matches m
+  JOIN users ua ON ua.id = m.user_a_id
+  JOIN users ub ON ub.id = m.user_b_id`;
+
+/**
+ * The condition of every participant-scoped read (CLAUDE.md invariants 1 and 4): `userId` is in
+ * the match, the match was not closed for a band change, and both users' live bands, derived from
+ * their birth dates right now, equal the match band. Anything unknown is "no" (fail closed).
+ */
+export const readableBy = (userId: string): SQL => sql`(
+    (m.user_a_id = ${userId}::uuid OR m.user_b_id = ${userId}::uuid)
+    AND m.close_reason IS DISTINCT FROM 'band_change'
+    AND coalesce(vc_band(ua.birth_date, vc_today()) = m.band, false)
+    AND coalesce(vc_band(ub.birth_date, vc_today()) = m.band, false)
+  )`;
 
 interface Row extends Record<string, unknown> {
   id: string;
@@ -38,6 +65,11 @@ interface Row extends Record<string, unknown> {
   /** Epoch milliseconds: Drizzle hands raw timestamps back as text, so they are read as numbers. */
   created_at_ms: number;
   game_deadline_at_ms: number;
+  results_ready_at_ms: number | null;
+  chat_deadline_at_ms: number | null;
+  game_questions: number | null;
+  you_done: boolean | null;
+  they_done: boolean | null;
 }
 
 const OPEN = sql.join(
@@ -45,21 +77,25 @@ const OPEN = sql.join(
   sql`, `,
 );
 
+const dateOrNull = (ms: number | null) => (ms === null ? null : new Date(ms));
+
 export function createMatchesRepository(db: Db): MatchesRepository {
   const select = async (userId: string, extra: SQL): Promise<MatchView[]> => {
     const result = await db.execute<Row>(sql`
       SELECT m.id, m.status, m.locale, m.tier, m.teaser,
         CASE WHEN m.user_a_id = ${userId}::uuid THEN m.alias_b ELSE m.alias_a END AS counterpart_alias,
         (extract(epoch FROM m.created_at) * 1000)::float8 AS created_at_ms,
-        (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms
-      FROM matches m
-      JOIN users ua ON ua.id = m.user_a_id
-      JOIN users ub ON ub.id = m.user_b_id
-      WHERE (m.user_a_id = ${userId}::uuid OR m.user_b_id = ${userId}::uuid)
-        AND m.close_reason IS DISTINCT FROM 'band_change'
-        AND coalesce(vc_band(ua.birth_date, vc_today()) = m.band, false)
-        AND coalesce(vc_band(ub.birth_date, vc_today()) = m.band, false)
-        AND ${extra}
+        (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms,
+        (extract(epoch FROM m.results_ready_at) * 1000)::float8 AS results_ready_at_ms,
+        (extract(epoch FROM m.chat_deadline_at) * 1000)::float8 AS chat_deadline_at_ms,
+        cardinality(g.question_ids) AS game_questions,
+        CASE WHEN m.user_a_id = ${userId}::uuid THEN g.a_done_at ELSE g.b_done_at END IS NOT NULL
+          AS you_done,
+        CASE WHEN m.user_a_id = ${userId}::uuid THEN g.b_done_at ELSE g.a_done_at END IS NOT NULL
+          AS they_done
+      FROM ${READABLE_MATCH}
+      LEFT JOIN games g ON g.match_id = m.id
+      WHERE ${readableBy(userId)} AND ${extra}
       ORDER BY m.created_at DESC, m.id DESC`);
     return result.rows.map((r) => ({
       id: r.id,
@@ -70,6 +106,16 @@ export function createMatchesRepository(db: Db): MatchesRepository {
       counterpartAlias: r.counterpart_alias,
       createdAt: new Date(r.created_at_ms),
       gameDeadlineAt: new Date(r.game_deadline_at_ms),
+      resultsReadyAt: dateOrNull(r.results_ready_at_ms),
+      chatDeadlineAt: dateOrNull(r.chat_deadline_at_ms),
+      game:
+        r.game_questions === null
+          ? null
+          : {
+              questions: r.game_questions,
+              youDone: r.you_done === true,
+              theyDone: r.they_done === true,
+            },
     }));
   };
 

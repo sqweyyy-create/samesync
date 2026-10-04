@@ -149,9 +149,63 @@ export const MatchSummary = z.object({
   teaser: z.string(),
   status: z.enum(MATCH_STATUSES),
   createdAt: z.string(),
+  /** The game can be played until then (Q2: 48 hours from the match). */
   gameDeadlineAt: z.string(),
+  /** When both had finished the game, and until when the chat stays open without a message. */
+  resultsReadyAt: z.nullable(z.string()),
+  chatDeadlineAt: z.nullable(z.string()),
+  /**
+   * How far the game is: its size and who has submitted their guesses. Never an answer or a
+   * guess. Null for a match that has no game.
+   */
+  game: z.nullable(
+    z.object({ questions: z.number(), youDone: z.boolean(), theyDone: z.boolean() }),
+  ),
 });
 export type MatchSummary = z.infer<typeof MatchSummary>;
 
 export const MatchesResponse = z.object({ matches: z.array(MatchSummary) });
 export type MatchesResponse = z.infer<typeof MatchesResponse>;
+
+/** A side of a take. A game never contains a skip. */
+export const Side = z.enum(['agree', 'disagree']);
+export type Side = z.infer<typeof Side>;
+
+/**
+ * The game as a player sees it before the results: the takes to guess, in that player's own
+ * order. It never carries an answer, of the caller or of the other person.
+ */
+export const GameResponse = z.object({
+  questions: z.array(z.object({ id: z.string(), text: z.string() })),
+});
+export type GameResponse = z.infer<typeof GameResponse>;
+
+/** All guesses of one player, sent once: one per question of the game. */
+export const PredictionsRequest = z.object({
+  predictions: z
+    .array(z.object({ questionId: ContentId, value: Side }))
+    .check(z.minLength(1), z.maxLength(50)),
+});
+export type PredictionsRequest = z.infer<typeof PredictionsRequest>;
+
+/** The results of a finished game. They exist only once both players have submitted. */
+export const ResultsResponse = z.object({
+  total: z.number(),
+  /** How many of the other person's answers the caller guessed, and the other way round. */
+  youGuessed: z.number(),
+  theyGuessed: z.number(),
+  /** Every question with both answers and both guesses. The last one is the closing question. */
+  rounds: z.array(
+    z.object({
+      questionId: z.string(),
+      text: z.string(),
+      yours: Side,
+      theirs: Side,
+      yourGuess: Side,
+      theirGuess: Side,
+    }),
+  ),
+  /** The suggested first message about the closing question, in the language of the match. */
+  opener: z.string(),
+});
+export type ResultsResponse = z.infer<typeof ResultsResponse>;
