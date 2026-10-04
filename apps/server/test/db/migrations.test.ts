@@ -305,7 +305,7 @@ describe('migrations', () => {
       await expectDenied('ALTER TABLE users DISABLE TRIGGER users_90_close_matches');
     });
 
-    it('can write runs, the outbox and game shells, but not delete them', async () => {
+    it('can write runs, the outbox and games, but not delete them', async () => {
       for (const table of ['match_runs', 'outbox', 'games']) {
         await app.query(`SELECT 1 FROM ${table}`);
         await expectDenied(`DELETE FROM ${table}`);
@@ -313,6 +313,30 @@ describe('migrations', () => {
       await app.query("UPDATE outbox SET status = 'pending' WHERE false");
       await app.query('UPDATE match_runs SET pairs_created = 0 WHERE false');
       await expectDenied('UPDATE games SET created_at = now()');
+    });
+
+    it('can mark a player of a game finished, and change nothing else of the game', async () => {
+      await app.query('UPDATE games SET a_done_at = now(), b_done_at = now() WHERE false');
+      // Locking a game row (the app does it while predictions are submitted) needs that grant.
+      await app.query('SELECT match_id FROM games FOR UPDATE');
+      await expectDenied("UPDATE games SET question_ids = '{}'");
+      await expectDenied("UPDATE games SET closing_question_id = 'q.x'");
+      await expectDenied("UPDATE games SET answers_a = '{}', answers_b = '{}'");
+      await expectDenied('ALTER TABLE games DISABLE TRIGGER games_10_guard_update');
+    });
+
+    it('can add predictions and read them, and never change or delete one', async () => {
+      await app.query('SELECT 1 FROM game_predictions');
+      await app.query(
+        "INSERT INTO game_predictions (match_id, predictor_id, question_id, predicted) SELECT gen_random_uuid(), gen_random_uuid(), 'q.x', 'agree' WHERE false",
+      );
+      await expectDenied("UPDATE game_predictions SET predicted = 'agree'");
+      await expectDenied('DELETE FROM game_predictions');
+      await expectDenied('TRUNCATE game_predictions');
+      await expectDenied(
+        'ALTER TABLE game_predictions DISABLE TRIGGER game_predictions_10_guard_insert',
+      );
+      await expectDenied('ALTER TABLE matches DISABLE TRIGGER matches_20_guard_game_status');
     });
 
     it('can only read blocks (they are written from Phase 5)', async () => {
@@ -334,6 +358,9 @@ describe('migrations', () => {
     it('cannot call the trigger functions or the admin function directly', async () => {
       await expectDenied('SELECT matches_guard_insert()');
       await expectDenied('SELECT users_close_matches_on_state_change()');
+      await expectDenied('SELECT game_predictions_guard_insert()');
+      await expectDenied('SELECT games_guard_update()');
+      await expectDenied('SELECT matches_guard_game_status()');
     });
 
     it('cannot read the migrations journal', async () => {

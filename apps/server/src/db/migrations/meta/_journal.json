@@ -50,6 +50,13 @@
       "when": 1791137950421,
       "tag": "0006_game",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791138029564,
+      "tag": "0007_game_safety",
+      "breakpoints": true
     }
   ]
 }
