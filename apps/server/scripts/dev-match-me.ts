@@ -1,16 +1,19 @@
 /* eslint-disable no-console -- CLI output */
 /**
- * Gives one real development user a match, so the bot notification can be checked in Telegram.
- * It creates synthetic users compatible with that user (same pool and mode, dating
- * compatibility), runs one matching run for the pool, and delivers the user's notification.
+ * Gives one real development user a match, so the bot notifications and the game can be checked
+ * in Telegram. It creates synthetic users compatible with that user (same pool and mode, dating
+ * compatibility), runs one matching run for the pool, and delivers the user's notifications.
  * Synthetic users never get a message. Refuses to run in production.
  *
- *   pnpm dev:match-me <public_id> [--n 300] [--lookalikes 3] [--ignore-limits] [--strict] [--no-send]
+ *   pnpm dev:match-me <public_id> [--n 300] [--lookalikes 3] [--counterpart-plays]
+ *                     [--ignore-limits] [--strict] [--no-send]
  *
  * <public_id> is the support code shown in the Mini App settings.
- *   --ignore-limits  lift the free-tier limits (3 new matches a day, 5 open) for this run
- *   --strict         keep the 24 h / 72 h waiting thresholds of the fallback tiers
- *   --no-send        leave the notification in the outbox (a running server sends it)
+ *   --counterpart-plays  the synthetic counterpart submits its guesses right away, so the game
+ *                        can be finished alone: play your side and the results are ready
+ *   --ignore-limits      lift the free-tier limits (3 new matches a day, 5 open) for this run
+ *   --strict             keep the 24 h / 72 h waiting thresholds of the fallback tiers
+ *   --no-send            leave the notifications in the outbox (a running server sends them)
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
@@ -18,6 +21,7 @@ import { Api } from 'grammy';
 import { systemClock } from '../src/clock';
 import { ConfigError, loadConfig, type Config } from '../src/config';
 import { createDb } from '../src/db/client';
+import { createGamesRepository } from '../src/db/repositories/games';
 import { createMatchingRepository } from '../src/db/repositories/matching';
 import { createOutboxRepository } from '../src/db/repositories/outbox';
 import { createUsersRepository } from '../src/db/repositories/users';
@@ -25,6 +29,7 @@ import { DEFAULT_MATCHING_PARAMS } from '../src/domain/matching/params';
 import { LOCK, withAdvisoryLock } from '../src/jobs/advisory-lock';
 import { inProcessPlanner } from '../src/jobs/matching-planner';
 import { createLogger } from '../src/logger';
+import { createGamePlay } from '../src/services/game';
 import { createMatchingService } from '../src/services/matching';
 import { createOutboxSender } from '../src/services/outbox-sender';
 import { connect, fail, refuseInProduction } from './lib/dev-runtime';
@@ -37,6 +42,7 @@ const { values, positionals } = parseArgs({
   options: {
     n: { type: 'string', default: '300' },
     lookalikes: { type: 'string', default: '3' },
+    'counterpart-plays': { type: 'boolean', default: false },
     'ignore-limits': { type: 'boolean', default: false },
     strict: { type: 'boolean', default: false },
     'no-send': { type: 'boolean', default: false },
@@ -81,6 +87,7 @@ try {
       repo,
       params,
       now: new Date(),
+      play: createGamePlay({ games: createGamesRepository(drizzle), clock: systemClock }),
       matching: createMatchingService({
         pool: db,
         repo,
@@ -97,6 +104,7 @@ try {
       publicId,
       poolSize,
       lookalikes,
+      counterpartPlays: values['counterpart-plays'],
       ignoreLimits: values['ignore-limits'],
       strict: values.strict,
       seed: Math.floor(Math.random() * 2 ** 31),
@@ -132,10 +140,17 @@ try {
     const { match } = result;
     console.log(`\nMatch for ${publicId}: ${match.alias}, tier ${match.tier}.`);
     console.log(`Teaser: ${match.teaser}`);
+    if (match.counterpart === 'played') {
+      console.log('Counterpart: its guesses are in. Play your side and the results are ready.');
+    } else if (match.counterpart === 'real_user') {
+      console.log('Counterpart: a real user, so nobody played for them.');
+    } else if (match.counterpart === 'refused') {
+      console.log('Counterpart: could not play (the game refused the guesses).');
+    }
     exitCode = 0;
 
     if (values['no-send'] || !config) {
-      console.log('Notification: left in the outbox (--no-send). A running server sends it.');
+      console.log('Notifications: left in the outbox (--no-send). A running server sends them.');
     } else {
       const api = new Api(config.botToken);
       const sender = createOutboxSender({
@@ -154,34 +169,47 @@ try {
         },
       });
       // Send what is due (a running server may be doing the same; the lock keeps it to one).
-      let state:
-        { status: string; cancel_reason: string | null; last_error: string | null } | undefined;
+      // The user gets "new match" and, when the counterpart has played, "your turn".
+      interface Queued {
+        kind: string;
+        status: string;
+        cancel_reason: string | null;
+        last_error: string | null;
+      }
+      let queued: Queued[] = [];
       for (let attempt = 0; attempt < 60; attempt++) {
-        ({
-          rows: [state],
-        } = await db.query<NonNullable<typeof state>>(
-          'SELECT status, cancel_reason, last_error FROM outbox WHERE match_id = $1 AND user_id = $2',
+        ({ rows: queued } = await db.query<Queued>(
+          `SELECT kind::text AS kind, status::text AS status, cancel_reason, last_error
+           FROM outbox WHERE match_id = $1 AND user_id = $2 ORDER BY created_at, id`,
           [match.id, result.userId],
         ));
-        if (state?.status !== 'pending') break;
+        if (!queued.some((row) => row.status === 'pending')) break;
         const ticked = await withAdvisoryLock(db, LOCK.outbox, () => sender.tick());
         if (!ticked.acquired) await sleep(500);
       }
-      if (state?.status === 'sent')
-        console.log('Notification: sent. Check the bot chat in Telegram.');
-      else if (state?.status === 'failed') {
-        console.log(`Notification: not delivered (${state.last_error ?? 'unknown error'}).`);
-        console.log(
-          'If the bot is blocked or was never started, send /start to it and run this again.',
-        );
-        exitCode = 1;
-      } else if (state?.status === 'cancelled') {
-        console.log(`Notification: dropped before sending (${state.cancel_reason ?? 'unknown'}).`);
-        exitCode = 1;
-      } else {
-        console.log(
-          'Notification: still pending. Is the server holding the outbox? Check its log.',
-        );
+      const NAMES: Record<string, string> = {
+        match_created: 'new match',
+        game_turn: 'your turn',
+      };
+      for (const row of queued) {
+        const name = `Notification (${NAMES[row.kind] ?? row.kind})`;
+        if (row.status === 'sent') console.log(`${name}: sent. Check the bot chat in Telegram.`);
+        else if (row.status === 'failed') {
+          console.log(`${name}: not delivered (${row.last_error ?? 'unknown error'}).`);
+          console.log(
+            'If the bot is blocked or was never started, send /start to it and run this again.',
+          );
+          exitCode = 1;
+        } else if (row.status === 'cancelled') {
+          console.log(`${name}: dropped before sending (${row.cancel_reason ?? 'unknown'}).`);
+          exitCode = 1;
+        } else {
+          console.log(`${name}: still pending. Is the server holding the outbox? Check its log.`);
+          exitCode = 1;
+        }
+      }
+      if (queued.length === 0) {
+        console.log('Notifications: none were queued for this user.');
         exitCode = 1;
       }
     }

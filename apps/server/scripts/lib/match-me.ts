@@ -3,6 +3,10 @@
  * user's pool (fillers, so rarity statistics look like a real pool, plus a few lookalikes who share
  * the user's rarest interests and most answers) and runs one matching run for that pool × mode.
  * The run itself is the real service: the database trigger still decides on every pair.
+ *
+ * With `counterpartPlays`, the synthetic counterpart of the new match submits its guesses right
+ * away, through the same game service and triggers as a real player, so the developer can finish
+ * the game alone and see the results. It never plays for a real user.
  */
 import type { Band, Locale, Mode } from '@samesync/shared';
 import { utcDate } from '@samesync/shared';
@@ -14,7 +18,9 @@ import type { MatchingRepository } from '../../src/db/repositories/matching';
 import type { MatchingParams } from '../../src/domain/matching/params';
 import { userIneligibility } from '../../src/domain/matching/plan';
 import { parseTeaser, renderTeaser } from '../../src/domain/matching/teaser';
-import type { Ineligibility } from '../../src/domain/matching/types';
+import type { Ineligibility, Stance } from '../../src/domain/matching/types';
+import { prng } from '../../src/domain/random';
+import type { GamePlay } from '../../src/services/game';
 import type { MatchingService, RunOutcome } from '../../src/services/matching';
 import {
   generateLookalikes,
@@ -32,8 +38,19 @@ export interface MatchMeOptions {
   ignoreLimits: boolean;
   /** Keep the real waiting thresholds for tiers 2 and 3 (by default any tier may match now). */
   strict: boolean;
+  /** The synthetic counterpart of the new match submits its guesses right away. */
+  counterpartPlays?: boolean;
   seed: number;
 }
+
+/** What happened when the counterpart was asked to play. */
+export type CounterpartPlay =
+  /** Its guesses are in: the game waits for the real user only. */
+  | 'played'
+  /** The counterpart is a real user: nobody plays for them. */
+  | 'real_user'
+  /** The game refused the guesses (it is over, or they were already in). */
+  | 'refused';
 
 export type MatchMeResult =
   | { status: 'user_not_found' }
@@ -47,7 +64,14 @@ export type MatchMeResult =
       run: RunOutcome;
       /** Why the user was skipped by the run, when that is the case. */
       ineligible: Ineligibility | null;
-      match: { id: string; tier: number; alias: string; teaser: string } | null;
+      match: {
+        id: string;
+        tier: number;
+        alias: string;
+        teaser: string;
+        /** Set when `counterpartPlays` was asked for. */
+        counterpart: CounterpartPlay | null;
+      } | null;
     };
 
 interface UserRow {
@@ -64,6 +88,44 @@ interface UserRow {
   dating_age_max: number | null;
 }
 
+/**
+ * Makes the synthetic counterpart of `matchId` submit its guesses about `userId`: about three in
+ * five right, like a person who reads the other fairly well. A real counterpart is left alone.
+ */
+export async function playAsCounterpart(
+  deps: { db: pg.Pool; play: GamePlay },
+  input: { matchId: string; userId: string; seed: number },
+): Promise<CounterpartPlay> {
+  const { rows } = await deps.db.query<{
+    counterpart_id: string;
+    synthetic: boolean;
+    question_ids: string[];
+    answers: Stance[];
+  }>(
+    `SELECT c.id AS counterpart_id, c.synthetic, g.question_ids,
+       (CASE WHEN m.user_a_id = $2 THEN g.answers_a ELSE g.answers_b END)::text[] AS answers
+     FROM matches m
+     JOIN games g ON g.match_id = m.id
+     JOIN users c ON c.id = CASE WHEN m.user_a_id = $2 THEN m.user_b_id ELSE m.user_a_id END
+     WHERE m.id = $1 AND $2 IN (m.user_a_id, m.user_b_id)`,
+    [input.matchId, input.userId],
+  );
+  const game = rows[0];
+  if (!game) return 'refused';
+  if (!game.synthetic) return 'real_user';
+  const random = prng(input.seed ^ 0x3c6ef372);
+  const outcome = await deps.play.submit(
+    game.counterpart_id,
+    input.matchId,
+    game.question_ids.map((questionId, i) => {
+      const actual = game.answers[i] ?? 'agree';
+      const other: Stance = actual === 'agree' ? 'disagree' : 'agree';
+      return { questionId, value: random() < 0.6 ? actual : other };
+    }),
+  );
+  return outcome.status === 'submitted' ? 'played' : 'refused';
+}
+
 export async function matchMe(
   deps: {
     /** App-role connection: the same privileges the server has. */
@@ -73,6 +135,8 @@ export async function matchMe(
     repo: MatchingRepository;
     params: MatchingParams;
     now: Date;
+    /** Needed for `counterpartPlays`. */
+    play?: GamePlay;
   },
   options: MatchMeOptions,
 ): Promise<MatchMeResult> {
@@ -160,6 +224,14 @@ export async function matchMe(
   const row = created.rows[0];
   if (row) {
     const alias = content.alias(row.alias);
+    let counterpart: CounterpartPlay | null = null;
+    if (options.counterpartPlays) {
+      if (!deps.play) throw new Error('counterpartPlays needs the game service');
+      counterpart = await playAsCounterpart(
+        { db, play: deps.play },
+        { matchId: row.id, userId: user.id, seed: options.seed },
+      );
+    }
     return {
       status: 'matched',
       ...base,
@@ -174,6 +246,7 @@ export async function matchMe(
           content.teaser,
           translatorFor(user.locale).t,
         ),
+        counterpart,
       },
     };
   }
