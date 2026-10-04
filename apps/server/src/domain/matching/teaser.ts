@@ -12,7 +12,8 @@ import type { Teaser } from './types';
 export interface TeaserContent {
   item(id: string): { name: LocalizedText; domain: Domain } | undefined;
   category(id: string): { name: LocalizedText; domain: Domain } | undefined;
-  question(id: string): { text: LocalizedText } | undefined;
+  /** How each side of a take reads inside a sentence (content/stances). */
+  stance(questionId: string): { agree: LocalizedText; disagree: LocalizedText } | undefined;
   isDomain(id: string): id is Domain;
 }
 
@@ -29,27 +30,35 @@ export function parseTeaser(value: unknown): Teaser {
 
 const text = (value: LocalizedText, locale: Locale) => value[locale] ?? value.ru ?? value.en;
 
-/** One or two sentences naming what the pair shares; a generic line if nothing can be named. */
+/**
+ * One sentence naming what the pair shares: the interest, and the view both hold on a take, in the
+ * words of the take's stance ("…also reads Berserk and thinks milk goes in before the cereal").
+ * A take without a stance is left out; if nothing can be named, the line is generic.
+ */
 export function renderTeaser(
   teaser: Teaser,
   locale: Locale,
   content: TeaserContent,
   t: Translator['t'],
 ): string {
-  const parts: string[] = [];
+  const sides = teaser.take ? content.stance(teaser.take.id) : undefined;
+  const stance = teaser.take && sides ? text(sides[teaser.take.value], locale) : undefined;
   const interest = teaser.interest;
   if (interest?.kind === 'domain') {
-    if (content.isDomain(interest.id)) parts.push(t(`teaser.domain.${interest.id}`));
+    if (content.isDomain(interest.id)) {
+      return stance
+        ? t(`teaser.domain.${interest.id}.take`, { stance })
+        : t(`teaser.domain.${interest.id}`);
+    }
   } else if (interest) {
     const entry =
       interest.kind === 'item' ? content.item(interest.id) : content.category(interest.id);
     const name = entry && text(entry.name, locale);
-    if (entry && name) parts.push(t(`teaser.${interest.kind}.${entry.domain}`, { name }));
+    if (entry && name) {
+      return stance
+        ? t(`teaser.${interest.kind}.${entry.domain}.take`, { name, stance })
+        : t(`teaser.${interest.kind}.${entry.domain}`, { name });
+    }
   }
-  if (teaser.take) {
-    const statement = content.question(teaser.take.id);
-    const body = statement && text(statement.text, locale);
-    if (body) parts.push(t(`teaser.take.${teaser.take.value}`, { text: body }));
-  }
-  return parts.length > 0 ? parts.join(' ') : t('teaser.generic');
+  return stance ? t('teaser.take', { stance }) : t('teaser.generic');
 }

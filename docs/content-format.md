@@ -4,7 +4,8 @@ This is the reference for writing SameSync's content files: the "hot takes" user
 
 - **Applies to:** schema version `1` as extended in Phase 1 (`revision`, `retiredIn`, `searchTerms`, dating options, `release.json`, `content.lock.json`), Phase 2 (chat aliases are required) and Phase 3 (stances). Checked against the repository on 2026-10-04.
 - **What onboarding (Phase 1) uses:** sections 3 (takes), 4 (interest catalog) and 5 (dating options), plus the release and lockfile workflow in section 7.
-- **What matching (Phase 2) uses:** the same takes and catalog (including `priorAgree` and `popularity`), and the chat aliases in section 6. Match teasers show take texts and item and category names, so see "How teasers use your text" in sections 3 and 4.
+- **What matching (Phase 2) uses:** the same takes and catalog (including `priorAgree` and `popularity`), and the chat aliases in section 6. Match teasers show stances and item and category names, so see "How teasers use your text" in sections 3 and 4.
+- **What the game (Phase 3) uses:** the takes (as cards to guess), and the stances and openers in section 6.
 - Fields added in Phase 1 are optional with defaults, so files written before Phase 1 stay valid.
 
 ## 1. Basics
@@ -135,7 +136,7 @@ File structure:
 - Specific beats generic: "Голосовые длиннее минуты — преступление" works better than "Люблю общаться".
 - No hate, sexual content, or questions about health or politics that identify a person. Content for `u18` gets an extra review.
 
-**How teasers use your text (Phase 2).** When two matched users are on the same side of a take, the match teaser quotes the statement as it is: «Вы сходитесь во мнении: «Ананасы на пицце — это нормально» — вы за.» / "You see it the same way: “Pineapple on pizza is fine” — you both agree." So write a statement that still reads well inside quotation marks, with no final full stop.
+**How teasers use your text.** A match teaser doesn't quote the statement. When two matched users are on the same side of a take, the teaser names that view in the words of the take's **stance** (section 6): «…и этот человек считает, что молоко наливают раньше хлопьев.» / "…and thinks milk goes in before the cereal." The statement itself is shown on cards, so write it with no final full stop.
 
 **Deck sizes (Phase 1, decided in PLAN.md Q5).**
 - Each user sees **35 takes**, drawn for their age band and mode. They can skip some but must answer at least 25.
@@ -237,7 +238,7 @@ Domains: `music` (artists, bands, genres), `games` (video and tabletop games), `
 
 If unsure, use `known`. Overrating mainstream items as `niche` produces bad matches, so err towards `mainstream` for anything widely known.
 
-**How teasers use your text (Phase 2).** A match teaser names what two users share: an item, or in broader matches a category. The name is put after a fixed phrase, unchanged: «У кого-то в плейлисте тоже Молчат Дома.», «У кого-то на книжной полке тоже Достоевский.», «Кто-то тоже любит такие игры: Инди-игры.» So keep every Russian name in its dictionary form (nominative), as in the examples, and don't add a full stop.
+**How teasers use your text.** A match teaser names what two users share: an item, or in broader matches a category. The name is put after a fixed phrase, unchanged: «У кого-то здесь в плейлисте тоже Молчат Дома.», «У кого-то здесь на книжной полке тоже Достоевский, и этот человек считает, что молоко наливают раньше хлопьев.», «У кого-то здесь в любимых играх тоже Инди-игры.» In English: "Someone here also reads Berserk and thinks milk goes in before the cereal." So keep every Russian name in its dictionary form (nominative), as in the examples, and don't add a full stop.
 
 **Catalog size.** Launch-shaped content needs at least 150 active items across at least 4 domains **in each locale** (`content:check --launch`, section 8). The final launch size is still open (PLAN.md Q6).
 
@@ -349,7 +350,7 @@ Chat aliases are used from Phase 2, stances and openers from Phase 3. Products a
 
 ### Stances (`content/stances/*.json`): Phase 3
 
-A stance says how each side of a take reads inside a sentence. It is what a person who agrees, or disagrees, thinks.
+A stance says how each side of a take reads inside a sentence. It is what a person who agrees, or disagrees, thinks. Match teasers use it to name a view two people share: "Someone here also reads Berserk and thinks **milk goes in before the cereal**."
 
 File structure:
 

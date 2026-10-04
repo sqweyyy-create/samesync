@@ -222,10 +222,10 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 **Assignment.** For each pool × mode, score the eligible pairs and sort them by tier first (1 before 2 before 3), then by score. Then go down the list greedily, accepting a pair only if neither user has already been given a match in this run. Sorting by tier first is what makes a broader overlap a fallback: without it, two people with similar takes could outrank a pair that shares a rare item. With a fixed seed the result is deterministic, so tests are reproducible; the seed only breaks ties and picks aliases.
 
 **Teaser.**
-- The teaser names the highest-weight shared item (or category, at tier 2) and the highest-weight shared take, e.g. «Кто-то тоже считает, что ананасы на пицце — норм, и слушает Molchat Doma. Сыграем?»
+- The teaser is one sentence that names the highest-weight shared item (or category, at tier 2) and the highest-weight shared take, e.g. «У кого-то здесь в плейлисте тоже Молчат Дома, и этот человек считает, что ананасы на пицце — это нормально.» / "Someone here also listens to Molchat Doma and thinks pineapple on pizza is fine."
 - Only content IDs are stored, in `matches.teaser`. The text is rendered in the recipient's locale.
-- Each domain has its own template ("listens to", "plays", "watches"…), for an item, a category and the domain itself. The Russian templates keep the name in the nominative («У кого-то в плейлисте тоже Молчат Дома.»), because content names are stored in their dictionary form.
-- Until Phase 3 adds stance texts, the take part quotes the statement: «Вы сходитесь во мнении: «…» — вы за.»
+- Each domain has its own template ("listens to", "plays", "watches"…), for an item, a category and the domain itself, with and without a shared take. The Russian templates keep the name in the nominative («У кого-то здесь в плейлисте тоже Молчат Дома.»), because content names are stored in their dictionary form.
+- The shared take is named through its stance (`content/stances`, since Phase 3): the text of the side both users are on, written to follow "thinks" / «считает, что». A take without a stance is left out of the teaser. Phase 2 quoted the statement instead.
 
 **Scale.** The MVP scores every pair within a pool × mode inside a worker thread. That is fine up to a few thousand users per pool: 5,000 users (12.5 million pairs) take about 5 seconds for the whole run (Phase 2 benchmark). Memory grows with the number of eligible pairs (8 bytes each), and the planner refuses pools above 20,000 candidates. Past a measured threshold, a later optimization finds candidates first through an inverted index on rare features in SQL, then scores only those. That optimization is not in the MVP.
 

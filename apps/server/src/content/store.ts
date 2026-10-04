@@ -79,7 +79,7 @@ export function createContentStore(bundle: ContentBundle, checksum: string): Con
   // Everything ever published, for rendering what existing matches refer to.
   const allCategories = new Map(bundle.categories.map((c) => [c.id, c]));
   const allItems = new Map(bundle.items.map((i) => [i.id, i]));
-  const allQuestions = new Map(bundle.questions.map((q) => [q.id, q]));
+  const stances = new Map(bundle.stances.map((s) => [s.questionId, s]));
 
   const inDeck = (q: Question, s: DeckScope) =>
     q.audiences.includes(s.band) && q.modes.includes(s.mode) && q.locales.includes(s.locale);
@@ -134,10 +134,7 @@ export function createContentStore(bundle: ContentBundle, checksum: string): Con
         const category = allCategories.get(id);
         return category ? { name: category.name, domain: category.domain } : undefined;
       },
-      question(id) {
-        const question = allQuestions.get(id);
-        return question ? { text: question.text } : undefined;
-      },
+      stance: (questionId) => stances.get(questionId),
       isDomain: (id): id is Domain => (DOMAINS as readonly string[]).includes(id),
     },
     alias: (id) => aliases.get(id),

@@ -2,6 +2,7 @@ import { DOMAINS, type Domain } from '@samesync/content';
 import { LOCALES } from '@samesync/shared';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import { describe, expect, it } from 'vitest';
+import { realContent } from '../../../test/support/app';
 import { HOUR, NOW, answers, candidate, planInput } from '../../../test/support/matching';
 import { planPool } from './plan';
 import { parseTeaser, renderTeaser, type TeaserContent } from './teaser';
@@ -87,7 +88,7 @@ describe('teaser selection', () => {
 });
 
 describe('teaser rendering', () => {
-  /** Fake content: one item and one category per domain, and one take. */
+  /** Fake content: one item and one category per domain, and the stance of one take. */
   const content: TeaserContent = {
     item: (id) => {
       const domain = id.split('.')[1] as Domain;
@@ -101,9 +102,12 @@ describe('teaser rendering', () => {
         ? { domain, name: { ru: `Категория-${domain}`, en: `Category-${domain}` } }
         : undefined;
     },
-    question: (id) =>
+    stance: (id) =>
       id === 'q.pizza'
-        ? { text: { ru: 'Ананасы на пицце — это нормально', en: 'Pineapple on pizza is fine' } }
+        ? {
+            agree: { ru: 'ананасы на пицце — это нормально', en: 'pineapple on pizza is fine' },
+            disagree: { ru: 'ананасам не место на пицце', en: "pineapple doesn't belong on pizza" },
+          }
         : undefined,
     isDomain: (id): id is Domain => (DOMAINS as readonly string[]).includes(id),
   };
@@ -111,53 +115,72 @@ describe('teaser rendering', () => {
     renderTeaser(teaser, locale, content, translatorFor(locale).t);
   const take = { id: 'q.pizza', value: 'agree' } as const;
 
-  it('has a template for every kind of overlap (tier) and every domain, in ru and en', () => {
+  it('has a template for every kind of overlap (tier) and every domain, with and without a take, in ru and en', () => {
     for (const locale of LOCALES) {
       const seen = new Set<string>();
+      const stance = locale === 'ru' ? 'ананасы на пицце — это нормально' : 'pineapple on pizza';
       for (const domain of DOMAINS) {
-        const item = render(
-          { interest: { kind: 'item', id: `i.${domain}.x` }, take: null },
-          locale,
-        );
-        const category = render(
-          { interest: { kind: 'category', id: `c.${domain}.x` }, take: null },
-          locale,
-        );
-        const whole = render({ interest: { kind: 'domain', id: domain }, take: null }, locale);
-        expect(item).toContain(locale === 'ru' ? `Предмет-${domain}` : `Item-${domain}`);
-        expect(category).toContain(locale === 'ru' ? `Категория-${domain}` : `Category-${domain}`);
-        for (const text of [item, category, whole]) {
-          // A missing key would come back as the key itself; a missing param as "{name}".
-          expect(text).not.toMatch(/teaser\.|[{}]/);
-          seen.add(text);
+        for (const shared of [null, take]) {
+          const item = render(
+            { interest: { kind: 'item', id: `i.${domain}.x` }, take: shared },
+            locale,
+          );
+          const category = render(
+            { interest: { kind: 'category', id: `c.${domain}.x` }, take: shared },
+            locale,
+          );
+          const whole = render({ interest: { kind: 'domain', id: domain }, take: shared }, locale);
+          expect(item).toContain(locale === 'ru' ? `Предмет-${domain}` : `Item-${domain}`);
+          expect(category).toContain(
+            locale === 'ru' ? `Категория-${domain}` : `Category-${domain}`,
+          );
+          for (const text of [item, category, whole]) {
+            // A missing key would come back as the key itself; a missing param as "{name}".
+            expect(text).not.toMatch(/teaser\.|[{}]/);
+            expect(text.includes(stance)).toBe(shared !== null);
+            // One sentence: the only full stop is the last character.
+            expect(text.indexOf('.')).toBe(text.length - 1);
+            seen.add(text);
+          }
         }
       }
-      expect(seen.size).toBeGreaterThanOrEqual(DOMAINS.length * 2 + 4);
+      // Items and categories may share their wording; domains never name anything.
+      expect(seen.size).toBeGreaterThanOrEqual(DOMAINS.length * 2 * 2);
     }
   });
 
-  it('renders the item and the take in the reader language', () => {
+  it('renders the item and the shared view in the reader language, as one sentence', () => {
     const teaser: Teaser = { interest: { kind: 'item', id: 'i.music.x' }, take };
     expect(render(teaser, 'ru')).toBe(
-      'У кого-то в плейлисте тоже Предмет-music. Вы сходитесь во мнении: «Ананасы на пицце — это нормально» — вы за.',
+      'У кого-то здесь в плейлисте тоже Предмет-music, и этот человек считает, что ананасы на пицце — это нормально.',
     );
     expect(render(teaser, 'en')).toBe(
-      'Someone here also listens to Item-music. You see it the same way: “Pineapple on pizza is fine” — you both agree.',
+      'Someone here also listens to Item-music and thinks pineapple on pizza is fine.',
     );
-    expect(render({ interest: null, take: { ...take, value: 'disagree' } }, 'ru')).toBe(
-      'Вы сходитесь во мнении: «Ананасы на пицце — это нормально» — вы против.',
+    expect(render({ interest: { kind: 'domain', id: 'games' }, take }, 'ru')).toBe(
+      'Кто-то здесь тоже любит игры и считает, что ананасы на пицце — это нормально.',
     );
   });
 
-  it('falls back to a generic line when nothing can be named', () => {
-    const unknown: Teaser = {
-      interest: { kind: 'item', id: 'i.music' },
-      take: { id: 'q.gone', value: 'agree' },
-    };
+  it('uses the stance of the side both are on, and names the view alone when nothing else is shared', () => {
+    const against: Teaser = { interest: null, take: { ...take, value: 'disagree' } };
+    expect(render(against, 'ru')).toBe(
+      'Кто-то здесь тоже считает, что ананасам не место на пицце.',
+    );
+    expect(render(against, 'en')).toBe(
+      "Someone here also thinks pineapple doesn't belong on pizza.",
+    );
+  });
+
+  it('leaves out a take that has no stance, and falls back to a generic line when nothing can be named', () => {
+    const noStance = { id: 'q.gone', value: 'agree' } as const;
+    expect(render({ interest: { kind: 'item', id: 'i.books.x' }, take: noStance }, 'ru')).toBe(
+      'У кого-то здесь на книжной полке тоже Предмет-books.',
+    );
     expect(render({ interest: { kind: 'item', id: 'x.unknown' }, take: null }, 'ru')).toBe(
       'Кто-то с похожими вкусами уже здесь.',
     );
-    expect(render({ ...unknown, interest: null }, 'en')).toBe(
+    expect(render({ interest: null, take: noStance }, 'en')).toBe(
       'Someone with similar tastes is already here.',
     );
     expect(render({ interest: { kind: 'domain', id: 'cooking' }, take: null }, 'en')).toBe(
@@ -170,6 +193,65 @@ describe('teaser rendering', () => {
     expect(parseTeaser(stored)).toEqual(stored);
     for (const bad of [null, 'text', {}, { interest: { kind: 'user', id: '1' }, take: null }]) {
       expect(parseTeaser(bad)).toEqual({ interest: null, take: null });
+    }
+  });
+});
+
+describe('teasers of the committed content', () => {
+  it('reads as in the product brief: an item in its dictionary form and a stance', async () => {
+    const { teaser: content } = await realContent();
+    const teaser: Teaser = {
+      interest: { kind: 'item', id: 'i.books.berserk' },
+      take: { id: 'q.milk_before_cereal', value: 'agree' },
+    };
+    expect(renderTeaser(teaser, 'en', content, translatorFor('en').t)).toBe(
+      'Someone here also reads Berserk and thinks milk goes in before the cereal.',
+    );
+    // Russian keeps the name in the nominative, whatever its declension would be.
+    expect(renderTeaser(teaser, 'ru', content, translatorFor('ru').t)).toBe(
+      'У кого-то здесь на книжной полке тоже Берсерк, и этот человек считает, что молоко наливают раньше хлопьев.',
+    );
+    const author: Teaser = {
+      interest: { kind: 'item', id: 'i.books.dostoevsky' },
+      take: { id: 'q.milk_before_cereal', value: 'disagree' },
+    };
+    expect(renderTeaser(author, 'ru', content, translatorFor('ru').t)).toBe(
+      'У кого-то здесь на книжной полке тоже Достоевский, и этот человек считает, что сначала хлопья, потом молоко.',
+    );
+  });
+
+  it('can name either side of every take of every deck, in ru and en', async () => {
+    const store = await realContent();
+    const takes = new Set<string>();
+    for (const scope of [
+      { band: 'u18', mode: 'friends' },
+      { band: 'adult', mode: 'friends' },
+      { band: 'adult', mode: 'dating' },
+    ] as const) {
+      for (const locale of LOCALES) {
+        for (const question of store.deckCandidates({ ...scope, locale })) takes.add(question.id);
+      }
+    }
+    expect(takes.size).toBeGreaterThanOrEqual(35);
+    const generic = new Set(LOCALES.map((locale) => translatorFor(locale).t('teaser.generic')));
+    for (const id of takes) {
+      for (const value of ['agree', 'disagree'] as const) {
+        for (const locale of LOCALES) {
+          const text = renderTeaser(
+            { interest: null, take: { id, value } },
+            locale,
+            store.teaser,
+            translatorFor(locale).t,
+          );
+          expect({ id, value, locale, generic: generic.has(text) }).toEqual({
+            id,
+            value,
+            locale,
+            generic: false,
+          });
+          expect(text).not.toMatch(/[{}]/);
+        }
+      }
     }
   });
 });

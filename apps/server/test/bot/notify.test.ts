@@ -72,7 +72,8 @@ const names = async () => {
   const take = [...scope.takes.slice(0, 5)].sort(
     (x, y) => x.priorAgree - y.priorAgree || (x.id < y.id ? -1 : 1),
   )[0]!;
-  return { item: content.teaser.item(item)!.name, take: content.teaser.question(take.id)!.text };
+  // Both agreed with it, so the teaser uses the "agree" side of its stance.
+  return { item: content.teaser.item(item)!.name, take: content.teaser.stance(take.id)!.agree };
 };
 
 describe('a new match', () => {

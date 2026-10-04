@@ -30,7 +30,10 @@ async function person(over: InsertUser = {}) {
   });
   return { ...row, as: t.as(telegram) };
 }
-const TEASER = { interest: { kind: 'item', id: 'i.music.molchat_doma' }, take: null };
+const TEASER = {
+  interest: { kind: 'item', id: 'i.music.molchat_doma' },
+  take: { id: 'q.milk_before_cereal', value: 'agree' },
+};
 async function matched(over: InsertUser = {}, band: 'adult' | 'u18' = 'adult') {
   const [a, b] = [await person(over), await person(over)];
   const match = await insertMatch(testDb.appPool, { a: a.id, b: b.id, band });
@@ -62,7 +65,8 @@ describe('GET /api/matches', () => {
       id: match.id,
       // The lower ID sees the other user's alias (alias_b), and the other way round.
       alias: { emoji: '🦉', name: 'Сова' },
-      teaser: 'У кого-то в плейлисте тоже Молчат Дома.',
+      teaser:
+        'У кого-то здесь в плейлисте тоже Молчат Дома, и этот человек считает, что молоко наливают раньше хлопьев.',
       status: 'pending_game',
     });
     expect((await list(high))[0]).toMatchObject({ alias: { emoji: '🦊', name: 'Лиса' } });
@@ -78,7 +82,8 @@ describe('GET /api/matches', () => {
     await testDb.ownerPool.query("UPDATE users SET locale = 'en' WHERE id = $1", [low.id]);
     expect((await list(low))[0]).toMatchObject({
       alias: { emoji: '🦉', name: 'Owl' },
-      teaser: 'Someone here also listens to Molchat Doma.',
+      teaser:
+        'Someone here also listens to Molchat Doma and thinks milk goes in before the cereal.',
     });
   });
 
