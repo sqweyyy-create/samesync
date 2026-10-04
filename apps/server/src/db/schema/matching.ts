@@ -116,6 +116,11 @@ export const matches = pgTable(
       'matches_expired_reason',
       sql`(${t.status} = 'expired') = coalesce(${t.closeReason} = 'expired', false)`,
     ),
+    // Results are ready from a known moment, and the chat window (Q2) is counted from it.
+    check(
+      'matches_results_ready_fields',
+      sql`${t.status} <> 'results_ready' OR (${t.resultsReadyAt} IS NOT NULL AND ${t.chatDeadlineAt} IS NOT NULL)`,
+    ),
     index('matches_user_b_idx').on(t.userBId),
     index('matches_open_a_idx')
       .on(t.userAId)
@@ -125,14 +130,6 @@ export const matches = pgTable(
       .where(sql`${t.status} IN ${OPEN}`),
   ],
 );
-
-/** Game shell: one row per match, created in the match transaction. Phase 3 adds the rest. */
-export const games = pgTable('games', {
-  matchId: uuid('match_id')
-    .primaryKey()
-    .references(() => matches.id),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
 
 /** Checked in both directions by the matches insert trigger. Written from Phase 5. */
 export const blocks = pgTable(

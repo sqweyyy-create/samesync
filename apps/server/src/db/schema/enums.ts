@@ -24,4 +24,14 @@ export const matchCloseReasonEnum = pgEnum('match_close_reason', MATCH_CLOSE_REA
 
 export const outboxStatusEnum = pgEnum('outbox_status', ['pending', 'sent', 'failed', 'cancelled']);
 /** One value per notification type; later phases add theirs. */
-export const outboxKindEnum = pgEnum('outbox_kind', ['match_created']);
+export const OUTBOX_KINDS = [
+  'match_created',
+  // Phase 3, the game: the other player finished first; both finished; one reminder before the
+  // deadline; the game was not played in time.
+  'game_turn',
+  'game_results',
+  'game_reminder',
+  'game_expired',
+] as const;
+export type OutboxKind = (typeof OUTBOX_KINDS)[number];
+export const outboxKindEnum = pgEnum('outbox_kind', OUTBOX_KINDS);

@@ -78,6 +78,97 @@ describe('upgrading a Phase 1 database (migration 0004)', () => {
   });
 });
 
+describe('upgrading a Phase 2 database (migration 0006)', () => {
+  let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
+  let owner: pg.Pool;
+  let phase2: string;
+
+  beforeAll(async () => {
+    db = await createEmptyDatabase();
+    owner = new pg.Pool({ connectionString: db.url, max: 1 });
+    phase2 = await migrationsUpTo(6);
+  });
+  afterAll(async () => {
+    await owner.end();
+    await db.drop();
+    await rm(phase2, { recursive: true, force: true });
+  });
+
+  it('closes the open matches that only have a game shell, drops their unsent notifications, and keeps the rest', async () => {
+    await runMigrations(db.url, phase2);
+    const user = async (telegramId: number) =>
+      (
+        await owner.query<{ id: string }>(
+          `INSERT INTO users (id, telegram_id, public_id, locale, status, birth_date, mode, last_active_at)
+           VALUES (gen_random_uuid(), $1, $2, 'ru', 'active', $3, 'friends', now()) RETURNING id`,
+          [telegramId, String(telegramId).padStart(10, '0'), birthDateYearsAgo(25)],
+        )
+      ).rows[0]!.id;
+    const match = async (first: string, second: string) => {
+      const [a, b] = first < second ? [first, second] : [second, first];
+      const { rows } = await owner.query<{ id: string }>(
+        `INSERT INTO matches (id, band, locale, mode, user_a_id, user_b_id, tier, score, teaser,
+           alias_a, alias_b, game_deadline_at)
+         VALUES (gen_random_uuid(), 'adult', 'ru', 'friends', $1, $2, 1, 1, '{}', 'a.fox', 'a.owl',
+           now() + interval '48 hours') RETURNING id`,
+        [a, b],
+      );
+      const id = rows[0]!.id;
+      await owner.query('INSERT INTO games (match_id) VALUES ($1)', [id]);
+      for (const userId of [a, b]) {
+        await owner.query(
+          `INSERT INTO outbox (id, user_id, kind, match_id, dedupe_key)
+           VALUES (gen_random_uuid(), $1, 'match_created', $2, $3)`,
+          [userId, id, `match_created:${id}:${userId}`],
+        );
+      }
+      return id;
+    };
+    const [u1, u2, u3] = [await user(1), await user(2), await user(3)];
+    const open = await match(u1, u2);
+    const left = await match(u1, u3);
+    await owner.query(
+      "UPDATE matches SET status = 'closed', close_reason = 'left', closed_at = now() WHERE id = $1",
+      [left],
+    );
+    await owner.query(
+      "UPDATE outbox SET status = 'sent', sent_at = now() WHERE match_id = $1 AND user_id = $2",
+      [open, u1],
+    );
+
+    await runMigrations(db.url);
+
+    const matches = await owner.query(
+      'SELECT id, status, close_reason, closed_at IS NOT NULL AS closed FROM matches ORDER BY id',
+    );
+    expect(matches.rows).toEqual(
+      [
+        { id: open, status: 'closed', close_reason: 'admin', closed: true },
+        { id: left, status: 'closed', close_reason: 'left', closed: true },
+      ].sort((x, y) => (x.id < y.id ? -1 : 1)),
+    );
+    // The shells are gone; a row of "games" now always has its questions.
+    expect((await owner.query('SELECT 1 FROM games')).rowCount).toBe(0);
+    const outbox = await owner.query(
+      'SELECT match_id, user_id, status::text AS status, cancel_reason FROM outbox ORDER BY match_id, user_id',
+    );
+    const expected = [
+      // Already sent: untouched. Still pending for the open match: cancelled.
+      { match_id: open, user_id: u1, status: 'sent', cancel_reason: null },
+      { match_id: open, user_id: u2, status: 'cancelled', cancel_reason: 'admin' },
+      // A match that was closed before keeps what it had.
+      { match_id: left, user_id: u1, status: 'pending', cancel_reason: null },
+      { match_id: left, user_id: u3, status: 'pending', cancel_reason: null },
+    ];
+    const byKey = (x: { match_id: string; user_id: string }) => `${x.match_id}:${x.user_id}`;
+    expect(outbox.rows).toEqual(expected.sort((x, y) => (byKey(x) < byKey(y) ? -1 : 1)));
+    // A bare shell can no longer be inserted: a game needs its questions.
+    await expect(
+      owner.query('INSERT INTO games (match_id) VALUES ($1)', [open]),
+    ).rejects.toMatchObject({ code: '23502' });
+  });
+});
+
 describe('migrations', () => {
   let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
   let owner: pg.Pool;
@@ -111,6 +202,7 @@ describe('migrations', () => {
       'content_releases',
       'dating_options',
       'feature_stats',
+      'game_predictions',
       'games',
       'interest_categories',
       'interest_items',

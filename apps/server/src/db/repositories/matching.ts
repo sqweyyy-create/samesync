@@ -4,8 +4,9 @@
  */
 import { OPEN_MATCH_STATUSES, type Locale, type Mode } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import type { GameSelection } from '../../domain/game/select';
 import type {
   FeatureStat,
   MatchCandidate,
@@ -15,7 +16,24 @@ import type {
   Tier,
 } from '../../domain/matching/types';
 import type { Db } from '../client';
-import { featureStats, games, matchRuns, matches, outbox } from '../schema/index';
+import { answers, featureStats, games, matchRuns, matches, outbox } from '../schema/index';
+
+/**
+ * Thrown inside `createMatch` when the two users' answers no longer make a game (they changed
+ * since the pair was planned). The transaction is rolled back and the run skips the pair.
+ */
+export class GameNotPossibleError extends Error {
+  override name = 'GameNotPossibleError';
+  constructor() {
+    super('the pair has no game: too few takes in common, or no disagreement');
+  }
+}
+
+/** Picks a pair's game from both users' current answers (skips left out), or null. */
+export type PickGame = (
+  answersA: ReadonlyMap<string, Stance>,
+  answersB: ReadonlyMap<string, Stance>,
+) => GameSelection | null;
 
 export interface RunRecord {
   id: string;
@@ -58,8 +76,10 @@ export interface MatchingRepository {
   loadExcludedPairs(userIds: readonly string[]): Promise<Array<[string, string]>>;
   saveFeatureStats(pool: PoolKey, stats: readonly FeatureStat[], now: Date): Promise<void>;
   /**
-   * One transaction per pair: the match (checked by the insert trigger), its game shell and one
-   * notification per user. Either all of it exists or none of it.
+   * One transaction per pair: the match (checked by the insert trigger), its game and one
+   * notification per user. Either all of it exists or none of it. The game is picked inside the
+   * transaction from the answers both users have right then, and keeps them as a snapshot.
+   * Throws `GameNotPossibleError` if `pickGame` finds no game.
    */
   createMatch(input: {
     runId: string;
@@ -68,6 +88,7 @@ export interface MatchingRepository {
     pair: PlannedPair;
     now: Date;
     gameDeadline: Date;
+    pickGame: PickGame;
   }): Promise<string>;
 }
 
@@ -275,7 +296,7 @@ export function createMatchingRepository(db: Db): MatchingRepository {
       });
     },
 
-    async createMatch({ runId, pool, mode, pair, now, gameDeadline }) {
+    async createMatch({ runId, pool, mode, pair, now, gameDeadline, pickGame }) {
       const matchId = uuidv7();
       await db.transaction(async (tx) => {
         await tx.insert(matches).values({
@@ -294,7 +315,26 @@ export function createMatchingRepository(db: Db): MatchingRepository {
           createdAt: now,
           gameDeadlineAt: gameDeadline,
         });
-        await tx.insert(games).values({ matchId, createdAt: now });
+        const answered = await tx
+          .select({ userId: answers.userId, questionId: answers.questionId, value: answers.value })
+          .from(answers)
+          .where(and(inArray(answers.userId, [pair.userA, pair.userB]), ne(answers.value, 'skip')));
+        const of = (userId: string) =>
+          new Map(
+            answered
+              .filter((row) => row.userId === userId)
+              .map((row) => [row.questionId, row.value as Stance]),
+          );
+        const game = pickGame(of(pair.userA), of(pair.userB));
+        if (!game) throw new GameNotPossibleError();
+        await tx.insert(games).values({
+          matchId,
+          questionIds: game.questionIds,
+          closingQuestionId: game.closingQuestionId,
+          answersA: game.answersA,
+          answersB: game.answersB,
+          createdAt: now,
+        });
         await tx.insert(outbox).values(
           [pair.userA, pair.userB].map((userId) => ({
             id: uuidv7(),

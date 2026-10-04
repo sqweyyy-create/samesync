@@ -1,5 +1,5 @@
 /**
- * The matching run against a real database, as the app role: matches, game shells and
+ * The matching run against a real database, as the app role: matches, their games and
  * notifications are created together, a drop runs once, an interrupted run is resumed without
  * duplicates, and the database trigger has the last word on every pair.
  */
@@ -58,7 +58,7 @@ const count = async (table: string) =>
   Number((await rows<{ n: string }>(`SELECT count(*) AS n FROM ${table}`))[0]?.n);
 
 describe('a matching run', () => {
-  it('creates the match, its game shell and one notification per user, and records the run', async () => {
+  it('creates the match, its game and one notification per user, and records the run', async () => {
     const [a, b] = await insertPair(niche[0]!);
     // Both agree on the first five takes; the teaser names the one fewest people agree with.
     const rarestAgree = [...scope.takes.slice(0, 5)].sort(

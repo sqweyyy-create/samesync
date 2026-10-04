@@ -27,6 +27,32 @@ export interface GameSelection {
   answersB: Stance[];
 }
 
+/**
+ * The takes of `deck` that both users answered (skips are not answers), with the pool's split on
+ * each. Only the deck of the match's pool × mode counts, as in matching.
+ */
+export function commonTakes(
+  deck: ReadonlyArray<{ id: string; priorAgree: number }>,
+  a: ReadonlyMap<string, Stance>,
+  b: ReadonlyMap<string, Stance>,
+  /** The pool's agree share of a take, if the run measured one; else the take's prior is used. */
+  agreeShare: (questionId: string) => number | undefined,
+): CommonTake[] {
+  const common: CommonTake[] = [];
+  for (const take of deck) {
+    const mine = a.get(take.id);
+    const theirs = b.get(take.id);
+    if (!mine || !theirs) continue;
+    common.push({
+      questionId: take.id,
+      a: mine,
+      b: theirs,
+      agreeShare: agreeShare(take.id) ?? take.priorAgree,
+    });
+  }
+  return common;
+}
+
 /** How far a take is from an even split: 0 for 50/50. */
 const imbalance = (take: CommonTake) => Math.abs(take.agreeShare - 0.5);
 
