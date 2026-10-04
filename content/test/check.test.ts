@@ -73,6 +73,16 @@ function root(files: Record<string, unknown>): string {
   return dir;
 }
 const takes = (...qs: unknown[]) => ({ 'questions/a.json': { schemaVersion: 1, questions: qs } });
+const stance = (over: Record<string, unknown> = {}) => ({
+  id: 's.sample',
+  questionId: 'q.sample',
+  agree: { ru: 'текст верен', en: 'the text is right' },
+  disagree: { ru: 'текст неверен', en: 'the text is wrong' },
+  ...over,
+});
+const stances = (...list: unknown[]) => ({
+  'stances/a.json': { schemaVersion: 1, stances: list },
+});
 const interests = (categories: unknown[], items: unknown[]) => ({
   'interests/a.json': { schemaVersion: 1, categories, items },
 });
@@ -212,6 +222,97 @@ describe('Phase 1 fields', () => {
         message: 'searchTerms.en: the item is not offered in locale en',
       },
     ]);
+  });
+});
+
+describe('stances', () => {
+  it('accepts one stance per take, with both sides in every locale of the take', async () => {
+    const dir = root({ ...takes(take()), ...stances(stance()) });
+    expect(await issuesOf(dir)).toEqual([]);
+    expect((await validateContentDir(dir)).bundle.stances.map((s) => s.id)).toEqual(['s.sample']);
+  });
+
+  it('requires both sides, the s. prefix and no unknown keys', async () => {
+    const issues = await issuesOf(
+      root({
+        ...takes(take()),
+        ...stances(
+          stance({ disagree: undefined }),
+          stance({ id: 'q.not_a_stance' }),
+          stance({ id: 's.b', side: 'agree' }),
+        ),
+      }),
+    );
+    const messages = issues.map((i) => i.message).join('\n');
+    expect(issues.every((i) => i.id === 'stances/a.json')).toBe(true);
+    expect(messages).toMatch(/stances\.0\.disagree/);
+    expect(messages).toMatch(/stances\.1\.id/);
+    expect(messages).toMatch(/stances\.2.*side/i);
+  });
+
+  it('reports a side that is missing a locale of its take, and a side that is too long', async () => {
+    const dir = root({
+      ...takes(take(), take({ id: 'q.ru_only', locales: ['ru'], text: { ru: 'Текст' } })),
+      ...stances(
+        stance({ agree: { ru: 'текст верен' }, disagree: { ru: 'я'.repeat(81), en: 'ok' } }),
+        // A take offered only in ru needs only ru stance texts.
+        stance({
+          id: 's.ru_only',
+          questionId: 'q.ru_only',
+          agree: { ru: 'да' },
+          disagree: { ru: 'нет' },
+        }),
+      ),
+    });
+    expect(await issuesOf(dir)).toEqual([
+      { id: 's.sample', message: 'agree is missing locale(s): en' },
+      { id: 's.sample', message: 'disagree.ru is 81 characters (max 80)' },
+    ]);
+  });
+
+  it('rejects an unknown take, a second stance for the same take and a duplicate ID', async () => {
+    const dir = root({
+      ...takes(take(), take({ id: 'q.other' })),
+      ...stances(
+        stance(),
+        stance({ id: 's.sample_again' }),
+        stance({ id: 's.orphan', questionId: 'q.does_not_exist' }),
+        stance({ id: 's.other', questionId: 'q.other' }),
+        stance({ id: 's.other', questionId: 'q.other' }),
+      ),
+    });
+    expect(await issuesOf(dir)).toEqual([
+      { id: 's.other', message: 'duplicate id' },
+      { id: 's.sample_again', message: 'q.sample already has a stance (s.sample)' },
+      { id: 's.orphan', message: 'references unknown question q.does_not_exist' },
+      { id: 's.other', message: 'q.other already has a stance (s.other)' },
+    ]);
+  });
+
+  it('stays valid when its take is retired: old matches still show it', async () => {
+    const dir = root({ ...takes(take({ retiredIn: '2026.10.1' })), ...stances(stance()) });
+    expect(await issuesOf(dir)).toEqual([]);
+  });
+
+  it('is covered by the lockfile and the checksum', async () => {
+    const dir = root({ ...takes(take()), ...stances(stance()) });
+    expect(await writeLockFile(dir)).toEqual({ issues: [], written: true });
+    const before = contentChecksum((await validateContentDir(dir)).bundle);
+    writeFileSync(
+      join(dir, 'stances/a.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        stances: [stance({ disagree: { ru: 'текст неверен', en: 'the text is not right' } })],
+      }),
+    );
+    const { bundle, issues } = await validateContentDir(dir);
+    expect(issues).toEqual([
+      {
+        id: 's.sample',
+        message: 'text changed without a revision bump (revision is 1; set it to 2)',
+      },
+    ]);
+    expect(contentChecksum(bundle)).not.toBe(before);
   });
 });
 

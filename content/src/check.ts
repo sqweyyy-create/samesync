@@ -13,11 +13,13 @@ import type {
   Product,
   Question,
   Release,
+  Stance,
 } from './schema';
 import { compareVersions } from './schema';
 
 export interface ContentBundle {
   questions: Question[];
+  stances: Stance[];
   categories: InterestCategory[];
   items: InterestItem[];
   genders: GenderOption[];
@@ -34,7 +36,7 @@ export interface ContentIssue {
 }
 
 /** Length limits, in characters (Unicode code points), so texts fit on cards and chips. */
-export const LIMITS = { takeText: 120, name: 40, searchTerm: 40 } as const;
+export const LIMITS = { takeText: 120, stanceText: 80, name: 40, searchTerm: 40 } as const;
 
 /**
  * Launch coverage minimums (Q5, PLAN.md Phase 1). Counted over entries that are not retired.
@@ -71,6 +73,7 @@ export function checkContent(bundle: ContentBundle): ContentIssue[] {
   const seen = new Set<string>();
   const all = [
     ...bundle.questions,
+    ...bundle.stances,
     ...bundle.categories,
     ...bundle.items,
     ...bundle.genders,
@@ -117,6 +120,24 @@ export function checkContent(bundle: ContentBundle): ContentIssue[] {
     checkRetired(q);
     if (q.audiences.includes('u18') && !q.modes.includes('friends')) {
       report(q.id, 'audience u18 needs mode friends (u18 users only use friends mode)');
+    }
+  }
+
+  // A stance belongs to one take and stays with it, also after the take is retired (matches made
+  // before the retirement still show it).
+  const stanceOf = new Map<string, string>();
+  for (const stance of bundle.stances) {
+    const question = questions.get(stance.questionId);
+    if (!question) {
+      report(stance.id, `references unknown question ${stance.questionId}`);
+      continue;
+    }
+    const other = stanceOf.get(question.id);
+    if (other) report(stance.id, `${question.id} already has a stance (${other})`);
+    else stanceOf.set(question.id, stance.id);
+    for (const side of ['agree', 'disagree'] as const) {
+      requireLocales(stance.id, side, stance[side], question.locales);
+      limitLength(stance.id, side, stance[side], LIMITS.stanceText);
     }
   }
 

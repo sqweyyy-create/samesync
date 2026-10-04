@@ -5,6 +5,7 @@ apps/server/src/db/migrations/meta/
 *.md
 # Authored content: values are validated by `pnpm content:check`; the formatter never rewrites it.
 content/questions/
+content/stances/
 content/interests/
 content/dating/
 content/openers/

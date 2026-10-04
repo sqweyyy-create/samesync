@@ -20,6 +20,11 @@ interface TextEntry {
 function textEntries(bundle: ContentBundle): TextEntry[] {
   return [
     ...bundle.questions.map((e) => ({ id: e.id, revision: e.revision, texts: { text: e.text } })),
+    ...bundle.stances.map((e) => ({
+      id: e.id,
+      revision: e.revision,
+      texts: { agree: e.agree, disagree: e.disagree },
+    })),
     ...bundle.categories.map((e) => ({ id: e.id, revision: e.revision, texts: { name: e.name } })),
     ...bundle.items.map((e) => ({ id: e.id, revision: e.revision, texts: { name: e.name } })),
     ...bundle.genders.map((e) => ({

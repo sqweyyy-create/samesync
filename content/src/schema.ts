@@ -2,7 +2,7 @@
  * Schemas for the versioned content files in /content (reference: docs/content-format.md).
  * Text lives here, never in the DB (PLAN.md §4). Unknown keys are rejected.
  * Fields added in Phase 1 (`revision`, `retiredIn`, `searchTerms`) are optional with defaults, so
- * files written before Phase 1 stay valid.
+ * files written before Phase 1 stay valid. Phase 3 added the stances file type.
  */
 import { BANDS, LOCALES, MODES } from '@samesync/shared';
 import { z } from 'zod';
@@ -93,6 +93,18 @@ export const GenderOption = z.strictObject({
   seeking: LocalizedText,
 });
 
+/**
+ * How each side of a take reads inside a sentence ("…thinks pineapple on pizza is fine"). One per
+ * take; it stays with the take, also after the take is retired.
+ */
+export const Stance = z.strictObject({
+  id: idWithPrefix('s'),
+  revision,
+  questionId: idWithPrefix('q'),
+  agree: LocalizedText,
+  disagree: LocalizedText,
+});
+
 export const Opener = z.strictObject({
   id: idWithPrefix('o'),
   revision,
@@ -129,6 +141,7 @@ export const InterestsFile = z.strictObject({
   items: z.array(InterestItem),
 });
 export const GendersFile = z.strictObject({ schemaVersion, genders: z.array(GenderOption) });
+export const StancesFile = z.strictObject({ schemaVersion, stances: z.array(Stance) });
 export const OpenersFile = z.strictObject({ schemaVersion, openers: z.array(Opener) });
 export const AliasesFile = z.strictObject({ schemaVersion, aliases: z.array(Alias) });
 export const ProductsFile = z.strictObject({ schemaVersion, products: z.array(Product) });
@@ -150,6 +163,7 @@ export type Question = z.infer<typeof Question>;
 export type InterestCategory = z.infer<typeof InterestCategory>;
 export type InterestItem = z.infer<typeof InterestItem>;
 export type GenderOption = z.infer<typeof GenderOption>;
+export type Stance = z.infer<typeof Stance>;
 export type Opener = z.infer<typeof Opener>;
 export type Alias = z.infer<typeof Alias>;
 export type Product = z.infer<typeof Product>;

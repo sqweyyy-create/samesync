@@ -12,6 +12,7 @@ import {
   ProductsFile,
   QuestionsFile,
   ReleaseFile,
+  StancesFile,
 } from './schema';
 
 export interface LoadResult {
@@ -23,7 +24,7 @@ export interface LoadResult {
 }
 
 /** Folders whose `*.json` files are content, and the file schema each one uses. */
-const CONTENT_DIRS = ['questions', 'interests', 'dating', 'openers', 'aliases'] as const;
+const CONTENT_DIRS = ['questions', 'stances', 'interests', 'dating', 'openers', 'aliases'] as const;
 export const RELEASE_FILE = 'release.json';
 const PRODUCTS_FILE = 'products.json';
 const ROOT_FILES = new Set([PRODUCTS_FILE, RELEASE_FILE, LOCK_FILE]);
@@ -46,6 +47,7 @@ async function entriesOf(dir: string) {
 export async function loadContent(root: string): Promise<LoadResult> {
   const bundle: ContentBundle = {
     questions: [],
+    stances: [],
     categories: [],
     items: [],
     genders: [],
@@ -109,6 +111,11 @@ export async function loadContent(root: string): Promise<LoadResult> {
         case 'questions': {
           const file = await parse(label, QuestionsFile);
           if (file) bundle.questions.push(...file.questions);
+          break;
+        }
+        case 'stances': {
+          const file = await parse(label, StancesFile);
+          if (file) bundle.stances.push(...file.stances);
           break;
         }
         case 'interests': {

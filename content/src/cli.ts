@@ -31,6 +31,7 @@ if (command === 'lock') {
   if (issues.length > 0) fail(`${name} failed`, issues);
   console.log(
     `${name} OK (release ${bundle.release?.version}): ${bundle.questions.length} questions, ` +
+      `${bundle.stances.length} stances, ` +
       `${bundle.categories.length} categories, ${bundle.items.length} items, ` +
       `${bundle.genders.length} dating options, ${bundle.openers.length} openers, ` +
       `${bundle.aliases.length} aliases, ${bundle.products.length} products`,

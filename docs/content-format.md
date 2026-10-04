@@ -2,7 +2,7 @@
 
 This is the reference for writing SameSync's content files: the "hot takes" users swipe on, and the interest catalog they pick from. You can author valid files from this page alone, without reading any code.
 
-- **Applies to:** schema version `1` as extended in Phase 1 (`revision`, `retiredIn`, `searchTerms`, dating options, `release.json`, `content.lock.json`) and Phase 2 (chat aliases are required). Checked against the repository on 2026-10-03.
+- **Applies to:** schema version `1` as extended in Phase 1 (`revision`, `retiredIn`, `searchTerms`, dating options, `release.json`, `content.lock.json`), Phase 2 (chat aliases are required) and Phase 3 (stances). Checked against the repository on 2026-10-04.
 - **What onboarding (Phase 1) uses:** sections 3 (takes), 4 (interest catalog) and 5 (dating options), plus the release and lockfile workflow in section 7.
 - **What matching (Phase 2) uses:** the same takes and catalog (including `priorAgree` and `popularity`), and the chat aliases in section 6. Match teasers show take texts and item and category names, so see "How teasers use your text" in sections 3 and 4.
 - Fields added in Phase 1 are optional with defaults, so files written before Phase 1 stay valid.
@@ -16,6 +16,7 @@ Content lives in the `content/` folder of the repository.
 | Folder or file | What it holds | Needed from |
 |---|---|---|
 | `content/questions/*.json` | Takes (agree/disagree statements) | Phase 1 |
+| `content/stances/*.json` | Stances: how each side of a take reads inside a sentence | Phase 3 |
 | `content/interests/*.json` | Interest categories and items | Phase 1 |
 | `content/dating/*.json` | Dating options ("You are" / "Looking for") | Phase 1 |
 | `content/openers/*.json` | Pre-written first messages | Phase 3 |
@@ -70,6 +71,7 @@ Every entry has an `id`, for example `q.pineapple_pizza` or `i.music.molchat_dom
 | Kind | Prefix | Example | Recommended shape (not enforced) |
 |---|---|---|---|
 | Take | `q` | `q.pineapple_pizza` | `q.<slug>` or `q.<topic>.<slug>` |
+| Stance | `s` | `s.pineapple_pizza` | `s.<take slug>` |
 | Interest category | `c` | `c.music.post_punk` | `c.<domain>.<slug>` |
 | Interest item | `i` | `i.music.molchat_doma` | **Enforced:** `i.<domain>.<slug>`, where `<domain>` is its category's domain |
 | Opener | `o` | `o.pineapple_pizza.agree` | `o.<take slug>.<agree or disagree>` |
@@ -89,7 +91,7 @@ Every entry has an `id`, for example `q.pineapple_pizza` or `i.music.molchat_dom
 
 ### Fields every text entry can have
 
-Every entry that has text (takes, categories, items, dating options, openers, aliases, products) accepts:
+Every entry that has text (takes, stances, categories, items, dating options, openers, aliases, products) accepts:
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
@@ -140,9 +142,11 @@ File structure:
 - So the content must supply at least 35 active (not retired) takes for every one of these 6 combinations: `u18`+`friends`, `adult`+`friends` and `adult`+`dating`, each in `ru` and in `en`. One take can count toward several combinations.
 - `pnpm content:check --launch` counts this (section 8).
 
-**Leave these out for now:**
-- Stance texts: Phase 3 adds short phrasings of each side, used in match teasers ("…also thinks …"). Don't add them yet; today they're rejected as unknown keys.
-- Openers: they already exist as their own file type (section 6), but aren't needed before Phase 3.
+**Two more texts belong to every take**, each in its own file type (section 6):
+- a **stance**: how each side of the take reads inside a sentence, used in match teasers ("…also thinks …");
+- two **openers**: a first message for each side, suggested after the game.
+
+They are not fields of the take: a take object with a `stance` or `opener` key is rejected as an unknown key.
 
 ### Example: a takes file
 
@@ -341,7 +345,53 @@ There must be at least two options that aren't retired. The decided list (Q11) i
 
 ## 6. Other file types
 
-Chat aliases are used from Phase 2. Openers and products are already defined and checked, so files of these types must be valid today, but nothing uses them yet. Each entry also accepts `revision` (section 2).
+Chat aliases are used from Phase 2, stances and openers from Phase 3. Products are already defined and checked, so that file must be valid today, but nothing uses it yet. Each entry also accepts `revision` (section 2).
+
+### Stances (`content/stances/*.json`): Phase 3
+
+A stance says how each side of a take reads inside a sentence. It is what a person who agrees, or disagrees, thinks.
+
+File structure:
+
+```json
+{ "schemaVersion": 1, "stances": [ /* stance objects */ ] }
+```
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `id` | string | yes | Prefix `s.`; recommended `s.<take slug>` |
+| `questionId` | string | yes | `id` of an existing take. A take has at most **one** stance |
+| `agree` | localized text | yes | The view of someone who **agrees** with the take, in every locale of the take. At most **80 characters** per locale |
+| `disagree` | localized text | yes | The view of someone who **disagrees** with it. Same rules |
+
+Writing a stance:
+- A clause that reads naturally after "thinks" / «считает, что»: "…thinks **milk goes in before the cereal**", «…считает, что **молоко наливают раньше хлопьев**».
+- Start with a lowercase letter unless the first word is a proper noun, and leave out the final full stop: the clause sits in the middle of a sentence.
+- Write `disagree` as the opposite view in its own words ("pineapple doesn't belong on pizza"), not as "not" plus the statement.
+- Russian must be gender-neutral, as everywhere.
+
+A stance stays with its take. When a take is retired, keep its stance in the file: matches made earlier still show it. A stance has no `retiredIn` of its own.
+
+<!-- content-example: stances/core.json -->
+```json
+{
+  "schemaVersion": 1,
+  "stances": [
+    {
+      "id": "s.pineapple_pizza",
+      "questionId": "q.pineapple_pizza",
+      "agree": { "ru": "ананасы на пицце — это нормально", "en": "pineapple on pizza is fine" },
+      "disagree": { "ru": "ананасам не место на пицце", "en": "pineapple doesn't belong on pizza" }
+    },
+    {
+      "id": "s.milk_before_cereal",
+      "questionId": "q.milk_before_cereal",
+      "agree": { "ru": "молоко наливают раньше хлопьев", "en": "milk goes in before the cereal" },
+      "disagree": { "ru": "сначала хлопья, потом молоко", "en": "cereal goes in before the milk" }
+    }
+  ]
+}
+```
 
 ### Openers (`content/openers/*.json`): Phase 3
 
@@ -487,7 +537,7 @@ Set `"retiredIn": "<current release version>"` on the entry and keep it in the f
 Run it from the repository root. It needs Node 24 and pnpm 12 (see `CLAUDE.md`). When everything is valid it prints one summary line (after pnpm's own command echo):
 
 ```
-content:check OK (release 2026.10.2): 67 questions, 31 categories, 187 items, 2 dating options, 2 openers, 32 aliases, 1 products
+content:check OK (release 2026.10.2): 67 questions, 0 stances, 31 categories, 187 items, 2 dating options, 2 openers, 32 aliases, 1 products
 ```
 
 Otherwise it exits with an error and prints one line per problem, named by file (for format errors) or by content ID (for cross-file errors):
@@ -508,18 +558,20 @@ A format error rejects **the whole file**: none of its entries are loaded. Anyth
 5. No ID is used twice across all files and kinds.
 6. Every localized text has every required locale:
    - takes, categories and items: each locale in their `locales`;
-   - openers: each locale of their take;
+   - stances (both sides) and openers: each locale of their take;
    - dating options, aliases and products: both `ru` and `en`.
 7. References resolve:
    - every item's `categoryId` exists and isn't retired (unless the item is retired too);
    - an item's `locales` and `audiences` are within its category's;
-   - every opener's `questionId` exists and isn't retired.
+   - every opener's `questionId` exists and isn't retired;
+   - every stance's `questionId` exists (the take may be retired), and no take has two stances.
 8. Consistency:
    - a take shown to `u18` includes `friends` mode;
    - an item ID uses its category's domain;
    - `searchTerms` only for the item's locales.
 9. Length limits, counted in characters (an emoji counts as one):
    - take text ≤ 120;
+   - each side of a stance ≤ 80;
    - category, item, dating-option and alias names ≤ 40;
    - search terms ≤ 40.
 10. At least two dating options that aren't retired, and at least two chat aliases.

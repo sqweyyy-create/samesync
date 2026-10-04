@@ -84,6 +84,7 @@ export function contentChecksum(bundle: ContentBundle): string {
     [...list].sort((a, b) => (a.id < b.id ? -1 : 1));
   const data = {
     questions: byId(bundle.questions),
+    stances: byId(bundle.stances),
     categories: byId(bundle.categories),
     items: byId(bundle.items),
     genders: byId(bundle.genders),
