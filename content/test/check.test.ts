@@ -497,7 +497,47 @@ describe('--launch coverage', () => {
       id: 'aliases',
       message: 'has 2 chat aliases (needs ≥ 12)',
     });
-    expect(launch).toHaveLength(9);
+    expect(launch).toContainEqual({
+      id: 'q.sample',
+      message: 'has no stance (content/stances/*.json)',
+    });
+    expect(launch).toContainEqual({
+      id: 'q.sample',
+      message: 'has no opener for the agree and disagree side (content/openers/*.json)',
+    });
+    expect(launch).toHaveLength(11);
+  });
+
+  it('requires a stance and an opener for each side of every take that is not retired', async () => {
+    const opener = (slug: string, side: string) => ({
+      id: `o.${slug}.${side}`,
+      questionId: `q.${slug}`,
+      side,
+      text: { ru: 'Почему?', en: 'Why?' },
+    });
+    const dir = root({
+      ...takes(
+        take(),
+        take({ id: 'q.half' }),
+        take({ id: 'q.bare' }),
+        take({ id: 'q.old', retiredIn: '2026.10.1' }),
+      ),
+      ...stances(stance(), stance({ id: 's.half', questionId: 'q.half' })),
+      'openers/a.json': {
+        schemaVersion: 1,
+        openers: [opener('sample', 'agree'), opener('sample', 'disagree'), opener('half', 'agree')],
+      },
+    });
+    expect(await issuesOf(dir)).toEqual([]);
+    const perTake = (await issuesOf(dir, true)).filter((i) => i.id.startsWith('q.'));
+    expect(perTake).toEqual([
+      { id: 'q.half', message: 'has no opener for the disagree side (content/openers/*.json)' },
+      { id: 'q.bare', message: 'has no stance (content/stances/*.json)' },
+      {
+        id: 'q.bare',
+        message: 'has no opener for the agree and disagree side (content/openers/*.json)',
+      },
+    ]);
   });
 
   it('does not count retired entries', async () => {

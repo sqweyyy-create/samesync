@@ -41,6 +41,8 @@ export const LIMITS = { takeText: 120, stanceText: 80, name: 40, searchTerm: 40 
 /**
  * Launch coverage minimums (Q5, PLAN.md Phase 1). Counted over entries that are not retired.
  * Aliases: a user can have 5 open matches (Q27), each under a different name, with room to spare.
+ * Every take also needs its stance and an opener for each side (PLAN.md Phase 3): a teaser can
+ * name any take, and a game can end on any take.
  */
 export const LAUNCH = {
   takesPerDeck: 35,
@@ -249,6 +251,22 @@ export function checkLaunchCoverage(bundle: ContentBundle): ContentIssue[] {
           message: `has ${count} takes (needs ≥ ${LAUNCH.takesPerDeck})`,
         });
       }
+    }
+  }
+  const withStance = new Set(bundle.stances.map((s) => s.questionId));
+  const openerSides = new Set(bundle.openers.map((o) => `${o.questionId}:${o.side}`));
+  for (const take of takes) {
+    if (!withStance.has(take.id)) {
+      issues.push({ id: take.id, message: 'has no stance (content/stances/*.json)' });
+    }
+    const missing = (['agree', 'disagree'] as const).filter(
+      (side) => !openerSides.has(`${take.id}:${side}`),
+    );
+    if (missing.length > 0) {
+      issues.push({
+        id: take.id,
+        message: `has no opener for the ${missing.join(' and ')} side (content/openers/*.json)`,
+      });
     }
   }
   const categories = new Map(bundle.categories.map((c) => [c.id, c]));

@@ -19,7 +19,7 @@ Content lives in the `content/` folder of the repository.
 | `content/stances/*.json` | Stances: how each side of a take reads inside a sentence | Phase 3 |
 | `content/interests/*.json` | Interest categories and items | Phase 1 |
 | `content/dating/*.json` | Dating options ("You are" / "Looking for") | Phase 1 |
-| `content/openers/*.json` | Pre-written first messages | Phase 3 |
+| `content/openers/*.json` | Pre-written first messages, one for each side of a take | Phase 3 |
 | `content/aliases/*.json` | Anonymous chat names | Phase 2 |
 | `content/products.json` | Telegram Stars products | Phase 6 |
 | `content/release.json` | The release version of the whole content set (section 7) | Phase 1, **required** |
@@ -370,7 +370,11 @@ Writing a stance:
 - Write `disagree` as the opposite view in its own words ("pineapple doesn't belong on pizza"), not as "not" plus the statement.
 - Russian must be gender-neutral, as everywhere.
 
+Launch-sized content needs a stance for **every** take that isn't retired (`content:check --launch`, section 8). A take without one still works, but its teasers leave the shared view out.
+
 A stance stays with its take. When a take is retired, keep its stance in the file: matches made earlier still show it. A stance has no `retiredIn` of its own.
+
+The committed file has 67 stances, one for every take; the example shows two:
 
 <!-- content-example: stances/core.json -->
 ```json
@@ -395,7 +399,7 @@ A stance stays with its take. When a take is retired, keep its stance in the fil
 
 ### Openers (`content/openers/*.json`): Phase 3
 
-The pre-written first message suggested after the game, written from the sender's side of a take they disagreed on.
+The pre-written first message suggested after the game, written from the sender's side of a take the two players disagreed on. The sender can edit it before sending.
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
@@ -404,7 +408,11 @@ The pre-written first message suggested after the game, written from the sender'
 | `side` | string | yes | `"agree"` or `"disagree"`: the side of the person **sending** the message. A take has at most **one** opener per side |
 | `text` | localized text | yes | In every locale of the referenced take. Gender-neutral Russian (it's sent in the user's name) |
 
+Launch-sized content needs an opener for **each side** of every take that isn't retired (`content:check --launch`, section 8): the game can end on any take the two players split on. Where one is missing, the app builds a plain first message from the take's statement instead.
+
 An opener stays with its take, like a stance. When a take is retired, keep its openers in the file: a game that started earlier still ends on them. An opener has no `retiredIn` of its own.
+
+The committed file has 134 openers, two for every take; the example shows the pair of one take:
 
 <!-- content-example: openers/core.json -->
 ```json
@@ -582,10 +590,9 @@ A format error rejects **the whole file**: none of its entries are loaded. Anyth
 **`pnpm content:check --launch`** runs all of the above and also checks that the content is big enough to launch, counting only entries that aren't retired:
 - ≥ 35 takes for each deck: `u18`+`friends`, `adult`+`friends` and `adult`+`dating`, each in `ru` and `en`;
 - ≥ 150 items across ≥ 4 domains in each locale;
-- ≥ 12 chat aliases.
+- ≥ 12 chat aliases;
+- a stance, and an opener for each side, for every take.
 
 The small test fixtures only need to pass the normal check; the committed content must pass both.
 
 **It does not check:** whether text is accurate, age-appropriate, well written or gender-neutral. That's editorial review.
-
-Phase 3 will add stance texts on takes and require openers (or a generic fallback) for every take.
