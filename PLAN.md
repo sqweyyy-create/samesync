@@ -9,7 +9,7 @@ Last updated: 2026-10-04. Project context and the non-negotiable safety rules ar
 | 0 | Scaffold | done (2026-10-03) |
 | 1 | Onboarding | done (2026-10-03) |
 | 2 | Matching engine | done (2026-10-04) |
-| 3 | Game | not started |
+| 3 | Game | done (2026-10-04) |
 | 4 | Anonymous chat | not started |
 | 5 | Safety & admin | not started |
 | 6 | Payments, limits, visual pass, deploy | not started |
@@ -572,7 +572,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - [x] Before a user has submitted and both are done, no endpoint returns the counterpart's answers. Predictions can't be changed after submission. *(test/game/api.test.ts: the game and submission responses never carry an answer, results answer 409 until both are done, a second submission is refused; test/safety/game-isolation.test.ts: the results query returns no answers before both finish, and the app role can't update or delete a prediction.)*
 - [x] Results are computed correctly, and the opener renders in the match's locale, referring only to the closing question. *(src/domain/game/results.test.ts, opener.test.ts; test/game/api.test.ts: both sides of one game, the opener of each side, and a reader who switched language.)*
 - [x] A non-participant gets 404. A match closed with `band_change` gets 404 for both former participants. *(test/game/api.test.ts for the three endpoints; test/safety/game-isolation.test.ts for the repository, also with a stale cached band.)*
-- [ ] Both users get the right notifications exactly once. Unplayed matches expire on time. *(Automated: test/game/notifications.test.ts against a faked Bot API: "your turn", "results are ready", the reminder and the expiry notice, each once; expiry at the deadline, idempotent. Pending: the product owner's check of the real notifications and the game in Telegram with `pnpm dev:match-me <code> --counterpart-plays`.)*
+- [x] Both users get the right notifications exactly once. Unplayed matches expire on time. *(Automated: test/game/notifications.test.ts against a faked Bot API: "your turn", "results are ready", the reminder and the expiry notice, each once; expiry at the deadline, idempotent. Manual: passed 2026-10-04, product owner, dev bot. The new-match and your-turn notifications, the game, the results screen with the disagreement card and the editable opener, the results-ready notification, the waiting screen, the 12-hour reminder and the expiry messages each arrived exactly once, in the owner's locale.)*
 
 **Tests that prove it**
 - `apps/server/src/domain/game/select.test.ts`: a property test. For random answer pairs that satisfy the eligibility rule (≥ 5 common, ≥ 1 split), the last question is a split, every question was answered by both, the output is deterministic with a seed, and the choice is the most balanced split.
@@ -601,21 +601,29 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - **API:**
   - `GET /api/matches` and `GET /api/matches/:id` also return `resultsReadyAt`, `chatDeadlineAt` and `game` (the number of questions and who has finished).
   - `GET …/game` answers 409 `conflict` once the caller has submitted or the game is over; `PUT …/predictions` answers 400 for anything but exactly one guess per question, and 409 for a second submission or a game that is over; `GET …/results` answers 409 `out_of_order` until both are done.
-  - Results are readable while the match is open (`results_ready` or `active`). Once it has ended they answer 409 (provisional, Q35).
+  - Results are readable while the match is open (`results_ready` or `active`). Once it has ended they answer 409 (Q35, decided).
 - **Safety SQL (migration 0007, §3 is updated):** the insert trigger on `game_predictions`, the update trigger on `games`, and a second update trigger on `matches` for the move to `results_ready`. They are new triggers; no earlier function was replaced. The move to `active` is still unguarded: Phase 4 owns it.
 - **Migration 0006 closes matches made before Phase 3.** They only have a game shell and can't be played. The ones still open are closed with reason `admin`, their unsent notifications are cancelled, and the shells are removed, so every row of `games` has its questions.
 - **Notifications:**
   - Four new outbox kinds: `game_turn`, `game_results`, `game_reminder`, `game_expired`. The texts name the other person by alias only, in wordings that keep the alias in the nominative.
-  - The reminder goes out 12 hours before the game deadline (provisional, Q34), once per player who hasn't played.
+  - The reminder goes out 12 hours before the game deadline (Q34, decided), once per player who hasn't played.
   - The sender re-checks each kind against the state it is about. "Your turn" that is still queued when the recipient plays is dropped with reason `outdated`.
   - The expiry notice has two texts (product owner, 2026-10-04): a player who didn't play is told that the time ran out, and a player who had sent their guesses is told that the other person didn't play in time.
 - **Deadlines job:** every minute, under an advisory lock. Expiry cancels the match's other pending notifications in the same transaction. A partial index on `matches.game_deadline_at` for `pending_game` matches serves it (migration 0008).
-- **Chat window (Q2):** `chat_deadline_at` is set to 48 hours after `results_ready_at`. The expiry of `results_ready` matches and its reminder stay in Phase 4, as planned there. Until then a match whose results are ready stays open and counts toward the open-match limit.
+- **Chat window (Q2):** `chat_deadline_at` is set to 48 hours after `results_ready_at`. The expiry of `results_ready` matches and its reminder stay in Phase 4, as planned there (confirmed by the product owner, 2026-10-04). Until then a match whose results are ready stays open and counts toward the open-match limit.
 - **Mini App:** the match screen has an intro, the cards, a last look before the one submission, a waiting screen and the results. The "Написать" button is disabled and nothing is sent. Initial JS is 96.8 KB gzip.
 - **Dev tooling:** `pnpm dev:match-me <public_id> --counterpart-plays` makes the synthetic counterpart submit its guesses through the real game service. It never plays for a real user.
 - **Parameters:** the number of questions (5, Q3) and the reminder lead are constants in `domain/game/params.ts`. The matching service refuses to start with more questions than `minCommonTakes`.
 - **Benchmark with games:** `pnpm bench:matching`, 2026-10-04, same machine: 5.5 s for 5,000 users (4.9 s before), longest event-loop lag 19 ms, 2,134 pairs, none refused.
-- **Open questions:** Q1, Q3 and Q4 are implemented as their provisional defaults. Q34 and Q35 are new.
+- **Open questions:** Q1, Q3 and Q4 are implemented as their provisional defaults. Q34 and Q35 were raised in this phase and decided on 2026-10-04.
+- **Safety sign-off (2026-10-04, product owner; CLAUDE.md invariant 11).** It covers every safety change listed in the Phase 3 report, which was taken from `git diff 2f80744..04e65d7`:
+  - Migration 0006: `game_predictions` (primary key, three foreign keys, CHECK `game_predictions_no_skip`); six new columns, one foreign key and three CHECKs on `games`; CHECK `matches_results_ready_fields`; four new `outbox_kind` values; and the cleanup that closes the matches made before Phase 3, cancels their unsent notifications and deletes the game shells.
+  - Migration 0007: the functions `game_predictions_guard_insert()`, `games_guard_update()` and `matches_guard_game_status()` with their triggers `game_predictions_10_guard_insert`, `games_10_guard_update` and `matches_20_guard_game_status`; `REVOKE ALL` on the three functions from PUBLIC; `GRANT UPDATE (a_done_at, b_done_at) ON games` and `GRANT SELECT, INSERT ON game_predictions` to `samesync_app`.
+  - Migration 0008: the index `matches_game_deadline_idx`.
+  - No earlier migration was edited, and no existing function or trigger was replaced, dropped or disabled.
+  - `test/safety/`: the new `game-isolation.test.ts` (34 tests), and in `outbox-recheck.test.ts` a new block of 13 tests for the four game notification kinds. No existing test or assertion changed.
+  - Other code that guards isolation: the participant scope shared by `db/repositories/matches.ts` and the new `db/repositories/games.ts` (the same conditions as before); a rule per notification kind in `dropReason` (`domain/notifications.ts`); the outbox repository and sender for the new kinds. Auth and the bot handlers did not change.
+  - After the sign-off the expiry notice got its second text, at the product owner's request: `services/outbox-sender.ts` picks the text by the recipient's side. No safety SQL, no safety test and none of the checks before sending changed.
 - **Local setup after pulling Phase 3:** run `pnpm db:migrate` (it closes the matches made before Phase 3) and `pnpm content:seed` (the content release changed) before `pnpm dev`.
 
 ---
@@ -842,8 +850,8 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q11. Dating gender and preference model.** Which gender options, and is "seeking" multi-select? ✅ **Decided (2026-10-03, product owner):** dating mode asks **"You are"** (man / woman, single choice) and **"Looking for"** (men / women, multi-select, at least one). A match requires mutual compatibility: each user's gender is in the other's "looking for". The option list lives in `content/` so it can be extended later; `users.gender` and `users.seeking` store option IDs (format: `docs/content-format.md`). The two extra fields are accepted as part of onboarding. Legal review of dating features is still covered by Q28.
 - **Q12. Age gaps in the adult pool.** The spec limits age gaps only for `u18`. Should an 18-year-old be matched with a 45-year-old, especially in dating? ✅ **Decided (2026-10-03, product owner):** dating has a user-set partner age range. It defaults to ±5 years from the user's own age, clamped to 18+, and can be changed in settings. Two users match only if each one's age is within the other's range. Friends mode has no age-gap limit (in the adult pool; the `u18` rule from Q14 is unchanged).
 - **Q13. Choosing and switching language.** Picked by the user or taken from `language_code`? Where do `uk`/`be`/`kk`… go? Does switching move pools and close open matches? Can bilingual users join both pools? ✅ **Decided (2026-10-03, product owner):** preselected from `language_code` (`ru` → ru, otherwise en), then stored in `users.locale`; changeable only in SameSync's settings; a change affects future matches only; one language pool per user. Consequence: after the first use, changing the Telegram client's language does **not** change SameSync's language. Phase 1 makes the bot and the Mini App read the stored locale (Phase 0 still follows the live `language_code`).
-- **Q34. When is the game reminder sent?** Q2 decided "one reminder each" but not the moment. *Provisional:* 12 hours before the game deadline, to every player who hasn't played (a constant in `domain/game/params.ts`). *Needed by:* G1.
-- **Q35. Can results be read after a match has ended?** *Provisional:* no. Results are shown while the match is open; once it has expired or closed, the other person's answers are no longer returned. *Needed by:* Phase 4.
+- **Q34. When is the game reminder sent?** Q2 decided "one reminder each" but not the moment. ✅ **Decided (2026-10-04, product owner):** the provisional default is accepted: 12 hours before the game deadline, to every player who hasn't played (a constant in `domain/game/params.ts`).
+- **Q35. Can results be read after a match has ended?** ✅ **Decided (2026-10-04, product owner):** the provisional default is accepted: no. Results are shown while the match is open; once it has expired or closed, the other person's answers are no longer returned.
 
 **Age & safety**
 - **Q14. What does "±2 years" mean?** ✅ **Decided (2026-10-02, product owner):** birth dates at most 2 calendar years apart (the stricter reading; constant over time). The looser whole-year-age reading was rejected.
