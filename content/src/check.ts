@@ -199,13 +199,23 @@ export function checkContent(bundle: ContentBundle): ContentIssue[] {
     );
   }
 
+  // Like a stance, an opener stays with its take after the take is retired: a game that started
+  // earlier still ends on it, and an ID can never be removed.
+  const openerOf = new Map<string, string>();
   for (const opener of bundle.openers) {
     const question = questions.get(opener.questionId);
     if (!question) {
       report(opener.id, `references unknown question ${opener.questionId}`);
       continue;
     }
-    if (question.retiredIn) report(opener.id, `references retired question ${question.id}`);
+    const key = `${question.id}:${opener.side}`;
+    const other = openerOf.get(key);
+    if (other) {
+      report(
+        opener.id,
+        `${question.id} already has an opener for the ${opener.side} side (${other})`,
+      );
+    } else openerOf.set(key, opener.id);
     requireLocales(opener.id, 'text', opener.text, question.locales);
   }
 

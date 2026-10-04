@@ -401,8 +401,10 @@ The pre-written first message suggested after the game, written from the sender'
 |---|---|---|---|
 | `id` | string | yes | Prefix `o.` |
 | `questionId` | string | yes | `id` of an existing take |
-| `side` | string | yes | `"agree"` or `"disagree"`: the side of the person **sending** the message |
+| `side` | string | yes | `"agree"` or `"disagree"`: the side of the person **sending** the message. A take has at most **one** opener per side |
 | `text` | localized text | yes | In every locale of the referenced take. Gender-neutral Russian (it's sent in the user's name) |
+
+An opener stays with its take, like a stance. When a take is retired, keep its openers in the file: a game that started earlier still ends on them. An opener has no `retiredIn` of its own.
 
 <!-- content-example: openers/core.json -->
 ```json
@@ -563,8 +565,8 @@ A format error rejects **the whole file**: none of its entries are loaded. Anyth
 7. References resolve:
    - every item's `categoryId` exists and isn't retired (unless the item is retired too);
    - an item's `locales` and `audiences` are within its category's;
-   - every opener's `questionId` exists and isn't retired;
-   - every stance's `questionId` exists (the take may be retired), and no take has two stances.
+   - every stance's and every opener's `questionId` exists (the take may be retired);
+   - no take has two stances, or two openers for the same side.
 8. Consistency:
    - a take shown to `u18` includes `friends` mode;
    - an item ID uses its category's domain;

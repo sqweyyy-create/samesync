@@ -184,7 +184,7 @@ describe('Phase 1 fields', () => {
     ]);
   });
 
-  it('rejects references to retired entries', async () => {
+  it('rejects an active item in a retired category, but keeps the openers of a retired take', async () => {
     const dir = root({
       ...takes(take({ retiredIn: '2026.10.1' })),
       ...interests([category({ retiredIn: '2026.10.1' })], [item()]),
@@ -200,12 +200,38 @@ describe('Phase 1 fields', () => {
         ],
       },
     });
+    // The opener stays valid: IDs are permanent, and a game that started earlier still ends on it.
     expect(await issuesOf(dir)).toEqual([
       {
         id: 'i.music.molchat_doma',
         message: 'references retired category c.music.post_punk; retire the item too or move it',
       },
-      { id: 'o.sample.agree', message: 'references retired question q.sample' },
+    ]);
+  });
+
+  it('rejects a second opener for the same side of a take', async () => {
+    const opener = (id: string, side: string) => ({
+      id,
+      questionId: 'q.sample',
+      side,
+      text: { ru: 'Почему?', en: 'Why?' },
+    });
+    const dir = root({
+      ...takes(take()),
+      'openers/a.json': {
+        schemaVersion: 1,
+        openers: [
+          opener('o.sample.agree', 'agree'),
+          opener('o.sample.disagree', 'disagree'),
+          opener('o.sample.agree_again', 'agree'),
+        ],
+      },
+    });
+    expect(await issuesOf(dir)).toEqual([
+      {
+        id: 'o.sample.agree_again',
+        message: 'q.sample already has an opener for the agree side (o.sample.agree)',
+      },
     ]);
   });
 
