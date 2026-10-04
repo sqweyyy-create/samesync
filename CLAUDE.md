@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** Phase 0 (scaffold), Phase 1 (onboarding) and Phase 2 (matching engine) are done; Phase 3 (game) is next. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phase 0 (scaffold), Phase 1 (onboarding) and Phase 2 (matching engine) are done. Phase 3 (game) is implemented and waiting for the product owner's manual check of the game and its notifications in Telegram; see the status table. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -50,7 +50,7 @@ apps/
       api/  screens/  ui/
 packages/
   shared/                 # zod API schemas, domain types, ageOn(), i18n runtime + locales/{ru,en}.json
-content/                  # questions/, interests/, openers, aliases, products.json, schemas; content.lock.json from Phase 1
+content/                  # questions/, stances/, interests/, openers/, aliases/, products.json, schemas; content.lock.json from Phase 1
 docs/                     # content-format.md (authoring reference for content/)
 ```
 
@@ -118,6 +118,11 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - A run only proposes pairs. Each match is inserted in its own transaction and the `matches` trigger decides; a refused pair is skipped and counted, never forced.
   - Scheduled jobs take a Postgres advisory lock (`jobs/advisory-lock.ts`).
   - `users.synthetic` marks dev-tooling users: never messaged, and ignored when `NODE_ENV=production`.
+- **Game (Phase 3):**
+  - `domain/game/` is pure. A match's game is picked inside the match transaction and keeps a snapshot of both users' answers (`games.answers_a` / `answers_b`); results use the snapshot, never the `answers` table.
+  - The other person's answers and guesses are read only through `getResultsForParticipant`, whose query selects them only once both players have finished. `GET …/game` carries the questions and nothing else.
+  - Guesses are submitted once, through `GamesRepository.submitPredictions` (one transaction). The app role can't update or delete a prediction.
+  - Every notification kind needs its rule in `dropReason` (`domain/notifications.ts`): what state the match must be in for the message to still be right.
 - **Bot:**
   - Relayed text goes out as plain text with no `parse_mode`.
   - Proactive messages go through the outbox (throttled, retried, de-duplicated). Direct replies to a user's own command can be sent inline.
@@ -144,6 +149,7 @@ pnpm dev                        # server (bot long-polling + API + jobs) and Vit
 pnpm dev:initdata               # signed initData + a URL to open the Mini App in a plain browser
 pnpm dev:population --pool adult:ru --mode friends --n 500   # synthetic users for one pool × mode
 pnpm dev:match-me <public_id>   # match a real dev user with synthetic ones and send them the bot notification
+pnpm dev:match-me <public_id> --counterpart-plays   # …and let the synthetic counterpart play, so the game can be finished alone
 pnpm bench:matching             # 5,000-user matching run on a throwaway database (manual benchmark)
 pnpm lint && pnpm typecheck && pnpm test
 pnpm test:safety                # pool isolation and minor-safety suites only
