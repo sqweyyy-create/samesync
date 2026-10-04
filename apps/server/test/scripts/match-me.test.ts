@@ -368,6 +368,37 @@ describe('the dev scripts', () => {
     expect(rows[0]).toEqual({ n: 12, synthetic: true, active: true, in_pool: true, dating: true });
   });
 
+  it('dev-match-me --counterpart-plays creates the match and plays the synthetic side', async () => {
+    const user = await realUser();
+    const url = new URL(testDb.ownerUrl);
+    url.searchParams.set('options', '-c role=samesync_app');
+    // No BOT_TOKEN: with --no-send the script needs none, and can't message anyone.
+    const result = await runScript(
+      'dev-match-me',
+      [user.publicId, '--counterpart-plays', '--no-send', '--n', '40'],
+      { DATABASE_URL: url.toString() },
+    );
+    expect(result.stderr).toBe('');
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('Pool adult:ru, friends mode.');
+    expect(result.stdout).toMatch(new RegExp(`Match for ${user.publicId}: \\S+ \\S+, tier \\d\\.`));
+    expect(result.stdout).toContain(
+      'Counterpart: its guesses are in. Play your side and the results are ready.',
+    );
+    expect(result.stdout).toContain('Notifications: left in the outbox (--no-send).');
+    const { rows } = await testDb.ownerPool.query<Record<string, unknown>>(
+      `SELECT bool_and(u.synthetic) AS synthetic, count(*)::int AS guesses,
+         count(DISTINCT p.predictor_id)::int AS players
+       FROM game_predictions p JOIN users u ON u.id = p.predictor_id`,
+    );
+    expect(rows[0]).toEqual({ synthetic: true, guesses: 5, players: 1 });
+    const queued = await testDb.ownerPool.query<{ kind: string }>(
+      "SELECT kind::text AS kind FROM outbox WHERE user_id = $1 AND status = 'pending' ORDER BY kind",
+      [user.id],
+    );
+    expect(queued.rows.map((r) => r.kind)).toEqual(['game_turn', 'match_created']);
+  });
+
   it('dev-match-me validates the support code before doing anything', async () => {
     const result = await runScript('dev-match-me', ['not a code'], {
       DATABASE_URL: testDb.ownerUrl,
