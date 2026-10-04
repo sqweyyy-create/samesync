@@ -1,0 +1,1 @@
+CREATE INDEX "matches_game_deadline_idx" ON "matches" USING btree ("game_deadline_at") WHERE "matches"."status" = 'pending_game';

@@ -57,6 +57,13 @@
       "when": 1791138029564,
       "tag": "0007_game_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791140184208,
+      "tag": "0008_game_deadline_index",
+      "breakpoints": true
     }
   ]
 }

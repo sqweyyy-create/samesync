@@ -128,6 +128,10 @@ export const matches = pgTable(
     index('matches_open_b_idx')
       .on(t.userBId)
       .where(sql`${t.status} IN ${OPEN}`),
+    // The deadlines job looks every minute for games that are overdue or about to be.
+    index('matches_game_deadline_idx')
+      .on(t.gameDeadlineAt)
+      .where(sql`${t.status} = 'pending_game'`),
   ],
 );
 
