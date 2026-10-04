@@ -6,14 +6,14 @@
 import type { Band, Locale, MatchStatus } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
 import { and, eq, sql } from 'drizzle-orm';
-import type { SendContext } from '../../domain/notifications';
+import type { NotificationKind, SendContext } from '../../domain/notifications';
 import type { Db } from '../client';
 import { outbox } from '../schema/index';
 
 export interface ClaimedMessage {
   id: string;
   userId: string;
-  kind: 'match_created';
+  kind: NotificationKind;
   matchId: string | null;
   attempts: number;
 }
@@ -48,6 +48,8 @@ interface ContextRow extends Record<string, unknown> {
   counterpart_alias: string | null;
   counterpart_status: UserStatus | null;
   counterpart_band: Band | null;
+  recipient_done: boolean | null;
+  game_deadline_at_ms: number | null;
 }
 
 export function createOutboxRepository(db: Db): OutboxRepository {
@@ -60,7 +62,7 @@ export function createOutboxRepository(db: Db): OutboxRepository {
       const result = await db.execute<{
         id: string;
         user_id: string;
-        kind: 'match_created';
+        kind: NotificationKind;
         match_id: string | null;
         attempts: number;
       }>(sql`
@@ -95,9 +97,15 @@ export function createOutboxRepository(db: Db): OutboxRepository {
           CASE WHEN m.user_a_id = r.id THEN m.alias_b WHEN m.user_b_id = r.id THEN m.alias_a END
             AS counterpart_alias,
           c.status AS counterpart_status,
-          vc_band(c.birth_date, vc_today()) AS counterpart_band
+          vc_band(c.birth_date, vc_today()) AS counterpart_band,
+          CASE WHEN g.match_id IS NULL THEN NULL
+            WHEN m.user_a_id = r.id THEN g.a_done_at IS NOT NULL
+            WHEN m.user_b_id = r.id THEN g.b_done_at IS NOT NULL
+          END AS recipient_done,
+          (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms
         FROM users r
         LEFT JOIN matches m ON m.id = ${matchId}::uuid
+        LEFT JOIN games g ON g.match_id = m.id
         LEFT JOIN users c ON c.id = CASE
           WHEN m.user_a_id = r.id THEN m.user_b_id
           WHEN m.user_b_id = r.id THEN m.user_a_id
@@ -116,7 +124,7 @@ export function createOutboxRepository(db: Db): OutboxRepository {
           liveBand: row.live_band,
         },
         match:
-          row.match_id && row.match_status && row.match_band
+          row.match_id && row.match_status && row.match_band && row.game_deadline_at_ms !== null
             ? {
                 id: row.match_id,
                 status: row.match_status,
@@ -125,6 +133,8 @@ export function createOutboxRepository(db: Db): OutboxRepository {
                 counterpartAlias: row.counterpart_alias,
                 counterpartStatus: row.counterpart_status,
                 counterpartLiveBand: row.counterpart_band,
+                recipientDone: row.recipient_done,
+                gameDeadlineAt: row.game_deadline_at_ms,
               }
             : null,
       };

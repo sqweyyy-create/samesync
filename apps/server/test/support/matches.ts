@@ -1,6 +1,7 @@
 import type { Band, Locale, Mode } from '@samesync/shared';
 import type pg from 'pg';
 import { v7 as uuidv7 } from 'uuid';
+import type { NotificationKind } from '../../src/domain/notifications';
 import { insertUser, type InsertUser } from './users';
 
 /** An onboarded, active user (adult, ru, friends unless overridden). */
@@ -56,16 +57,17 @@ export async function insertMatch(
   return { id, userA, userB };
 }
 
-/** A pending "new match" notification for `userId`. */
+/** A pending notification for `userId`: "new match" unless another kind is given. */
 export async function insertOutbox(
   pool: pg.Pool,
-  input: { userId: string; matchId: string },
+  input: { userId: string; matchId: string; kind?: NotificationKind },
 ): Promise<{ id: string }> {
   const id = uuidv7();
+  const kind = input.kind ?? 'match_created';
   await pool.query(
     `INSERT INTO outbox (id, user_id, kind, match_id, dedupe_key)
-     VALUES ($1, $2, 'match_created', $3, $4)`,
-    [id, input.userId, input.matchId, `match_created:${input.matchId}:${input.userId}`],
+     VALUES ($1, $2, $3, $4, $5)`,
+    [id, input.userId, kind, input.matchId, `${kind}:${input.matchId}:${input.userId}`],
   );
   return { id };
 }

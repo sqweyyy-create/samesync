@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_SEND_ATTEMPTS,
+  NOTIFICATION_KINDS,
   dropReason,
+  hoursLeft,
   isQuietHour,
   localHour,
   retryDelayMs,
+  type NotificationKind,
   type SendContext,
 } from './notifications';
 
@@ -25,9 +28,15 @@ const match: NonNullable<SendContext['match']> = {
   counterpartAlias: 'a.fox',
   counterpartStatus: 'active',
   counterpartLiveBand: 'adult',
+  recipientDone: false,
+  gameDeadlineAt: Date.UTC(2026, 9, 6, 12),
 };
-const reason = (r: Partial<typeof recipient> | null, m: Partial<typeof match> | null = {}) =>
-  dropReason({
+const reason = (
+  r: Partial<typeof recipient> | null,
+  m: Partial<typeof match> | null = {},
+  kind: NotificationKind = 'match_created',
+) =>
+  dropReason(kind, {
     recipient: r && { ...recipient, ...r },
     match: m && { ...match, ...m },
   });
@@ -80,6 +89,74 @@ describe('dropReason: the checks made right before a notification is sent', () =
     expect(reason({ synthetic: true, status: 'frozen' }, { status: 'closed' })).toBe(
       'synthetic_user',
     );
+  });
+});
+
+describe('dropReason for the game notifications', () => {
+  /** A match state in which a message of each kind is still right. */
+  const VALID: Record<NotificationKind, Partial<typeof match>> = {
+    match_created: {},
+    game_turn: {},
+    game_reminder: {},
+    game_results: { status: 'results_ready', recipientDone: true },
+    game_expired: { status: 'expired', recipientDone: false },
+  };
+
+  it('sends "your turn" and the reminder only while the game is on and the recipient has not played', () => {
+    for (const kind of ['game_turn', 'game_reminder'] as const) {
+      expect(reason({}, {}, kind)).toBeNull();
+      expect(reason({}, { recipientDone: true }, kind)).toBe('outdated');
+      expect(reason({}, { status: 'results_ready', recipientDone: true }, kind)).toBe('outdated');
+      expect(reason({}, { status: 'active', recipientDone: true }, kind)).toBe('outdated');
+      expect(reason({}, { status: 'expired' }, kind)).toBe('match_closed');
+      expect(reason({}, { status: 'closed' }, kind)).toBe('match_closed');
+      // A match without a game has nobody to remind.
+      expect(reason({}, { recipientDone: null }, kind)).toBe('outdated');
+    }
+  });
+
+  it('sends "results are ready" only for an open match whose game is finished', () => {
+    expect(reason({}, { status: 'results_ready', recipientDone: true }, 'game_results')).toBeNull();
+    expect(reason({}, { status: 'active', recipientDone: true }, 'game_results')).toBeNull();
+    expect(reason({}, { status: 'pending_game' }, 'game_results')).toBe('outdated');
+    expect(reason({}, { status: 'closed' }, 'game_results')).toBe('match_closed');
+    expect(reason({}, { status: 'expired' }, 'game_results')).toBe('match_closed');
+  });
+
+  it('sends the expiry notice only for an expired match', () => {
+    expect(reason({}, { status: 'expired' }, 'game_expired')).toBeNull();
+    for (const status of ['pending_game', 'results_ready', 'active', 'closed'] as const) {
+      expect(reason({}, { status }, 'game_expired')).toBe('outdated');
+    }
+  });
+
+  it.each(NOTIFICATION_KINDS)(
+    'never sends %s across bands, to or about a frozen user, or to a synthetic one',
+    (kind) => {
+      const valid = VALID[kind];
+      expect(reason({}, valid, kind)).toBeNull();
+      expect(reason({ liveBand: 'u18' }, valid, kind)).toBe('band_mismatch');
+      expect(reason({}, { ...valid, counterpartLiveBand: 'u18' }, kind)).toBe('band_mismatch');
+      expect(reason({}, { ...valid, counterpartLiveBand: null }, kind)).toBe('band_mismatch');
+      expect(reason({ status: 'frozen' }, valid, kind)).toBe('recipient_frozen');
+      expect(reason({}, { ...valid, counterpartStatus: 'frozen' }, kind)).toBe(
+        'counterpart_not_active',
+      );
+      expect(reason({ synthetic: true }, valid, kind)).toBe('synthetic_user');
+      expect(reason({ botReachable: false }, valid, kind)).toBe('bot_unreachable');
+      expect(reason({}, { ...valid, counterpartAlias: null }, kind)).toBe('not_participant');
+      expect(reason({}, null, kind)).toBe('match_missing');
+    },
+  );
+});
+
+describe('hoursLeft', () => {
+  const deadline = Date.UTC(2026, 9, 6, 12);
+  it('rounds up to whole hours and never goes below one', () => {
+    expect(hoursLeft(new Date(deadline - 12 * 3_600_000), deadline)).toBe(12);
+    expect(hoursLeft(new Date(deadline - 11.2 * 3_600_000), deadline)).toBe(12);
+    expect(hoursLeft(new Date(deadline - 60_000), deadline)).toBe(1);
+    expect(hoursLeft(new Date(deadline + 60_000), deadline)).toBe(1);
   });
 });
 

@@ -3,10 +3,12 @@
  * invariants 1, 3 and 9). A notification that was fine when it was queued is dropped, with the
  * reason recorded, if by send time the match is closed, a live band no longer equals the match
  * band, or a user is frozen. The states below are built with the triggers switched off, to prove
- * the sender does not rely on them.
+ * the sender does not rely on them. This holds for every kind of notification, the game's too.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { NotificationKind } from '../../src/domain/notifications';
 import { createTestDatabase, type TestDatabase } from '../support/db';
+import { insertGame } from '../support/games';
 import {
   insertActiveUser,
   insertMatch,
@@ -150,5 +152,98 @@ describe('the outbox sender', () => {
     for (const telegramId of mine) {
       expect(all.filter((id) => id === telegramId)).toHaveLength(1);
     }
+  });
+});
+
+describe('the game notifications are re-checked like every other', () => {
+  const GAME_KINDS = ['game_turn', 'game_reminder', 'game_results', 'game_expired'] as const;
+
+  /** Two matched users with a game, and one pending notification of `kind` for each of them. */
+  async function queuedGame(kind: NotificationKind, band: 'adult' | 'u18' = 'adult') {
+    const birthDate = birthDateYearsAgo(band === 'adult' ? 25 : 16);
+    const a = await insertActiveUser(testDb.appPool, { birthDate });
+    const b = await insertActiveUser(testDb.appPool, { birthDate });
+    const match = await insertMatch(testDb.appPool, { a: a.id, b: b.id, band });
+    await insertGame(testDb.appPool, match.id);
+    // The state each kind is about: results are ready, or the game ran out of time.
+    if (kind === 'game_results') {
+      await raw('UPDATE games SET a_done_at = now(), b_done_at = now() WHERE match_id = $1', [
+        match.id,
+      ]);
+      await raw(
+        `UPDATE matches SET status = 'results_ready', results_ready_at = now(),
+           chat_deadline_at = now() + interval '48 hours' WHERE id = $1`,
+        [match.id],
+      );
+    }
+    if (kind === 'game_expired') {
+      await raw(
+        "UPDATE matches SET status = 'expired', close_reason = 'expired', closed_at = now() WHERE id = $1",
+        [match.id],
+      );
+    }
+    const toA = await insertOutbox(testDb.appPool, { userId: a.id, matchId: match.id, kind });
+    const toB = await insertOutbox(testDb.appPool, { userId: b.id, matchId: match.id, kind });
+    return { a, b, match, toA, toB };
+  }
+
+  it.each(GAME_KINDS)('%s is sent while everything still holds', async (kind) => {
+    const { a, b, toA, toB } = await queuedGame(kind);
+    const sentTo = await sendAll();
+    expect(sentTo).toEqual(expect.arrayContaining([a.telegramId, b.telegramId]));
+    for (const row of [toA, toB]) {
+      expect(await outboxRow(testDb.ownerPool, row.id)).toMatchObject({ status: 'sent' });
+    }
+  });
+
+  it.each(GAME_KINDS)(
+    '%s is dropped for both users when a live band differs from the match band, with a stale cache',
+    async (kind) => {
+      const { a, b, toA, toB } = await queuedGame(kind, 'u18');
+      await raw('UPDATE users SET birth_date = $1 WHERE id = $2', [birthDateYearsAgo(18), a.id]);
+      const sentTo = await sendAll();
+      expect(sentTo).not.toContain(a.telegramId);
+      expect(sentTo).not.toContain(b.telegramId);
+      for (const row of [toA, toB]) {
+        expect(await outboxRow(testDb.ownerPool, row.id)).toMatchObject({
+          status: 'cancelled',
+          cancel_reason: 'band_mismatch',
+        });
+      }
+    },
+  );
+
+  it.each(GAME_KINDS)('%s is dropped to and about a frozen user', async (kind) => {
+    const { a, b, toA, toB } = await queuedGame(kind);
+    await raw("UPDATE users SET status = 'frozen' WHERE id = $1", [a.id]);
+    const sentTo = await sendAll();
+    expect(sentTo).not.toContain(a.telegramId);
+    expect(sentTo).not.toContain(b.telegramId);
+    expect(await outboxRow(testDb.ownerPool, toA.id)).toMatchObject({
+      status: 'cancelled',
+      cancel_reason: 'recipient_frozen',
+    });
+    expect(await outboxRow(testDb.ownerPool, toB.id)).toMatchObject({
+      status: 'cancelled',
+      cancel_reason: 'counterpart_not_active',
+    });
+  });
+
+  it('a game notification of a match closed for a band change is never sent', async () => {
+    const { a, b, toA, toB } = await queuedGame('game_turn', 'u18');
+    await testDb.ownerPool.query(
+      "SELECT admin_set_birth_date($1, $2::date, 777, 'age correction')",
+      [a.id, birthDateYearsAgo(18)],
+    );
+    // The state-change trigger already cancelled both rows in the same transaction.
+    for (const row of [toA, toB]) {
+      expect(await outboxRow(testDb.ownerPool, row.id)).toMatchObject({
+        status: 'cancelled',
+        cancel_reason: 'band_change',
+      });
+    }
+    const sentTo = await sendAll();
+    expect(sentTo).not.toContain(a.telegramId);
+    expect(sentTo).not.toContain(b.telegramId);
   });
 });

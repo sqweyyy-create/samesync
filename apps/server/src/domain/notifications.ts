@@ -6,6 +6,18 @@
 import { OPEN_MATCH_STATUSES, type Band, type Locale, type MatchStatus } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
 
+/** The kinds of queued messages: the values of the `outbox_kind` enum. Later phases add theirs. */
+export const NOTIFICATION_KINDS = [
+  'match_created',
+  // The game (Phase 3): the other player finished first; both finished; the one reminder before
+  // the deadline; the game was not played in time.
+  'game_turn',
+  'game_results',
+  'game_reminder',
+  'game_expired',
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
 /** Everything the sender re-checks, read in one query right before sending. */
 export interface SendContext {
   recipient: {
@@ -27,6 +39,10 @@ export interface SendContext {
     counterpartAlias: string | null;
     counterpartStatus: UserStatus | null;
     counterpartLiveBand: Band | null;
+    /** Whether the recipient has submitted their guesses; null if the match has no game. */
+    recipientDone: boolean | null;
+    /** Epoch milliseconds. */
+    gameDeadlineAt: number;
   } | null;
 }
 
@@ -40,11 +56,39 @@ export type DropReason =
   | 'match_missing'
   | 'not_participant'
   | 'match_closed'
+  | 'outdated'
   | 'band_mismatch'
   | 'counterpart_not_active';
 
+const isOpen = (status: MatchStatus) => (OPEN_MATCH_STATUSES as readonly string[]).includes(status);
+
+/**
+ * Whether the match is still in the state a message of this kind is about. "Your turn" after the
+ * recipient has played, or "results are ready" for a match that has closed, would be wrong.
+ */
+function stateProblem(
+  kind: NotificationKind,
+  match: NonNullable<SendContext['match']>,
+): 'match_closed' | 'outdated' | null {
+  switch (kind) {
+    case 'match_created':
+      return isOpen(match.status) ? null : 'match_closed';
+    case 'game_turn':
+    case 'game_reminder':
+      if (!isOpen(match.status)) return 'match_closed';
+      // Only while the game is on and the recipient still has to play.
+      return match.status === 'pending_game' && match.recipientDone === false ? null : 'outdated';
+    case 'game_results':
+      if (!isOpen(match.status)) return 'match_closed';
+      return match.status === 'pending_game' ? 'outdated' : null;
+    case 'game_expired':
+      // The one notice about a match that is over: only for a game that ran out of time.
+      return match.status === 'expired' ? null : 'outdated';
+  }
+}
+
 /** Null means "send". Anything unknown or missing is a drop: fail closed (invariant 10). */
-export function dropReason(context: SendContext): DropReason | null {
+export function dropReason(kind: NotificationKind, context: SendContext): DropReason | null {
   const { recipient, match } = context;
   if (!recipient) return 'recipient_missing';
   // Dev tooling users have no Telegram account behind them.
@@ -54,12 +98,19 @@ export function dropReason(context: SendContext): DropReason | null {
   if (!recipient.botReachable) return 'bot_unreachable';
   if (!match) return 'match_missing';
   if (match.counterpartAlias === null) return 'not_participant';
-  if (!(OPEN_MATCH_STATUSES as readonly string[]).includes(match.status)) return 'match_closed';
+  const state = stateProblem(kind, match);
+  if (state) return state;
   // Both live bands must equal the match band, even if the age-transition job hasn't run yet.
+  // This holds for every kind: no message about the other person crosses a band.
   if (recipient.liveBand !== match.band || match.counterpartLiveBand !== match.band)
     return 'band_mismatch';
   if (match.counterpartStatus !== 'active') return 'counterpart_not_active';
   return null;
+}
+
+/** Whole hours left until `deadline`, rounded up, and at least 1 (for "N hours left" copy). */
+export function hoursLeft(now: Date, deadline: number): number {
+  return Math.max(1, Math.ceil((deadline - now.getTime()) / 3_600_000));
 }
 
 /** Q22 (decided): between 23:00 and 08:00 local time messages are sent silently, never held. */

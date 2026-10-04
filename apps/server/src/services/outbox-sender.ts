@@ -12,15 +12,17 @@
 import type { Locale } from '@samesync/shared';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import type { Clock } from '../clock';
-import type { ContentStore } from '../content/store';
+import { aliasLabel, type ContentStore } from '../content/store';
 import type { ClaimedMessage, OutboxRepository } from '../db/repositories/outbox';
 import type { UsersRepository } from '../db/repositories/users';
 import { parseTeaser, renderTeaser } from '../domain/matching/teaser';
 import {
   MAX_SEND_ATTEMPTS,
   dropReason,
+  hoursLeft,
   isQuietHour,
   retryDelayMs,
+  type NotificationKind,
   type SendContext,
 } from '../domain/notifications';
 import type { Logger } from '../logger';
@@ -119,16 +121,61 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const lastSentTo = new Map<number, number>();
 
+  /** The text and the button of one message, in the recipient's language. */
+  function compose(
+    kind: NotificationKind,
+    recipient: NonNullable<SendContext['recipient']>,
+    match: NonNullable<SendContext['match']>,
+  ): { text: string; button: { text: string; web_app: { url: string } } } {
+    const { locale } = recipient;
+    const { t } = translatorFor(locale);
+    const toMatch = { url: matchUrl(deps.miniAppUrl, match.id) };
+    // The other person appears only under their per-match alias, never by name or username.
+    const { emoji, name } = aliasLabel(content, match.counterpartAlias, locale);
+    const alias = `${emoji} ${name}`;
+    switch (kind) {
+      case 'match_created': {
+        const teaser = renderTeaser(parseTeaser(match.teaser), locale, content.teaser, t);
+        return {
+          text: t('bot.match.new', { teaser }),
+          button: { text: t('bot.match.open'), web_app: toMatch },
+        };
+      }
+      case 'game_turn':
+        return {
+          text: t('bot.game.turn', { alias }),
+          button: { text: t('bot.game.play'), web_app: toMatch },
+        };
+      case 'game_reminder':
+        return {
+          text: t('bot.game.reminder', {
+            alias,
+            count: hoursLeft(clock.now(), match.gameDeadlineAt),
+          }),
+          button: { text: t('bot.game.play'), web_app: toMatch },
+        };
+      case 'game_results':
+        return {
+          text: t('bot.game.results', { alias }),
+          button: { text: t('bot.game.see_results'), web_app: toMatch },
+        };
+      case 'game_expired':
+        // The match is over: the button opens the app, not the match.
+        return {
+          text: t('bot.game.expired', { alias }),
+          button: { text: t('bot.start.open_app'), web_app: { url: deps.miniAppUrl } },
+        };
+    }
+  }
+
   function render(
+    kind: NotificationKind,
     recipient: NonNullable<SendContext['recipient']>,
     match: NonNullable<SendContext['match']>,
   ) {
-    const { t } = translatorFor(recipient.locale);
-    const teaser = renderTeaser(parseTeaser(match.teaser), recipient.locale, content.teaser, t);
     return {
       chatId: recipient.telegramId,
-      text: t('bot.match.new', { teaser }),
-      button: { text: t('bot.match.open'), web_app: { url: matchUrl(deps.miniAppUrl, match.id) } },
+      ...compose(kind, recipient, match),
       silent: isQuietHour(clock.now(), recipient.timezone, deps.fallbackTimeZone[recipient.locale]),
     };
   }
@@ -136,7 +183,7 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
   async function deliver(message: ClaimedMessage): Promise<Outcome> {
     // Re-read everything now, not when the message was queued.
     const context = await outbox.sendContext(message);
-    const drop = dropReason(context);
+    const drop = dropReason(message.kind, context);
     if (drop || !context.recipient || !context.match) {
       const reason = drop ?? 'match_missing';
       await outbox.cancel(message.id, reason);
@@ -144,7 +191,7 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
       return 'cancelled';
     }
 
-    const { chatId, text, button, silent } = render(context.recipient, context.match);
+    const { chatId, text, button, silent } = render(message.kind, context.recipient, context.match);
     const wait = (lastSentTo.get(chatId) ?? 0) + perChatMs - clock.now().getTime();
     if (wait > 0) await sleep(wait);
     try {

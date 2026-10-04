@@ -69,6 +69,16 @@ export function localized(text: LocalizedText, locale: Locale): string {
   return text[locale] ?? text.ru ?? text.en ?? '';
 }
 
+/** How the other person of a match is shown: the emoji and name of their per-match alias. */
+export function aliasLabel(
+  content: Pick<ContentStore, 'alias'>,
+  aliasId: string | null,
+  locale: Locale,
+): { emoji: string; name: string } {
+  const alias = aliasId ? content.alias(aliasId) : undefined;
+  return { emoji: alias?.emoji ?? '👤', name: alias ? localized(alias.text, locale) : '—' };
+}
+
 export function createContentStore(bundle: ContentBundle, checksum: string): ContentStore {
   if (!bundle.release) throw new Error('content has no release.json');
   const byId = <T extends { id: string }>(list: T[]) =>
