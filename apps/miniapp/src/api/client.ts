@@ -4,12 +4,15 @@ import {
   AUTH_SCHEME,
   DatingOptionsResponse,
   DeckResponse,
+  GameResponse,
   InterestsResponse,
   MatchSummary,
   MatchesResponse,
   MeResponse,
+  ResultsResponse,
   type AnswerValue,
   type ApiErrorCode,
+  type PredictionsRequest,
   type SetModeRequest,
 } from '@samesync/shared/api';
 
@@ -42,6 +45,14 @@ export interface ApiClient {
   readonly complete: (timezone: string | undefined) => Promise<ApiResult<MeResponse>>;
   readonly matches: () => Promise<ApiResult<MatchesResponse>>;
   readonly match: (id: string) => Promise<ApiResult<MatchSummary>>;
+  /** The takes of a match's game to guess. Never anyone's answers. */
+  readonly game: (matchId: string) => Promise<ApiResult<GameResponse>>;
+  /** All guesses at once; they can't be changed afterwards. Answers with the updated match. */
+  readonly submitPredictions: (
+    matchId: string,
+    predictions: PredictionsRequest['predictions'],
+  ) => Promise<ApiResult<MatchSummary>>;
+  readonly results: (matchId: string) => Promise<ApiResult<ResultsResponse>>;
 }
 
 export interface ApiClientDeps {
@@ -115,5 +126,11 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
       call(MeResponse, 'POST', '/api/onboarding/complete', timezone ? { timezone } : {}),
     matches: () => call(MatchesResponse, 'GET', '/api/matches'),
     match: (id) => call(MatchSummary, 'GET', `/api/matches/${encodeURIComponent(id)}`),
+    game: (id) => call(GameResponse, 'GET', `/api/matches/${encodeURIComponent(id)}/game`),
+    submitPredictions: (id, predictions) =>
+      call(MatchSummary, 'PUT', `/api/matches/${encodeURIComponent(id)}/predictions`, {
+        predictions,
+      }),
+    results: (id) => call(ResultsResponse, 'GET', `/api/matches/${encodeURIComponent(id)}/results`),
   };
 }

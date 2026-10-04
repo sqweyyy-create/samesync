@@ -234,32 +234,59 @@ describe('<App> matches', () => {
   const match = {
     id: '01a10238-d68a-76a8-87cc-960f650dd8c3',
     alias: { emoji: '🦊', name: 'Лиса' },
-    teaser: 'У кого-то в плейлисте тоже Молчат Дома.',
+    teaser: 'У кого-то здесь в плейлисте тоже Молчат Дома.',
     status: 'pending_game' as const,
     createdAt: '2026-10-03T10:00:00.000Z',
     gameDeadlineAt: '2026-10-05T10:00:00.000Z',
     resultsReadyAt: null,
     chatDeadlineAt: null,
-    game: null,
+    game: { questions: 5, youDone: false, theyDone: false },
   };
 
-  it('lists the matches on the home screen and opens the placeholder match screen', async () => {
+  it('lists the matches on the home screen with whose turn it is, and opens the match on its intro', async () => {
     const api = fakeApi({
       getMe: vi.fn(() => ok(active)),
       matches: vi.fn(() => ok({ matches: [match] })),
     });
     renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} />);
     expect(await screen.findByText('Знакомства')).toBeTruthy();
-    expect(screen.getByText('У кого-то в плейлисте тоже Молчат Дома.')).toBeTruthy();
+    expect(screen.getByText('У кого-то здесь в плейлисте тоже Молчат Дома.')).toBeTruthy();
+    expect(screen.getByText('Твой ход')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Лиса/ }));
     expect(screen.getByRole('heading', { name: '🦊 Лиса' })).toBeTruthy();
     expect(
-      screen.getByText('Скоро здесь появится игра: вы попробуете угадать ответы друг друга.'),
+      screen.getByText(
+        'Угадайте ответы друг друга: 5 карточек, а в конце — то, в чём вы разошлись.',
+      ),
     ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Играть' })).toBeTruthy();
     // Already loaded with the list: no second request for the same match.
     expect(api.match).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Назад' }));
     expect(await screen.findByText('Профиль готов!')).toBeTruthy();
+  });
+
+  it('says on the home screen when a match waits for the other person or has results', async () => {
+    const api = fakeApi({
+      getMe: vi.fn(() => ok(active)),
+      matches: vi.fn(() =>
+        ok({
+          matches: [
+            { ...match, id: 'waiting', game: { questions: 5, youDone: true, theyDone: false } },
+            {
+              ...match,
+              id: 'ready',
+              status: 'results_ready' as const,
+              game: { questions: 5, youDone: true, theyDone: true },
+            },
+          ],
+        }),
+      ),
+    });
+    renderWithI18n(<App api={api} platform={fakePlatform()} today={TODAY} />);
+    expect(await screen.findByText('Ждём ответный ход')).toBeTruthy();
+    expect(screen.getByText('Результаты готовы')).toBeTruthy();
+    expect(screen.queryByText('Твой ход')).toBeNull();
   });
 
   it('shows no matches section while there are none', async () => {
@@ -273,7 +300,7 @@ describe('<App> matches', () => {
   it('opens the match from the bot notification link, loading it by ID', async () => {
     const api = fakeApi({
       getMe: vi.fn(() => ok(active)),
-      match: vi.fn(() => ok({ ...match, status: 'closed' as const })),
+      match: vi.fn(() => ok({ ...match, status: 'closed' as const, game: null })),
     });
     renderWithI18n(
       <App api={api} platform={fakePlatform()} today={TODAY} initialMatchId={match.id} />,

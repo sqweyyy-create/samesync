@@ -65,6 +65,9 @@ export function fakeApi(over: Partial<{ [K in keyof ApiClient]: ApiClient[K] }> 
     complete: vi.fn(unused),
     matches: vi.fn(() => ok({ matches: [] })),
     match: vi.fn(unused),
+    game: vi.fn(unused),
+    submitPredictions: vi.fn(unused),
+    results: vi.fn(unused),
     ...over,
   };
 }

@@ -1,12 +1,28 @@
 import type { MatchSummary } from '@samesync/shared/api';
-import { useEffect, useState } from 'react';
-import type { ApiClient } from '../api/client';
-import { useT } from '../i18n/I18nProvider';
+import type { MessageKey } from '@samesync/shared/i18n';
+import { useCallback, useEffect, useState } from 'react';
+import type { ApiClient, ApiResult } from '../api/client';
+import { useLocale, useT } from '../i18n/I18nProvider';
 import { Screen } from '../ui/Screen';
+import { Game } from './Game';
+import { Results } from './Results';
 
-const OPEN: ReadonlyArray<MatchSummary['status']> = ['pending_game', 'results_ready', 'active'];
+/** Where a match stands for the person looking at it. */
+type Stage = 'play' | 'waiting' | 'results' | 'ended';
 
-/** The matches the user has right now: who (an alias) and what they share (the teaser). */
+function stageOf(match: MatchSummary): Stage {
+  if (match.status === 'results_ready' || match.status === 'active') return 'results';
+  if (match.status === 'pending_game' && match.game) return match.game.youDone ? 'waiting' : 'play';
+  return 'ended';
+}
+
+const STATE_HINT: Partial<Record<Stage, MessageKey>> = {
+  play: 'miniapp.match.state.play',
+  waiting: 'miniapp.match.state.waiting',
+  results: 'miniapp.match.state.results',
+};
+
+/** The matches the user has right now: who (an alias), what they share, and whose turn it is. */
 export function MatchList({
   api,
   onOpen,
@@ -25,19 +41,25 @@ export function MatchList({
   return (
     <>
       <h2>{t('miniapp.matches.title')}</h2>
-      {matches.map((match) => (
-        <button key={match.id} type="button" className="choice" onClick={() => onOpen(match)}>
-          <span>{`${match.alias.emoji} ${match.alias.name}`}</span>
-          <small>{match.teaser}</small>
-        </button>
-      ))}
+      {matches.map((match) => {
+        const hint = STATE_HINT[stageOf(match)];
+        return (
+          <button key={match.id} type="button" className="choice" onClick={() => onOpen(match)}>
+            <span>{`${match.alias.emoji} ${match.alias.name}`}</span>
+            <small>{match.teaser}</small>
+            {hint && <small>{t(hint)}</small>}
+          </button>
+        );
+      })}
     </>
   );
 }
 
 /**
- * One match. A placeholder until Phase 3 brings the game: it shows the other person's alias and
- * what the two share. Opened from the list, or straight from the bot notification by ID.
+ * One match, from the teaser to the results: play the game, wait for the other person, then see
+ * how well you read each other. Opened from the list, or straight from a bot notification by ID.
+ * While waiting, the match is looked up again whenever the app comes back to the foreground
+ * (there are no WebSockets).
  */
 export function Match({
   api,
@@ -51,29 +73,100 @@ export function Match({
   onBack: () => void;
 }) {
   const t = useT();
-  const [loaded, setLoaded] = useState<MatchSummary | 'unavailable' | null>(null);
-  useEffect(() => {
-    if (known) return;
-    void api
-      .match(matchId)
-      .then((result) => setLoaded(result.kind === 'ok' ? result.data : 'unavailable'));
-  }, [api, known, matchId]);
+  const { locale } = useLocale();
+  const [match, setMatch] = useState<MatchSummary | 'unavailable' | null>(known ?? null);
+  const [playing, setPlaying] = useState(false);
 
-  const match = known ?? loaded;
+  const apply = useCallback((result: ApiResult<MatchSummary>) => {
+    if (result.kind === 'ok') setMatch(result.data);
+    // Gone for this user (closed for good, or never theirs). A network hiccup changes nothing.
+    else if (result.kind === 'error') setMatch('unavailable');
+  }, []);
+  const reload = useCallback(() => void api.match(matchId).then(apply), [api, matchId, apply]);
+  const stale = useCallback(() => {
+    setPlaying(false);
+    reload();
+  }, [reload]);
+
+  useEffect(() => {
+    if (!known) void api.match(matchId).then(apply);
+  }, [api, known, matchId, apply]);
+
+  const stage = match && match !== 'unavailable' ? stageOf(match) : null;
+  useEffect(() => {
+    if (stage !== 'waiting') return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') reload();
+    };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [stage, reload]);
+
   const back = (
     <button type="button" className="secondary" onClick={onBack}>
       {t('miniapp.action.back')}
     </button>
   );
   if (match === null) return <Screen hint={t('miniapp.status.loading')} />;
-  if (match === 'unavailable') {
+  if (match === 'unavailable' || stage === null) {
     return <Screen hint={t('miniapp.match.unavailable')}>{back}</Screen>;
   }
+
+  const alias = `${match.alias.emoji} ${match.alias.name}`;
+  if (stage === 'results') {
+    return <Results api={api} matchId={match.id} alias={alias} onStale={stale} onBack={onBack} />;
+  }
+  if (stage === 'play' && playing) {
+    return (
+      <Game
+        api={api}
+        matchId={match.id}
+        alias={alias}
+        onSubmitted={(next) => {
+          setPlaying(false);
+          setMatch(next);
+        }}
+        onStale={stale}
+        onBack={() => setPlaying(false)}
+      />
+    );
+  }
+  if (stage === 'play') {
+    const until = new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(match.gameDeadlineAt));
+    return (
+      <Screen title={alias} hint={match.teaser}>
+        <p>{t('miniapp.game.intro', { count: match.game?.questions ?? 0 })}</p>
+        <p className="hint">{t('miniapp.game.deadline', { time: until })}</p>
+        <button type="button" onClick={() => setPlaying(true)}>
+          {t('miniapp.game.play')}
+        </button>
+        {back}
+      </Screen>
+    );
+  }
+  if (stage === 'waiting') {
+    return (
+      <Screen title={alias} hint={match.teaser}>
+        <p>{t('miniapp.game.waiting', { alias })}</p>
+        <button type="button" className="secondary" onClick={reload}>
+          {t('miniapp.game.refresh')}
+        </button>
+        {back}
+      </Screen>
+    );
+  }
   return (
-    <Screen title={`${match.alias.emoji} ${match.alias.name}`} hint={match.teaser}>
-      <p>
-        {OPEN.includes(match.status) ? t('miniapp.match.placeholder') : t('miniapp.match.ended')}
-      </p>
+    <Screen title={alias} hint={match.teaser}>
+      <p>{t('miniapp.match.ended')}</p>
       {back}
     </Screen>
   );
