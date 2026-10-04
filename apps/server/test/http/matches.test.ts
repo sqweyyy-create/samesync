@@ -66,7 +66,7 @@ describe('GET /api/matches', () => {
       // The lower ID sees the other user's alias (alias_b), and the other way round.
       alias: { emoji: '🦉', name: 'Сова' },
       teaser:
-        'У кого-то здесь в плейлисте тоже Молчат Дома, и этот человек считает, что молоко наливают раньше хлопьев.',
+        'У кого-то здесь в плейлисте тоже Молчат Дома — и такое же мнение: молоко наливают раньше хлопьев.',
       status: 'pending_game',
     });
     expect((await list(high))[0]).toMatchObject({ alias: { emoji: '🦊', name: 'Лиса' } });

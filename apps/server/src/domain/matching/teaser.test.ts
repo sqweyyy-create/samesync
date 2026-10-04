@@ -152,7 +152,7 @@ describe('teaser rendering', () => {
   it('renders the item and the shared view in the reader language, as one sentence', () => {
     const teaser: Teaser = { interest: { kind: 'item', id: 'i.music.x' }, take };
     expect(render(teaser, 'ru')).toBe(
-      'У кого-то здесь в плейлисте тоже Предмет-music, и этот человек считает, что ананасы на пицце — это нормально.',
+      'У кого-то здесь в плейлисте тоже Предмет-music — и такое же мнение: ананасы на пицце — это нормально.',
     );
     expect(render(teaser, 'en')).toBe(
       'Someone here also listens to Item-music and thinks pineapple on pizza is fine.',
@@ -209,14 +209,14 @@ describe('teasers of the committed content', () => {
     );
     // Russian keeps the name in the nominative, whatever its declension would be.
     expect(renderTeaser(teaser, 'ru', content, translatorFor('ru').t)).toBe(
-      'У кого-то здесь на книжной полке тоже Берсерк, и этот человек считает, что молоко наливают раньше хлопьев.',
+      'У кого-то здесь на книжной полке тоже Берсерк — и такое же мнение: молоко наливают раньше хлопьев.',
     );
     const author: Teaser = {
       interest: { kind: 'item', id: 'i.books.dostoevsky' },
       take: { id: 'q.milk_before_cereal', value: 'disagree' },
     };
     expect(renderTeaser(author, 'ru', content, translatorFor('ru').t)).toBe(
-      'У кого-то здесь на книжной полке тоже Достоевский, и этот человек считает, что сначала хлопья, потом молоко.',
+      'У кого-то здесь на книжной полке тоже Достоевский — и такое же мнение: сначала хлопья, потом молоко.',
     );
   });
 
