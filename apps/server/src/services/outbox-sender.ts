@@ -160,9 +160,13 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
           button: { text: t('bot.game.see_results'), web_app: toMatch },
         };
       case 'game_expired':
-        // The match is over: the button opens the app, not the match.
+        // The match is over: the button opens the app, not the match. A player who had sent
+        // their guesses is told that the other person didn't play; "time ran out" is for the
+        // one who didn't.
         return {
-          text: t('bot.game.expired', { alias }),
+          text: t(match.recipientDone === true ? 'bot.game.expired.played' : 'bot.game.expired', {
+            alias,
+          }),
           button: { text: t('bot.start.open_app'), web_app: { url: deps.miniAppUrl } },
         };
     }

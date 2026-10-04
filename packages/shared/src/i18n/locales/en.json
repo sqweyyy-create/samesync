@@ -13,6 +13,7 @@
     "other": "{count} hours left to play. {alias} is waiting."
   },
   "bot.game.expired": "Time ran out for the game, so this match has closed ({alias}). New ones are on the way.",
+  "bot.game.expired.played": "Your match didn't play in time, so it has closed ({alias}). New ones are on the way.",
   "teaser.item.music": "Someone here also listens to {name}.",
   "teaser.item.music.take": "Someone here also listens to {name} and thinks {stance}.",
   "teaser.item.games": "Someone here also plays {name}.",

@@ -294,6 +294,46 @@ describe('expiry (Q2: an unplayed game expires 48 hours after the match)', () =>
     expect(calls).toHaveLength(2);
   });
 
+  it('tells a player who had played that the other person did not, and the other one that time ran out', async () => {
+    // Two half-played games: in each, user A sent their guesses and user B never played.
+    const first = await started();
+    const second = await started();
+    await testDb.ownerPool.query("UPDATE users SET locale = 'en' WHERE id = ANY($1::uuid[])", [
+      [first.b.id, second.a.id],
+    ]);
+    for (const { matchId, a } of [first, second]) await play().submit(a.id, matchId, predictions());
+    const at = new Date(Math.max(first.deadline.getTime(), second.deadline.getTime()) + 1);
+    expect((await deadlines(at).run()).expired).toBe(2);
+
+    const { sender, calls } = await buildSender(testDb, { now: at });
+    for (let i = 0; i < 5; i++) await sender.tick();
+    const sentTo = (telegramId: number) => {
+      const mine = calls.filter((c) => c.payload.chat_id === telegramId);
+      // One message each: the expiry notice ("your turn" went with the match).
+      expect(mine).toHaveLength(1);
+      return mine[0]?.payload;
+    };
+    // The one who played, in Russian and in English. They see the other person as 🦉.
+    expect(sentTo(first.a.telegramId)).toMatchObject({
+      text: 'Собеседник не успел сыграть, и знакомство закрылось (🦉 Сова). Скоро будут новые.',
+      reply_markup: button('Открыть SameSync', TEST_MINIAPP_URL),
+    });
+    expect(sentTo(second.a.telegramId)).toMatchObject({
+      text: "Your match didn't play in time, so it has closed (🦉 Owl). New ones are on the way.",
+      reply_markup: button('Open SameSync', TEST_MINIAPP_URL),
+    });
+    // The one who did not play keeps "time ran out". They see the other person as 🦊.
+    expect(sentTo(first.b.telegramId)).toMatchObject({
+      text: 'Time ran out for the game, so this match has closed (🦊 Fox). New ones are on the way.',
+      reply_markup: button('Open SameSync', TEST_MINIAPP_URL),
+    });
+    expect(sentTo(second.b.telegramId)).toMatchObject({
+      text: 'Время на игру вышло, и это знакомство закрылось (🦊 Лиса). Скоро будут новые.',
+      reply_markup: button('Открыть SameSync', TEST_MINIAPP_URL),
+    });
+    expect(calls).toHaveLength(4);
+  });
+
   it('expires a half-played game too, and nothing can be submitted afterwards', async () => {
     const { matchId, a, b, deadline } = await started();
     await play().submit(a.id, matchId, predictions());

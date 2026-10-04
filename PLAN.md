@@ -608,6 +608,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
   - Four new outbox kinds: `game_turn`, `game_results`, `game_reminder`, `game_expired`. The texts name the other person by alias only, in wordings that keep the alias in the nominative.
   - The reminder goes out 12 hours before the game deadline (provisional, Q34), once per player who hasn't played.
   - The sender re-checks each kind against the state it is about. "Your turn" that is still queued when the recipient plays is dropped with reason `outdated`.
+  - The expiry notice has two texts (product owner, 2026-10-04): a player who didn't play is told that the time ran out, and a player who had sent their guesses is told that the other person didn't play in time.
 - **Deadlines job:** every minute, under an advisory lock. Expiry cancels the match's other pending notifications in the same transaction. A partial index on `matches.game_deadline_at` for `pending_game` matches serves it (migration 0008).
 - **Chat window (Q2):** `chat_deadline_at` is set to 48 hours after `results_ready_at`. The expiry of `results_ready` matches and its reminder stay in Phase 4, as planned there. Until then a match whose results are ready stays open and counts toward the open-match limit.
 - **Mini App:** the match screen has an intro, the cards, a last look before the one submission, a waiting screen and the results. The "Написать" button is disabled and nothing is sent. Initial JS is 96.8 KB gzip.
