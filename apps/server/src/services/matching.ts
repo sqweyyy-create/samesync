@@ -146,6 +146,8 @@ export function createMatchingService(deps: MatchingServiceDeps): MatchingServic
               commonTakes(scope.takes, a, b, agreeShare),
               questionCount,
               hashString(`${run.seed}:${pair.userA}:${pair.userB}`),
+              // The teaser already tells both what they think of this take.
+              new Set(pair.teaser.take ? [pair.teaser.take.id] : []),
             ),
         });
         pairsCreated++;

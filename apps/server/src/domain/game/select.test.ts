@@ -161,6 +161,25 @@ describe('selectGame', () => {
     expect(game.closingQuestionId).toBe('q.t01');
   });
 
+  it('leaves out a take the players already know the answer to, unless nothing else is left', () => {
+    // t02 is the rarest shared view: without the hint it is always picked.
+    const takes = [
+      take(1, 'agree', 'disagree'),
+      take(2, 'agree', 'agree', 0.05),
+      ...Array.from({ length: 5 }, (_, i) => take(10 + i, 'agree', 'agree', 0.5)),
+    ];
+    for (let s = 0; s < 30; s++) {
+      expect(selectGame(takes, COUNT, s)?.questionIds).toContain('q.t02');
+      expect(selectGame(takes, COUNT, s, new Set(['q.t02']))?.questionIds).not.toContain('q.t02');
+    }
+    // With exactly five takes in common there is no choice: the known one is asked too.
+    const tight = takes.slice(0, 5);
+    const game = selectGame(tight, COUNT, 1, new Set(['q.t02']));
+    expect(game?.questionIds).toHaveLength(COUNT);
+    expect(game?.questionIds).toContain('q.t02');
+    expect(game?.closingQuestionId).toBe('q.t01');
+  });
+
   it('gives no game without a split, or with fewer takes in common than questions', () => {
     const agreeOnly = Array.from({ length: 8 }, (_, i) => take(i, 'agree', 'agree'));
     expect(selectGame(agreeOnly, COUNT, 1)).toBeNull();

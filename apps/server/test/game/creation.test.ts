@@ -90,6 +90,28 @@ describe('the game of a new match', () => {
     expect(game?.answers_a.at(-1)).not.toBe(game?.answers_b.at(-1));
   });
 
+  it('does not ask about the take the teaser already gave away', async () => {
+    // Nine takes in common, all shared but one: the teaser names the rarest shared view.
+    await insertPerson(testDb.appPool, {
+      items: [niche[0]!],
+      answers: answersFor(scope, 'AAAAAAAAD'),
+    });
+    await insertPerson(testDb.appPool, {
+      items: [niche[0]!],
+      answers: answersFor(scope, 'AAAAAAAAA'),
+    });
+    const { service } = await buildMatching(testDb);
+    await service.run({ pool: ADULT_RU, mode: 'friends', slot: SLOT });
+    const { rows } = await testDb.ownerPool.query<{ take: string | null }>(
+      "SELECT teaser #>> '{take,id}' AS take FROM matches",
+    );
+    const teaserTake = rows[0]?.take;
+    expect(teaserTake).toBeTruthy();
+    const [game] = await games();
+    expect(game?.question_ids).toHaveLength(5);
+    expect(game?.question_ids).not.toContain(teaserTake);
+  });
+
   it('does not change when a user edits their answers afterwards (Q5)', async () => {
     const a = await insertPerson(testDb.appPool, {
       items: [niche[0]!],

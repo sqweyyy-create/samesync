@@ -63,11 +63,16 @@ const sharedShare = (take: CommonTake) =>
 /**
  * The game of one pair, or null when their takes can't make one: fewer than `count` in common, or
  * no disagreement to end on. Matching only pairs people who have both (PLAN.md §5, hard filters).
+ *
+ * `known` are takes whose answer a player already knows before the game, such as the shared view
+ * the match teaser names. Asking about them would be no guess at all, so they are used only when
+ * nothing else is left.
  */
 export function selectGame(
   common: readonly CommonTake[],
   count: number,
   seed: number,
+  known: ReadonlySet<string> = new Set(),
 ): GameSelection | null {
   if (!Number.isInteger(count) || count < 1) throw new Error('a game needs at least one question');
   const unique = new Map(common.map((take) => [take.questionId, take]));
@@ -81,7 +86,11 @@ export function selectGame(
     .sort((x, y) => imbalance(x) - imbalance(y));
   const agreements = takes
     .filter((take) => take.a === take.b)
-    .sort((x, y) => sharedShare(x) - sharedShare(y));
+    .sort(
+      (x, y) =>
+        Number(known.has(x.questionId)) - Number(known.has(y.questionId)) ||
+        sharedShare(x) - sharedShare(y),
+    );
   const closing = splits[0];
   if (!closing || takes.length < count) return null;
 
