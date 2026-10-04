@@ -1,4 +1,4 @@
-/** The scheduled jobs of Phase 2: matching drops, the outbox sender and the age transition. */
+/** The scheduled jobs: matching drops, the outbox sender, the age transition, game deadlines. */
 import { BANDS, LOCALES, type Band, type Locale, type Mode } from '@samesync/shared';
 import type pg from 'pg';
 import type { Clock } from '../clock';
@@ -8,6 +8,7 @@ import type { MatchingService } from '../services/matching';
 import type { OutboxSender } from '../services/outbox-sender';
 import { LOCK, withAdvisoryLock } from './advisory-lock';
 import type { AgeTransition } from './age-transition';
+import type { GameDeadlines } from './game-deadlines';
 import type { Job } from './scheduler';
 
 const MINUTE = 60_000;
@@ -86,6 +87,18 @@ export function createAgeTransitionJob(deps: { pool: pg.Pool; ageTransition: Age
     runOnStart: true,
     async run() {
       await withAdvisoryLock(deps.pool, LOCK.ageTransition, () => deps.ageTransition.run());
+    },
+  };
+}
+
+/** Every minute: expires games past their deadline and queues the reminders that are due (Q2). */
+export function createGameDeadlinesJob(deps: { pool: pg.Pool; deadlines: GameDeadlines }): Job {
+  return {
+    name: 'game-deadlines',
+    intervalMs: MINUTE,
+    runOnStart: true,
+    async run() {
+      await withAdvisoryLock(deps.pool, LOCK.gameDeadlines, () => deps.deadlines.run());
     },
   };
 }

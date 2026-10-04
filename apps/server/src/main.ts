@@ -16,10 +16,17 @@ import { createMatchingRepository } from './db/repositories/matching';
 import { createOutboxRepository } from './db/repositories/outbox';
 import { createProfileRepository } from './db/repositories/profile';
 import { createUsersRepository } from './db/repositories/users';
+import { DEFAULT_GAME_PARAMS } from './domain/game/params';
 import { DEFAULT_MATCHING_PARAMS } from './domain/matching/params';
 import { createHttpApp } from './http/app';
 import { createAgeTransition } from './jobs/age-transition';
-import { createAgeTransitionJob, createMatchingJob, createOutboxJob } from './jobs/jobs';
+import { createGameDeadlines } from './jobs/game-deadlines';
+import {
+  createAgeTransitionJob,
+  createGameDeadlinesJob,
+  createMatchingJob,
+  createOutboxJob,
+} from './jobs/jobs';
 import { workerPlanner } from './jobs/matching-planner';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
@@ -117,6 +124,10 @@ const scheduler = createScheduler({
       }),
     }),
     createMatchingJob({ matching, clock, logger, drops: config.matching.drops }),
+    createGameDeadlinesJob({
+      pool,
+      deadlines: createGameDeadlines({ games, clock, logger, params: DEFAULT_GAME_PARAMS }),
+    }),
     createOutboxJob({ pool, sender }),
   ],
 });
