@@ -98,13 +98,16 @@ Pool isolation is enforced in six layers, so a bug in one layer can't break it:
      - a new match starts as `pending_game`.
    - `matches` UPDATE: the pair, the pool (band, locale, mode), the teaser and the aliases never change, and a closed match stays closed. The app role can only update the lifecycle columns.
    - `messages` INSERT requires an open match, a sender who is a participant, both live bands equal to `matches.band`, and neither user frozen.
-   - `game_predictions` INSERT requires an open match and a predictor who is a participant.
+   - `game_predictions` INSERT requires a match whose game is still being played (`pending_game`), a predictor who is a participant, both users `active`, both live bands equal to `matches.band`, and a question of that match's game. A player who has finished can't add another.
+   - `games` UPDATE: the questions and the answer snapshot never change; a player is finished only with a prediction for every question, and stays finished.
+   - `matches` UPDATE to `results_ready`: only from `pending_game`, with both players finished, both users `active` and both live bands equal to `matches.band`. A match never returns to `pending_game`.
    - `reveal_consents` INSERT requires `matches.band = 'adult'` and both users adult right now.
 3. **State-change triggers:**
    - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. From Phase 4 it also clears `active_match_id`. The `username` and the dating fields (gender, seeking, partner age range) are nulled by `admin_set_birth_date()` when the band becomes `u18`.
    - `birth_date` is write-once except through `admin_set_birth_date()`.
 4. **Repository API:**
    - Every read of another user's data goes through `getMatchForParticipant(userId, matchId)`. It checks participation, that the match is readable (not closed for `band_change`), and that live bands are equal.
+   - The game uses the same scope. The other person's answers and guesses are returned only by `getResultsForParticipant`, and its query selects them only once both players have finished.
    - Candidate queries for matching always take a `PoolKey`.
 5. **Checks at send time:** the outbox sender and the relay re-check everything right before each Telegram call.
 6. **Database roles:**
@@ -152,8 +155,8 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `games` | `match_id` (PK, FK), `question_ids text[]` (ordered, last = closing split), `closing_question_id`, `a_done_at`, `b_done_at`, `created_at` | Created in the same transaction as the match. Phase 2 creates the shell (`match_id`, `created_at`); Phase 3 adds the rest. |
-| `game_predictions` | PK `(match_id, predictor_id, question_id)`, `predicted` (`agree` / `disagree`), `created_at` | Write-once. Participant trigger. |
+| `games` | `match_id` (PK, FK), `question_ids text[]` (ordered, last = closing split), `closing_question_id`, `answers_a`, `answers_b` (each user's own answers to `question_ids`, as they were when the match was made), `a_done_at`, `b_done_at`, `created_at` | Created in the same transaction as the match. CHECKs: answers aligned with the questions, no skips, the closing question is last and is a split. Update trigger described in §3; the app role can only write the two `done` columns. |
+| `game_predictions` | PK `(match_id, predictor_id, question_id)`, `predicted` (`agree` / `disagree`), `created_at` | Write-once: the app role has no UPDATE or DELETE. Insert trigger described in §3. |
 
 ### Chat
 
@@ -174,7 +177,7 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `outbox` | `id`, `user_id`, `kind`, `match_id`, `payload jsonb` (i18n key + params, never rendered text), `dedupe_key` (unique), `status` (`pending` / `sent` / `failed` / `cancelled`), `attempts`, `next_attempt_at`, `sent_at`, `last_error`, `cancel_reason`, `created_at` | Rendered in the recipient's locale at send time. `cancel_reason` records why a row was dropped without sending. |
+| `outbox` | `id`, `user_id`, `kind` (`match_created`, `game_turn`, `game_results`, `game_reminder`, `game_expired`), `match_id`, `payload jsonb` (i18n key + params, never rendered text), `dedupe_key` (unique), `status` (`pending` / `sent` / `failed` / `cancelled`), `attempts`, `next_attempt_at`, `sent_at`, `last_error`, `cancel_reason`, `created_at` | Rendered in the recipient's locale at send time. `cancel_reason` records why a row was dropped without sending. |
 | `payments` | `id`, `user_id`, `product_id`, `stars_amount`, `invoice_payload` (unique, opaque), `telegram_payment_charge_id` (unique), `status` (`pending` / `paid` / `refunded` / `expired`), `created_at`, `paid_at`, `refunded_at` | Idempotency keys are the two unique columns. |
 | `entitlements` | `id`, `user_id`, `kind`, `amount`, `valid_from`, `valid_until`, `source_payment_id`, `revoked_at` | Paid features are still undecided, so this table is generic. |
 
@@ -565,11 +568,11 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 **Out of scope.** Sending messages (Phase 4), LLM-generated text, score history or leaderboards, rematches.
 
 **Acceptance criteria**
-- [ ] Every game has exactly the configured number of questions (provisional 5), all answered by both users, and its last question is a split.
-- [ ] Before a user has submitted and both are done, no endpoint returns the counterpart's answers. Predictions can't be changed after submission.
-- [ ] Results are computed correctly, and the opener renders in the match's locale, referring only to the closing question.
-- [ ] A non-participant gets 404. A match closed with `band_change` gets 404 for both former participants.
-- [ ] Both users get the right notifications exactly once. Unplayed matches expire on time.
+- [x] Every game has exactly the configured number of questions (provisional 5), all answered by both users, and its last question is a split. *(src/domain/game/select.test.ts: property tests over random eligible pairs; test/game/creation.test.ts: every game of a real run on 80 users, checked against the `answers` table; the `games` CHECKs in test/safety/game-isolation.test.ts.)*
+- [x] Before a user has submitted and both are done, no endpoint returns the counterpart's answers. Predictions can't be changed after submission. *(test/game/api.test.ts: the game and submission responses never carry an answer, results answer 409 until both are done, a second submission is refused; test/safety/game-isolation.test.ts: the results query returns no answers before both finish, and the app role can't update or delete a prediction.)*
+- [x] Results are computed correctly, and the opener renders in the match's locale, referring only to the closing question. *(src/domain/game/results.test.ts, opener.test.ts; test/game/api.test.ts: both sides of one game, the opener of each side, and a reader who switched language.)*
+- [x] A non-participant gets 404. A match closed with `band_change` gets 404 for both former participants. *(test/game/api.test.ts for the three endpoints; test/safety/game-isolation.test.ts for the repository, also with a stale cached band.)*
+- [ ] Both users get the right notifications exactly once. Unplayed matches expire on time. *(Automated: test/game/notifications.test.ts against a faked Bot API: "your turn", "results are ready", the reminder and the expiry notice, each once; expiry at the deadline, idempotent. Pending: the product owner's check of the real notifications and the game in Telegram with `pnpm dev:match-me <code> --counterpart-plays`.)*
 
 **Tests that prove it**
 - `apps/server/src/domain/game/select.test.ts`: a property test. For random answer pairs that satisfy the eligibility rule (≥ 5 common, ≥ 1 split), the last question is a split, every question was answered by both, the output is deterministic with a seed, and the choice is the most balanced split.
@@ -579,6 +582,40 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - `apps/server/test/safety/game-isolation.test.ts`: the DB rejects predictions from non-participants and on closed matches; after a band change, neither side can read the game or results.
 - `content/test/check.test.ts` (extended): every take has stance texts (for teasers) and openers or a valid fallback in both locales.
 - `apps/miniapp`: prediction flow, the waiting state, and results rendering with the closing card last.
+
+**Phase 3 implementation notes (2026-10-04).** Deviations from, and additions to, the scope above:
+- **Content (docs/content-format.md is the reference; release `2026.10.3`):**
+  - Stances are their own file type, `content/stances/*.json` (one entry per take, with an `agree` and a `disagree` text), not fields of a take. The 67 stances and 134 openers were authored by the product owner and are committed as they are.
+  - `content:check --launch` requires a stance and an opener for each side of every take that isn't retired. The normal check doesn't: a take without a stance is left out of teasers, and a missing opener falls back to a message built from the statement.
+  - A take has at most one stance and one opener per side. Each side of a stance is at most 80 characters.
+  - Stances and openers stay with a retired take. The old rule rejected an opener of a retired take, which would have made retiring impossible: an opener can't be deleted and has no `retiredIn`.
+- **Teaser (§5 is updated to match):** one sentence from the take's stance. English follows the brief ("Someone here also reads Berserk and thinks milk goes in before the cereal"). Russian keeps the name in the nominative with «У кого-то здесь на книжной полке тоже Берсерк, и этот человек считает, что …»: the form «читает {name}» is wrong for most names («читает Достоевский»). The Russian teaser strings need the product owner's review.
+- **Picking the game (`domain/game/select.ts`):**
+  - Only takes of the match's pool × mode deck count, as in matching.
+  - The other four questions are the pair's rarest shared views, with exactly one more disagreement when there is one. More disagreements are used only when shared views run out.
+  - The take named by the teaser is left out when the pair has enough others: both already know that answer.
+  - Ties are broken by a seed derived from the run seed and the pair.
+  - The game is picked inside the match transaction from the answers at that moment. A pair that no longer has a game (answers changed since planning) is skipped and counted in `pairs_rejected`.
+- **Answer snapshot (§4 is updated):** `games.answers_a` / `answers_b` keep both users' answers to the game's questions. Results use the snapshot, so editing a profile later doesn't change a game (Q5).
+- **Order of the cards:** each player gets the questions in an order of their own. The stored order ends on the split, which would give that answer away.
+- **API:**
+  - `GET /api/matches` and `GET /api/matches/:id` also return `resultsReadyAt`, `chatDeadlineAt` and `game` (the number of questions and who has finished).
+  - `GET …/game` answers 409 `conflict` once the caller has submitted or the game is over; `PUT …/predictions` answers 400 for anything but exactly one guess per question, and 409 for a second submission or a game that is over; `GET …/results` answers 409 `out_of_order` until both are done.
+  - Results are readable while the match is open (`results_ready` or `active`). Once it has ended they answer 409 (provisional, Q35).
+- **Safety SQL (migration 0007, §3 is updated):** the insert trigger on `game_predictions`, the update trigger on `games`, and a second update trigger on `matches` for the move to `results_ready`. They are new triggers; no earlier function was replaced. The move to `active` is still unguarded: Phase 4 owns it.
+- **Migration 0006 closes matches made before Phase 3.** They only have a game shell and can't be played. The ones still open are closed with reason `admin`, their unsent notifications are cancelled, and the shells are removed, so every row of `games` has its questions.
+- **Notifications:**
+  - Four new outbox kinds: `game_turn`, `game_results`, `game_reminder`, `game_expired`. The texts name the other person by alias only, in wordings that keep the alias in the nominative.
+  - The reminder goes out 12 hours before the game deadline (provisional, Q34), once per player who hasn't played.
+  - The sender re-checks each kind against the state it is about. "Your turn" that is still queued when the recipient plays is dropped with reason `outdated`.
+- **Deadlines job:** every minute, under an advisory lock. Expiry cancels the match's other pending notifications in the same transaction.
+- **Chat window (Q2):** `chat_deadline_at` is set to 48 hours after `results_ready_at`. The expiry of `results_ready` matches and its reminder stay in Phase 4, as planned there. Until then a match whose results are ready stays open and counts toward the open-match limit.
+- **Mini App:** the match screen has an intro, the cards, a last look before the one submission, a waiting screen and the results. The "Написать" button is disabled and nothing is sent. Initial JS is 96.8 KB gzip.
+- **Dev tooling:** `pnpm dev:match-me <public_id> --counterpart-plays` makes the synthetic counterpart submit its guesses through the real game service. It never plays for a real user.
+- **Parameters:** the number of questions (5, Q3) and the reminder lead are constants in `domain/game/params.ts`. The matching service refuses to start with more questions than `minCommonTakes`.
+- **Benchmark with games:** `pnpm bench:matching`, 2026-10-04, same machine: 5.5 s for 5,000 users (4.9 s before), longest event-loop lag 19 ms, 2,134 pairs, none refused.
+- **Open questions:** Q1, Q3 and Q4 are implemented as their provisional defaults. Q34 and Q35 are new.
+- **Local setup after pulling Phase 3:** run `pnpm db:migrate` (it closes the matches made before Phase 3) and `pnpm content:seed` (the content release changed) before `pnpm dev`.
 
 ---
 
@@ -791,10 +828,10 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 Each question lists a *provisional* default used until it is answered (implemented as config or content where possible) and the phase that needs the answer.
 
 **Product & core loop**
-- **Q1. Is the game required before chatting?** The loop implies yes, but it isn't stated. *Provisional:* yes; chat opens at `results_ready`. *Needed by:* Phase 3.
+- **Q1. Is the game required before chatting?** The loop implies yes, but it isn't stated. *Provisional:* yes; chat opens at `results_ready`. Phase 3 is built this way. *Needed by:* Phase 4.
 - **Q2. When does the 48h clock start, and what about later silence?** ✅ **Decided (2026-10-02, product owner):** the game has 48h from match creation; chat has 48h from `results_ready` if no message is sent; nothing expires after the first message; one reminder each.
-- **Q3. How many game questions?** "Several". *Provisional:* 5, including the closing split. *Needed by:* Phase 3.
-- **Q4. Is the opener template-based or LLM-generated, and can the user edit it?** "Pre-generated" is ambiguous, and no LLM is in the stack. An LLM would also send minors' data to a third party. *Provisional:* per-take templates in `content/`, editable before sending. *Needed by:* Phase 3.
+- **Q3. How many game questions?** "Several". *Provisional:* 5, including the closing split (a constant in `domain/game/params.ts`, implemented in Phase 3). *Needed by:* G1.
+- **Q4. Is the opener template-based or LLM-generated, and can the user edit it?** "Pre-generated" is ambiguous, and no LLM is in the stack. An LLM would also send minors' data to a third party. *Provisional:* per-take templates in `content/`, editable before sending (implemented in Phase 3; the product owner authored an opener for each side of every take). *Needed by:* Phase 4.
 - **Q5. Take deck rules.** Fixed or random deck from a larger bank? Is skip allowed? Can answers be edited later? ✅ **Decided (2026-10-03, product owner):** 35 takes drawn per band × mode, skip allowed (≥ 25 non-skip answers required), answers editable later with effect on future matches only.
 - **Q6. Interest catalog.** Catalog-only or free-text entries (free text needs moderation, especially for `u18`)? Min/max picks? Who curates, and how big must the ru catalog be at launch? ✅ **Decided (2026-10-03, product owner):** catalog-only (no free-text entries), 5–30 picks per user, a curated catalog maintained by the team (format: `docs/content-format.md`). ✅ **Decided (2026-10-03, product owner):** `content:check --launch` keeps counting items per locale for now (≥ 150 each; the launch content has 187 ru / 157 en). Counting per band × locale must be revisited before G3: `u18:en` currently sees only 127 items. **Still open:** how big the ru catalog must be at launch. *Needed by:* G2 (catalog size), G3 (per-band count).
 - **Q7. Are photos in the product at all?** ✅ **Decided (2026-10-02, product owner):** no photos anywhere in the MVP.
@@ -804,6 +841,8 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q11. Dating gender and preference model.** Which gender options, and is "seeking" multi-select? ✅ **Decided (2026-10-03, product owner):** dating mode asks **"You are"** (man / woman, single choice) and **"Looking for"** (men / women, multi-select, at least one). A match requires mutual compatibility: each user's gender is in the other's "looking for". The option list lives in `content/` so it can be extended later; `users.gender` and `users.seeking` store option IDs (format: `docs/content-format.md`). The two extra fields are accepted as part of onboarding. Legal review of dating features is still covered by Q28.
 - **Q12. Age gaps in the adult pool.** The spec limits age gaps only for `u18`. Should an 18-year-old be matched with a 45-year-old, especially in dating? ✅ **Decided (2026-10-03, product owner):** dating has a user-set partner age range. It defaults to ±5 years from the user's own age, clamped to 18+, and can be changed in settings. Two users match only if each one's age is within the other's range. Friends mode has no age-gap limit (in the adult pool; the `u18` rule from Q14 is unchanged).
 - **Q13. Choosing and switching language.** Picked by the user or taken from `language_code`? Where do `uk`/`be`/`kk`… go? Does switching move pools and close open matches? Can bilingual users join both pools? ✅ **Decided (2026-10-03, product owner):** preselected from `language_code` (`ru` → ru, otherwise en), then stored in `users.locale`; changeable only in SameSync's settings; a change affects future matches only; one language pool per user. Consequence: after the first use, changing the Telegram client's language does **not** change SameSync's language. Phase 1 makes the bot and the Mini App read the stored locale (Phase 0 still follows the live `language_code`).
+- **Q34. When is the game reminder sent?** Q2 decided "one reminder each" but not the moment. *Provisional:* 12 hours before the game deadline, to every player who hasn't played (a constant in `domain/game/params.ts`). *Needed by:* G1.
+- **Q35. Can results be read after a match has ended?** *Provisional:* no. Results are shown while the match is open; once it has expired or closed, the other person's answers are no longer returned. *Needed by:* Phase 4.
 
 **Age & safety**
 - **Q14. What does "±2 years" mean?** ✅ **Decided (2026-10-02, product owner):** birth dates at most 2 calendar years apart (the stricter reading; constant over time). The looser whole-year-age reading was rejected.
