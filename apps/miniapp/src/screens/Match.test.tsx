@@ -243,6 +243,11 @@ describe('<Match> results', () => {
     expect(closing.compareDocumentPosition(articles[2]!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(articles[2]?.className).toBe('card');
     expect(screen.getByText('Ты: За · 🦊 Лиса: Против')).toBeTruthy();
+    // The closing question counts like the others: both guesses are shown for it too (the same
+    // outcome as in the first round).
+    const marks = screen.getAllByText('Твой прогноз: верно · Прогноз о тебе: мимо');
+    expect(marks).toHaveLength(2);
+    expect(closing.compareDocumentPosition(marks[1]!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     // The opener is there to edit. Sending arrives with the chat: the button does nothing yet.
     const opener = screen.getByLabelText('Первое сообщение');

@@ -46,6 +46,11 @@ export function Results({
       alias,
       theirs: label(round.theirs),
     });
+  const guesses = (round: ResultsResponse['rounds'][number]) =>
+    t('miniapp.results.guesses', {
+      you: mark(round.yourGuess === round.theirs),
+      they: mark(round.theirGuess === round.yours),
+    });
   const closing = results.rounds.at(-1);
 
   return (
@@ -58,12 +63,7 @@ export function Results({
         <article key={round.questionId} className="round">
           <p>{round.text}</p>
           <p className="hint">{answers(round)}</p>
-          <p className="hint">
-            {t('miniapp.results.guesses', {
-              you: mark(round.yourGuess === round.theirs),
-              they: mark(round.theirGuess === round.yours),
-            })}
-          </p>
+          <p className="hint">{guesses(round)}</p>
         </article>
       ))}
       {closing && (
@@ -71,6 +71,7 @@ export function Results({
           <h2>{t('miniapp.results.closing')}</h2>
           <article className="card">{closing.text}</article>
           <p className="hint">{answers(closing)}</p>
+          <p className="hint">{guesses(closing)}</p>
           <label className="field">
             {t('miniapp.results.opener')}
             <textarea value={opener} maxLength={2000} onChange={(e) => setOpener(e.target.value)} />
