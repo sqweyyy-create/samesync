@@ -11,6 +11,8 @@
     "dev:initdata": "pnpm --filter @samesync/server run dev:initdata",
     "dev:population": "pnpm --filter @samesync/server run dev:population",
     "dev:match-me": "pnpm --filter @samesync/server run dev:match-me",
+    "dev:say": "pnpm --filter @samesync/server run dev:say",
+    "dev:reveal": "pnpm --filter @samesync/server run dev:reveal",
     "bench:matching": "pnpm --filter @samesync/server run bench:matching",
     "db:migrate": "pnpm --filter @samesync/server run db:migrate",
     "db:generate": "pnpm --filter @samesync/server run db:generate",
