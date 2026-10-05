@@ -4,13 +4,15 @@
  * a band change, or as soon as either user's live band differs from the match band, even before
  * the age-transition job has closed it. Nothing here returns the other user's ID.
  */
-import { OPEN_MATCH_STATUSES, type Locale, type MatchStatus } from '@samesync/shared';
+import { OPEN_MATCH_STATUSES, type Band, type Locale, type MatchStatus } from '@samesync/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../client';
 
 export interface MatchView {
   id: string;
   status: MatchStatus;
+  /** The caller's own pool: both users of a match are in the same band. */
+  band: Band;
   locale: Locale;
   tier: number;
   /** Content IDs only (see domain/matching/teaser.ts). */
@@ -58,6 +60,7 @@ export const readableBy = (userId: string): SQL => sql`(
 interface Row extends Record<string, unknown> {
   id: string;
   status: MatchStatus;
+  band: Band;
   locale: Locale;
   tier: number;
   teaser: unknown;
@@ -82,7 +85,7 @@ const dateOrNull = (ms: number | null) => (ms === null ? null : new Date(ms));
 export function createMatchesRepository(db: Db): MatchesRepository {
   const select = async (userId: string, extra: SQL): Promise<MatchView[]> => {
     const result = await db.execute<Row>(sql`
-      SELECT m.id, m.status, m.locale, m.tier, m.teaser,
+      SELECT m.id, m.status, m.band, m.locale, m.tier, m.teaser,
         CASE WHEN m.user_a_id = ${userId}::uuid THEN m.alias_b ELSE m.alias_a END AS counterpart_alias,
         (extract(epoch FROM m.created_at) * 1000)::float8 AS created_at_ms,
         (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms,
@@ -100,6 +103,7 @@ export function createMatchesRepository(db: Db): MatchesRepository {
     return result.rows.map((r) => ({
       id: r.id,
       status: r.status,
+      band: r.band,
       locale: r.locale,
       tier: r.tier,
       teaser: r.teaser,

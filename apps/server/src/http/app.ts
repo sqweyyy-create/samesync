@@ -4,6 +4,7 @@ import {
   PredictionsRequest,
   SaveAnswersRequest,
   SaveInterestsRequest,
+  SendMessageRequest,
   SetBirthDateRequest,
   SetLocaleRequest,
   SetModeRequest,
@@ -14,6 +15,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type * as z from 'zod/mini';
 import type { Clock } from '../clock';
 import type { Logger } from '../logger';
+import type { ChatService } from '../services/chat';
 import { ServiceError } from '../services/errors';
 import type { GameService } from '../services/game';
 import type { MatchesService } from '../services/matches';
@@ -28,6 +30,7 @@ export interface HttpAppDeps {
   profile: ProfileService;
   matches: MatchesService;
   game: GameService;
+  chat: Pick<ChatService, 'sendFromApp'>;
 }
 
 const NOT_FOUND: ApiErrorBody = { error: 'not_found' };
@@ -54,7 +57,7 @@ async function body<T extends z.ZodMiniType>(c: Context, schema: T): Promise<z.i
 
 export function createHttpApp(deps: HttpAppDeps): Hono {
   const app = new Hono();
-  const { profile, matches, game } = deps;
+  const { profile, matches, game, chat } = deps;
 
   // Request log: method, path without query, status, duration. Never headers or bodies.
   app.use(async (c, next) => {
@@ -146,6 +149,13 @@ export function createHttpApp(deps: HttpAppDeps): Hono {
   api.get('/matches/:id/results', async (c) =>
     c.json(await game.results(c.get('auth'), c.req.param('id'))),
   );
+
+  // The first message of the chat, written in the Mini App. It goes through the relay like a
+  // message written in the bot; the answer is the match as it is afterwards, never the message.
+  api.post('/matches/:id/messages', async (c) => {
+    const { text } = await body(c, SendMessageRequest);
+    return c.json(await chat.sendFromApp(c.get('auth'), c.req.param('id'), text));
+  });
 
   app.route('/api', api);
 

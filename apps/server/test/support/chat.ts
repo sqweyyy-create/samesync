@@ -2,9 +2,16 @@
 import type { Band, Locale } from '@samesync/shared';
 import type pg from 'pg';
 import { v7 as uuidv7 } from 'uuid';
+import type { TestUser } from './fixtures';
 import { insertGame, insertPredictions, markDone, toResultsReady } from './games';
 import { insertActiveUser, insertMatch } from './matches';
 import { birthDateYearsAgo, type InsertUser } from './users';
+
+/** A user row and the Telegram account behind it. */
+export interface Person {
+  id: string;
+  telegramId: number;
+}
 
 export interface Chat {
   matchId: string;
@@ -13,6 +20,26 @@ export interface Chat {
   b: string;
   telegramA: number;
   telegramB: number;
+  /** The two people in the order they were given or created. */
+  first: Person;
+  second: Person;
+}
+
+let people = 0;
+
+/**
+ * The Telegram account of a person as updates carry it. Every part of the identity is unlike
+ * anything else in a test, so a leak scanner can look for each of them.
+ */
+export function telegramUser(person: Person, locale: 'ru' | 'en' = 'ru'): TestUser {
+  const n = ++people;
+  return {
+    id: person.telegramId,
+    first_name: `Имярек${n}`,
+    last_name: `Фамильев${n}`,
+    username: `secret_handle_${n}`,
+    language_code: locale,
+  };
 }
 
 /**
@@ -28,17 +55,22 @@ export async function insertChat(
     locale?: Locale;
     first?: InsertUser;
     second?: InsertUser;
+    /** Two people who exist already, instead of two new ones. */
+    between?: readonly [Person, Person];
+    /** Content alias IDs: how the first appears to the second, and the second to the first. */
+    seenAs?: readonly [string, string];
   } = {},
 ): Promise<Chat> {
   const years = over.years ?? 25;
   const base = { birthDate: birthDateYearsAgo(years), locale: over.locale ?? 'ru' };
-  const first = await insertActiveUser(pool, { ...base, ...over.first });
-  const second = await insertActiveUser(pool, { ...base, ...over.second });
+  const first = over.between?.[0] ?? (await insertActiveUser(pool, { ...base, ...over.first }));
+  const second = over.between?.[1] ?? (await insertActiveUser(pool, { ...base, ...over.second }));
   const match = await insertMatch(pool, {
     a: first.id,
     b: second.id,
     band: over.band ?? (years >= 18 ? 'adult' : 'u18'),
     locale: over.locale ?? 'ru',
+    ...(over.seenAs ? { seenAs: over.seenAs } : {}),
   });
   await insertGame(pool, match.id);
   for (const [side, predictorId] of [
@@ -56,8 +88,14 @@ export async function insertChat(
     b: match.userB,
     telegramA: telegramOf(match.userA),
     telegramB: telegramOf(match.userB),
+    first,
+    second,
   };
 }
+
+/** An active adult (25) of the ru pool, to put into several chats. */
+export const insertAdult = (pool: pg.Pool, over: InsertUser = {}): Promise<Person> =>
+  insertActiveUser(pool, { birthDate: birthDateYearsAgo(25), ...over });
 
 export interface InsertMessage {
   matchId: string;

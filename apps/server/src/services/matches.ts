@@ -11,6 +11,7 @@ import type { Clock } from '../clock';
 import { aliasLabel, type ContentStore } from '../content/store';
 import type { MatchView, MatchesRepository } from '../db/repositories/matches';
 import type { UsersRepository } from '../db/repositories/users';
+import { chatOpenIn } from '../domain/chat/params';
 import { parseTeaser, renderTeaser } from '../domain/matching/teaser';
 import type { ValidatedInitData } from '../http/auth/init-data';
 import { loadCurrentUser } from './current-user';
@@ -35,6 +36,7 @@ export function presentMatch(view: MatchView, locale: Locale, content: ContentSt
     resultsReadyAt: view.resultsReadyAt?.toISOString() ?? null,
     chatDeadlineAt: view.chatDeadlineAt?.toISOString() ?? null,
     game: view.game,
+    chat: chatOpenIn(view.band),
   };
 }
 

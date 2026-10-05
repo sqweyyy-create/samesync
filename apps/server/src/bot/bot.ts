@@ -1,18 +1,21 @@
-import { resolveLocale } from '@samesync/shared';
+import { resolveLocale, type Locale } from '@samesync/shared';
 import type { Translator } from '@samesync/shared/i18n';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import { Bot, InlineKeyboard, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import type { UsersRepository } from '../db/repositories/users';
 import type { Logger } from '../logger';
+import { registerChat, type ChatBotDeps } from './chat';
 
-export type BotContext = Context & { t: Translator['t'] };
+export type BotContext = Context & { t: Translator['t']; locale: Locale };
 
 export interface BotDeps {
   token: string;
   miniAppUrl: string;
   logger: Logger;
   users: Pick<UsersRepository, 'localeOf' | 'storeUsernameIfAdult' | 'setBotReachable'>;
+  /** The chat: relaying messages, /chats, /leave and /reveal (PLAN.md Phase 4). */
+  chat?: ChatBotDeps;
   /** Skips the getMe call; used by tests. */
   botInfo?: UserFromGetMe;
 }
@@ -26,7 +29,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   bot.use(async (ctx, next) => {
     const from = ctx.from;
     const stored = from ? await deps.users.localeOf(from.id) : null;
-    ctx.t = translatorFor(stored ?? resolveLocale(from?.language_code)).t;
+    ctx.locale = stored ?? resolveLocale(from?.language_code);
+    ctx.t = translatorFor(ctx.locale).t;
     if (from && ctx.chat?.type === 'private') {
       await deps.users.storeUsernameIfAdult(from.id, from.username ?? null);
       // Whoever writes to the bot can be written to again (after a 403 marked them unreachable).
@@ -47,6 +51,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   dm.command('help', async (ctx) => {
     await ctx.reply(ctx.t('bot.help'));
   });
+
+  // After the commands above: its last handler takes every other message of a private chat.
+  if (deps.chat) registerChat(dm, deps.chat);
 
   // Blocking the bot arrives as "kicked", unblocking as "member". Unreachable users are not
   // matched, so nobody gets a match whose notification can't be delivered.

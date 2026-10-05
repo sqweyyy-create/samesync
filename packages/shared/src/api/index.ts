@@ -17,6 +17,10 @@ export const ApiErrorCode = z.enum([
   'conflict',
   'out_of_order',
   'invalid',
+  /** Too many requests of this kind in a short time. */
+  'rate_limited',
+  /** Something we depend on (Telegram) did not answer: trying again later may work. */
+  'unavailable',
   'internal',
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
@@ -161,6 +165,11 @@ export const MatchSummary = z.object({
   game: z.nullable(
     z.object({ questions: z.number(), youDone: z.boolean(), theyDone: z.boolean() }),
   ),
+  /**
+   * Whether this match can have a chat at all. The chat itself is open while the status is
+   * `results_ready` (nobody has written yet) or `active`, and it takes place in the bot.
+   */
+  chat: z.boolean(),
 });
 export type MatchSummary = z.infer<typeof MatchSummary>;
 
@@ -187,6 +196,15 @@ export const PredictionsRequest = z.object({
     .check(z.minLength(1), z.maxLength(50)),
 });
 export type PredictionsRequest = z.infer<typeof PredictionsRequest>;
+
+/** Longest chat message, in characters (the server counts code points). */
+export const MESSAGE_MAX_LENGTH = 2000;
+
+/** A message written in the Mini App: the opener, sent as the first message of the chat. */
+export const SendMessageRequest = z.object({
+  text: z.string().check(z.minLength(1), z.maxLength(2 * MESSAGE_MAX_LENGTH)),
+});
+export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
 /** The results of a finished game. They exist only once both players have submitted. */
 export const ResultsResponse = z.object({

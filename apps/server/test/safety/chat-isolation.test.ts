@@ -6,9 +6,13 @@
  * match band even when the cached `age_band` is stale, nothing is stored in a u18 match, a stored
  * message never changes, a chat starts only with a delivered message, and usernames can be
  * revealed only between two adults who both consented.
+ * The second part drives the real relay through the bot and the API: it reads both users again
+ * immediately before every Telegram call, so nothing is relayed to or from a frozen user or across
+ * bands, and a match whose live bands no longer fit is closed by the very message that finds out.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  activeMatchOf,
   consentRows,
   insertBlock,
   insertChat,
@@ -17,10 +21,20 @@ import {
   insertMessage,
   messageRows,
   startChat,
+  telegramUser,
 } from '../support/chat';
+import { buildChatApp, type ChatApp } from '../support/chat-app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import { insertGame } from '../support/games';
-import { insertActiveUser, insertMatch, matchRow, withoutTriggers } from '../support/matches';
+import {
+  insertActiveUser,
+  insertMatch,
+  insertOutbox,
+  matchRow,
+  outboxRow,
+  withoutTriggers,
+} from '../support/matches';
+import { lastIncomingId, textUpdate } from '../support/telegram';
 import { birthDateYearsAgo } from '../support/users';
 
 let testDb: TestDatabase;
@@ -554,5 +568,293 @@ describe('consent to reveal usernames', () => {
         b,
       ]),
     ).rejects.toMatchObject({ code: 'SS041' });
+  });
+});
+
+/**
+ * Makes a user 16 or 17 by birth date behind the back of every trigger: the cached band and the
+ * user's matches stay adult. The username the bot stored for the adult goes too, as it would for
+ * any row that is under 18 (the CHECK on `username` would refuse the row otherwise).
+ */
+const makeMinor = (userId: string, years: 16 | 17 = 16) =>
+  withoutTriggers(testDb.ownerPool, (client) =>
+    client.query('UPDATE users SET birth_date = $2, username = NULL WHERE id = $1', [
+      userId,
+      birthDateYearsAgo(years),
+    ]),
+  );
+
+/**
+ * Two adults who are chatting, as the bot sees them. `fox` is user A of the match (🦊 Лиса to the
+ * other one) and `owl` is user B (🦉 Сова). Each has already written once.
+ */
+async function talking(options: Parameters<typeof buildChatApp>[1] = {}) {
+  const app = await buildChatApp(testDb, options);
+  const c = await chat();
+  const fox = telegramUser({ id: c.a, telegramId: c.telegramA });
+  const owl = telegramUser({ id: c.b, telegramId: c.telegramB });
+  await app.handle(textUpdate(fox, 'привет'));
+  const foxMessage = lastIncomingId();
+  await app.handle(textUpdate(owl, 'и тебе привет'));
+  const rows = await messageRows(testDb.ownerPool, c.matchId);
+  app.telegram.clear();
+  return {
+    ...c,
+    app,
+    fox,
+    owl,
+    /** A message of each of them, as it sits in the other one's bot chat: to reply to. */
+    inOwlChat: Number(rows[0]?.recipient_tg_message_id),
+    inFoxChat: Number(rows[1]?.recipient_tg_message_id),
+    foxMessage,
+  };
+}
+const texts = (app: ChatApp, chatId: number) => app.telegram.sentTo(chatId).map((m) => m.text);
+const ENDED = 'Этот чат завершён. Сообщение не доставлено.';
+
+describe('the relay and a band change', () => {
+  it('refuses the next message and closes the match when a live band has changed, before any job ran', async () => {
+    const { app, matchId, a, b, fox, owl } = await talking();
+    const pending = await insertOutbox(testDb.appPool, {
+      userId: b,
+      matchId,
+      kind: 'reveal_request',
+    });
+    // By birth date the sender is 16 now; the cached band and the match still say adult.
+    await makeMinor(a);
+    expect((await matchRow(testDb.ownerPool, matchId))?.status).toBe('active');
+
+    await app.handle(textUpdate(fox, 'это не должно дойти'));
+    expect(texts(app, owl.id)).toEqual([]);
+    expect(texts(app, fox.id)).toEqual([ENDED]);
+    // The message that found out closed the match, in the same breath.
+    expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'band_change',
+    });
+    expect(await outboxRow(testDb.ownerPool, pending.id)).toMatchObject({
+      status: 'cancelled',
+      cancel_reason: 'band_change',
+    });
+    const cache = await testDb.ownerPool.query<{ age_band: string }>(
+      'SELECT age_band FROM users WHERE id = $1',
+      [a],
+    );
+    expect(cache.rows[0]?.age_band).toBe('u18');
+    expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+
+    // And nothing comes back the other way either.
+    app.telegram.clear();
+    await app.handle(textUpdate(owl, 'ты тут?'));
+    expect(texts(app, fox.id)).toEqual([]);
+    expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+  });
+
+  it('does the same when it is the recipient whose band changed, by reply and by the API', async () => {
+    const byReply = await talking();
+    await makeMinor(byReply.b, 17);
+    await byReply.app.handle(textUpdate(byReply.fox, 'ответ', { replyTo: byReply.inFoxChat }));
+    expect(texts(byReply.app, byReply.owl.id)).toEqual([]);
+    expect(texts(byReply.app, byReply.fox.id)).toEqual([ENDED]);
+    expect(await matchRow(testDb.ownerPool, byReply.matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'band_change',
+    });
+
+    const byApi = await talking();
+    await makeMinor(byApi.b, 17);
+    const response = await byApi.app
+      .as({ id: byApi.fox.id, first_name: 'Dev' })
+      .post(`/api/matches/${byApi.matchId}/messages`, { text: 'из приложения' });
+    // The match is no longer readable for either of them: it looks like it never existed.
+    expect(response.status).toBe(404);
+    expect(byApi.app.telegram.calls).toEqual([]);
+    expect(await matchRow(testDb.ownerPool, byApi.matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'band_change',
+    });
+  });
+
+  it('closes the match even when the cached band cannot be rewritten', async () => {
+    const { app, matchId, a, fox, owl } = await talking();
+    // The stored username makes the row invalid as a u18 row: writing the cache fails its CHECK.
+    await tamper(a, 'birth_date', birthDateYearsAgo(16));
+    const before = await testDb.ownerPool.query<{ username: string | null }>(
+      'SELECT username FROM users WHERE id = $1',
+      [a],
+    );
+    expect(before.rows[0]?.username).not.toBeNull();
+
+    await app.handle(textUpdate(fox, 'это не должно дойти'));
+    expect(texts(app, owl.id)).toEqual([]);
+    expect(texts(app, fox.id)).toEqual([ENDED]);
+    expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'band_change',
+    });
+    expect(app.logLines().join('\n')).toContain('cached band not rewritten');
+  });
+
+  it('closes such a match as soon as its participant touches the chat at all, and never shows its alias', async () => {
+    const { app, matchId, a, fox } = await talking();
+    await makeMinor(a);
+    await app.handle(textUpdate(fox, '/chats'));
+    expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'band_change',
+    });
+    expect(JSON.stringify(app.telegram.calls)).not.toContain('Сова');
+  });
+
+  it('refuses after an admin corrected a birth date: the correction itself closed the match', async () => {
+    const { app, matchId, a, fox, owl, inOwlChat } = await talking();
+    await testDb.ownerPool.query('SELECT admin_set_birth_date($1, $2, 1, $3)', [
+      a,
+      birthDateYearsAgo(16),
+      'test: wrong year',
+    ]);
+    expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'band_change',
+    });
+
+    await app.handle(textUpdate(fox, 'я всё ещё тут'));
+    await app.handle(textUpdate(owl, 'и я', { replyTo: inOwlChat }));
+    await app.handle(textUpdate(owl, 'алло'));
+    expect(texts(app, owl.id).every((t) => !t.startsWith('🦊'))).toBe(true);
+    expect(texts(app, fox.id).every((t) => !t.startsWith('🦉'))).toBe(true);
+    expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+    // The API agrees: the match is gone for both.
+    for (const who of [fox, owl]) {
+      const response = await app
+        .as({ id: who.id, first_name: 'Dev' })
+        .post(`/api/matches/${matchId}/messages`, { text: 'привет' });
+      expect(response.status).toBe(404);
+    }
+    expect(app.telegram.of('sendMessage').every((c) => typeof c.payload['text'] === 'string')).toBe(
+      true,
+    );
+    expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+  });
+});
+
+describe('the relay and a frozen user', () => {
+  it('relays nothing to or from a frozen user: the freeze closed the chat', async () => {
+    const { app, matchId, a, fox, owl, inOwlChat } = await talking();
+    await testDb.appPool.query("UPDATE users SET status = 'frozen' WHERE id = $1", [a]);
+    expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'frozen',
+    });
+
+    await app.handle(textUpdate(fox, 'я заморожен'));
+    expect(texts(app, owl.id)).toEqual([]);
+    expect(texts(app, fox.id)).toEqual(['Сейчас отправлять сообщения нельзя.']);
+
+    app.telegram.clear();
+    await app.handle(textUpdate(owl, 'ответ', { replyTo: inOwlChat }));
+    await app.handle(textUpdate(owl, 'и ещё'));
+    expect(texts(app, fox.id)).toEqual([]);
+    expect(texts(app, owl.id)).toEqual([ENDED, ENDED]);
+    expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+
+    // The API refuses a frozen account outright.
+    const response = await app
+      .as({ id: fox.id, first_name: 'Dev' })
+      .post(`/api/matches/${matchId}/messages`, { text: 'привет' });
+    expect(response.status).toBe(403);
+  });
+
+  it.each(['frozen', 'deleted', 'waitlisted'])(
+    'relays nothing to or from a %s user even if their match were still open',
+    async (status) => {
+      const { app, matchId, a, fox, owl } = await talking();
+      // The state the close trigger prevents: a non-active user in an open chat.
+      await tamper(a, 'status', status);
+      expect((await matchRow(testDb.ownerPool, matchId))?.status).toBe('active');
+
+      await app.handle(textUpdate(fox, 'от меня'));
+      await app.handle(textUpdate(owl, 'ко мне'));
+      expect(texts(app, owl.id).every((t) => !t.startsWith('🦊'))).toBe(true);
+      expect(texts(app, fox.id).every((t) => !t.startsWith('🦉'))).toBe(true);
+      expect(texts(app, fox.id)).toEqual(['Сейчас отправлять сообщения нельзя.']);
+      expect(texts(app, owl.id)).toEqual([ENDED]);
+      expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+    },
+  );
+
+  it('checks again right before the Telegram call: a freeze between two tries stops the second', async () => {
+    const c = await chat();
+    const fox = telegramUser({ id: c.a, telegramId: c.telegramA });
+    const owl = telegramUser({ id: c.b, telegramId: c.telegramB });
+    // The recipient is frozen while the relay waits to try the delivery again.
+    const app = await buildChatApp(testDb, {
+      onRetryWait: async () => {
+        await testDb.appPool.query("UPDATE users SET status = 'frozen' WHERE id = $1", [c.b]);
+      },
+    });
+    let attempts = 0;
+    app.telegram.answer = (call) => {
+      if (call.payload['chat_id'] !== owl.id) return { ok: true };
+      attempts++;
+      return { ok: false, error_code: 429, description: 'Too Many Requests', retry_after: 1 };
+    };
+    await app.handle(textUpdate(fox, 'успею?'));
+    expect(attempts).toBe(1);
+    expect(await messageRows(testDb.ownerPool, c.matchId)).toEqual([
+      expect.objectContaining({ verdict: 'rejected', delivered: false }),
+    ]);
+    expect((await matchRow(testDb.ownerPool, c.matchId))?.close_reason).toBe('frozen');
+  });
+});
+
+describe('the relay and other people', () => {
+  it('never writes into a match the sender is not in, whatever their active chat points to', async () => {
+    const { app, a, fox } = await talking();
+    const others = await talking();
+    // Nothing in the database stops the pointer from naming any match: the relay must not care.
+    await testDb.appPool.query('UPDATE users SET active_match_id = $2 WHERE id = $1', [
+      a,
+      others.matchId,
+    ]);
+    others.app.telegram.clear();
+    await app.handle(textUpdate(fox, 'не моё'));
+    await app.handle(textUpdate(fox, 'и это', { replyTo: others.inFoxChat }));
+    for (const stranger of [others.fox, others.owl]) {
+      expect(texts(app, stranger.id)).toEqual([]);
+      expect(texts(others.app, stranger.id)).toEqual([]);
+    }
+    expect(await messageRows(testDb.ownerPool, others.matchId)).toHaveLength(2);
+    // The bogus pointer is gone after its first use.
+    expect(await activeMatchOf(testDb.ownerPool, a)).not.toBe(others.matchId);
+  });
+
+  it('relays nothing between two users one of whom blocked the other', async () => {
+    const { app, matchId, a, b, fox, owl } = await talking();
+    await insertBlock(testDb.ownerPool, b, a);
+    await app.handle(textUpdate(fox, 'от заблокированного'));
+    await app.handle(textUpdate(owl, 'заблокированному'));
+    expect(texts(app, owl.id)).toEqual([ENDED]);
+    expect(texts(app, fox.id)).toEqual([ENDED]);
+    expect(await messageRows(testDb.ownerPool, matchId)).toHaveLength(2);
+  });
+
+  it('gives the recipient the alias and the text only, whatever the sender account looks like', async () => {
+    const { app, fox, owl } = await talking();
+    await app.handle(textUpdate(fox, 'ещё одно'));
+    const [call] = app.telegram.calls;
+    expect(app.telegram.calls.map((c) => c.method)).toEqual(['sendMessage']);
+    expect(Object.keys(call?.payload ?? {}).sort()).toEqual([
+      'chat_id',
+      'link_preview_options',
+      'reply_markup',
+      'text',
+    ]);
+    expect(call?.payload['text']).toBe('🦊 Лиса\nещё одно');
+    const sent = JSON.stringify(call);
+    for (const secret of [fox.first_name, fox.last_name, fox.username, String(fox.id)]) {
+      expect(sent).not.toContain(secret);
+    }
+    expect(call?.payload['chat_id']).toBe(owl.id);
   });
 });

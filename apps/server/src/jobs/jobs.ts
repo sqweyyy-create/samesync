@@ -1,4 +1,7 @@
-/** The scheduled jobs: matching drops, the outbox sender, the age transition, game deadlines. */
+/**
+ * The scheduled jobs: matching drops, the outbox sender, the age transition, the deadlines of the
+ * game and of the chat, and retention.
+ */
 import { BANDS, LOCALES, type Band, type Locale, type Mode } from '@samesync/shared';
 import type pg from 'pg';
 import type { Clock } from '../clock';
@@ -8,7 +11,9 @@ import type { MatchingService } from '../services/matching';
 import type { OutboxSender } from '../services/outbox-sender';
 import { LOCK, withAdvisoryLock } from './advisory-lock';
 import type { AgeTransition } from './age-transition';
+import type { ChatDeadlines } from './chat-deadlines';
 import type { GameDeadlines } from './game-deadlines';
+import type { Retention } from './retention';
 import type { Job } from './scheduler';
 
 const MINUTE = 60_000;
@@ -99,6 +104,30 @@ export function createGameDeadlinesJob(deps: { pool: pg.Pool; deadlines: GameDea
     runOnStart: true,
     async run() {
       await withAdvisoryLock(deps.pool, LOCK.gameDeadlines, () => deps.deadlines.run());
+    },
+  };
+}
+
+/** Every minute: expires chats nobody wrote in and queues the reminders that are due (Q2). */
+export function createChatDeadlinesJob(deps: { pool: pg.Pool; deadlines: ChatDeadlines }): Job {
+  return {
+    name: 'chat-deadlines',
+    intervalMs: MINUTE,
+    runOnStart: true,
+    async run() {
+      await withAdvisoryLock(deps.pool, LOCK.chatDeadlines, () => deps.deadlines.run());
+    },
+  };
+}
+
+/** Hourly, and once at startup: removes message texts that are past their retention (Q20). */
+export function createRetentionJob(deps: { pool: pg.Pool; retention: Retention }): Job {
+  return {
+    name: 'retention',
+    intervalMs: 60 * MINUTE,
+    runOnStart: true,
+    async run() {
+      await withAdvisoryLock(deps.pool, LOCK.retention, () => deps.retention.run());
     },
   };
 }

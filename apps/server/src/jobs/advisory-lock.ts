@@ -13,6 +13,8 @@ export const LOCK = {
   outbox: 1,
   ageTransition: 2,
   gameDeadlines: 3,
+  chatDeadlines: 4,
+  retention: 5,
   /** One lock per pool × mode, so different pools can run side by side. */
   matching: (pool: { band: Band; locale: Locale }, mode: Mode) =>
     100 +

@@ -1,5 +1,6 @@
 import { contentChecksum, loadValidContent } from '@samesync/content';
 import type { Hono } from 'hono';
+import type { BotContext } from '../../src/bot/bot';
 import { fixedClock, type Clock } from '../../src/clock';
 import { DEFAULT_CONTENT_DIR } from '../../src/config';
 import { createContentStore, type ContentStore } from '../../src/content/store';
@@ -9,9 +10,11 @@ import { createProfileRepository } from '../../src/db/repositories/profile';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { createHttpApp } from '../../src/http/app';
 import type { Logger } from '../../src/logger';
+import type { ChatService } from '../../src/services/chat';
 import { createGameService } from '../../src/services/game';
 import { createMatchesService } from '../../src/services/matches';
 import { createProfileService } from '../../src/services/profile';
+import { chatServices } from './chat-app';
 import type { TestDatabase } from './db';
 import {
   CLOCK_SKEW_SEC,
@@ -21,6 +24,7 @@ import {
   memoryLogger,
   type TestUser,
 } from './fixtures';
+import { fakeTelegram, type FakeTelegram } from './telegram';
 
 let cached: Promise<ContentStore> | undefined;
 
@@ -45,6 +49,8 @@ export interface TestApp {
   app: Hono;
   content: ContentStore;
   clock: Clock;
+  /** The fake Bot API behind the chat: what a message sent from the Mini App turns into. */
+  telegram: FakeTelegram<BotContext>;
   /** Requests as `user`, with initData signed at the clock's current time. */
   as(user: TestUser): {
     get(path: string): Promise<Response>;
@@ -64,17 +70,21 @@ export async function buildTestApp(
     logger?: Logger;
     content?: ContentStore;
     clock?: Clock;
+    /** A chat service that exists already, with the fake Bot API it talks to (support/chat-app.ts). */
+    chat?: { chats: ChatService; telegram: FakeTelegram<BotContext> };
   } = {},
 ): Promise<TestApp> {
   const content = options.content ?? (await realContent());
   const clock = options.clock ?? fixedClock(new Date());
   const users = createUsersRepository(testDb.db);
   const matches = createMatchesRepository(testDb.db);
+  const logger = options.logger ?? memoryLogger().logger;
+  const telegram = options.chat?.telegram ?? fakeTelegram<BotContext>();
   const app = createHttpApp({
     botToken: TEST_BOT_TOKEN,
     initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
     clock,
-    logger: options.logger ?? memoryLogger().logger,
+    logger,
     profile: createProfileService({
       users,
       profile: createProfileRepository(testDb.db),
@@ -90,11 +100,13 @@ export async function buildTestApp(
       content,
       clock,
     }),
+    chat: options.chat?.chats ?? chatServices(testDb, { content, clock, logger, telegram }).chats,
   });
   return {
     app,
     content,
     clock,
+    telegram,
     as(user) {
       const headers = () => ({
         Authorization: `tma ${initDataFor(user, { authDate: clock.now() })}`,

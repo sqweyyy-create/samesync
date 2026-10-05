@@ -26,6 +26,11 @@ export interface InsertMatch {
   status?: string;
   /** Keep `a` and `b` as given instead of ordering them (to attack the ordering CHECK). */
   keepOrder?: boolean;
+  /**
+   * Content alias IDs: how `a` appears to `b`, and how `b` appears to `a`. Without it user A of
+   * the match is `a.fox` and user B is `a.owl`.
+   */
+  seenAs?: readonly [string, string];
 }
 
 /**
@@ -36,13 +41,15 @@ export async function insertMatch(
   pool: pg.Pool,
   input: InsertMatch,
 ): Promise<{ id: string; userA: string; userB: string }> {
-  const [userA, userB] =
-    input.keepOrder || input.a < input.b ? [input.a, input.b] : [input.b, input.a];
+  const asGiven = input.keepOrder || input.a < input.b;
+  const [userA, userB] = asGiven ? [input.a, input.b] : [input.b, input.a];
+  const [ofA, ofB] = input.seenAs ?? ['a.fox', 'a.owl'];
+  const [aliasA, aliasB] = !input.seenAs || asGiven ? [ofA, ofB] : [ofB, ofA];
   const id = uuidv7();
   await pool.query(
     `INSERT INTO matches (id, band, locale, mode, user_a_id, user_b_id, tier, score, teaser,
        alias_a, alias_b, status, game_deadline_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 1, 1, $7, 'a.fox', 'a.owl', $8, now() + interval '48 hours')`,
+     VALUES ($1, $2, $3, $4, $5, $6, 1, 1, $7, $8, $9, $10, now() + interval '48 hours')`,
     [
       id,
       input.band ?? 'adult',
@@ -51,6 +58,8 @@ export async function insertMatch(
       userA,
       userB,
       JSON.stringify({ interest: null, take: { id: 'q.pineapple_pizza', value: 'agree' } }),
+      aliasA,
+      aliasB,
       input.status ?? 'pending_game',
     ],
   );

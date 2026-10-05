@@ -241,6 +241,7 @@ describe('<App> matches', () => {
     resultsReadyAt: null,
     chatDeadlineAt: null,
     game: { questions: 5, youDone: false, theyDone: false },
+    chat: true,
   };
 
   it('lists the matches on the home screen with whose turn it is, and opens the match on its intro', async () => {

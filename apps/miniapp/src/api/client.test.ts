@@ -54,6 +54,7 @@ describe('createApiClient', () => {
       resultsReadyAt: null,
       chatDeadlineAt: null,
       game: { questions: 5, youDone: false, theyDone: true },
+      chat: true,
     };
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -84,6 +85,7 @@ describe('createApiClient', () => {
       resultsReadyAt: '2026-10-04T12:00:00.000Z',
       chatDeadlineAt: '2026-10-06T12:00:00.000Z',
       game: { questions: 1, youDone: true, theyDone: true },
+      chat: true,
     };
     const results = {
       total: 1,

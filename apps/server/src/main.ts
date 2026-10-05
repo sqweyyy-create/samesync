@@ -5,36 +5,47 @@
 import { serve } from '@hono/node-server';
 import { contentChecksum, loadValidContent } from '@samesync/content';
 import { createBot } from './bot/bot';
+import { registerCommands } from './bot/chat';
 import { systemClock } from './clock';
 import { ConfigError, loadConfig, type Config } from './config';
 import { assertContentSeeded } from './content/seed';
 import { createContentStore, type ContentStore } from './content/store';
 import { createDb, createPool } from './db/client';
+import { createChatRepository } from './db/repositories/chat';
 import { createGamesRepository } from './db/repositories/games';
 import { createMatchesRepository } from './db/repositories/matches';
 import { createMatchingRepository } from './db/repositories/matching';
 import { createOutboxRepository } from './db/repositories/outbox';
 import { createProfileRepository } from './db/repositories/profile';
+import { createRevealRepository } from './db/repositories/reveal';
 import { createUsersRepository } from './db/repositories/users';
+import { DEFAULT_CHAT_PARAMS } from './domain/chat/params';
 import { DEFAULT_GAME_PARAMS } from './domain/game/params';
 import { DEFAULT_MATCHING_PARAMS } from './domain/matching/params';
 import { createHttpApp } from './http/app';
 import { createAgeTransition } from './jobs/age-transition';
+import { createChatDeadlines } from './jobs/chat-deadlines';
 import { createGameDeadlines } from './jobs/game-deadlines';
 import {
   createAgeTransitionJob,
+  createChatDeadlinesJob,
   createGameDeadlinesJob,
   createMatchingJob,
   createOutboxJob,
+  createRetentionJob,
 } from './jobs/jobs';
 import { workerPlanner } from './jobs/matching-planner';
+import { createRetention } from './jobs/retention';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
+import { createChatService } from './services/chat';
 import { createGameService } from './services/game';
 import { createMatchesService } from './services/matches';
 import { createMatchingService } from './services/matching';
 import { createOutboxSender } from './services/outbox-sender';
 import { createProfileService } from './services/profile';
+import { createRelayService, type RelayTelegram } from './services/relay';
+import { createRevealService } from './services/reveal';
 import { DEV_SYNTHETIC_USERNAME, createUsernames } from './services/usernames';
 
 let config: Config;
@@ -64,6 +75,7 @@ const db = createDb(pool);
 const users = createUsersRepository(db);
 const matches = createMatchesRepository(db);
 const games = createGamesRepository(db);
+const chat = createChatRepository(db);
 
 const profile = createProfileService({
   users,
@@ -72,6 +84,44 @@ const profile = createProfileService({
   clock,
   u18PoolEnabled: config.u18PoolEnabled,
 });
+
+// The bot is created after the services its handlers use, and they talk to Telegram through it:
+// these two objects reach `bot.api` only when a message is actually sent.
+// New plain-text messages only: no parse_mode, never forwardMessage or copyMessage.
+const relayTelegram: RelayTelegram = {
+  sendMessage: (chatId, text, options) => bot.api.sendMessage(chatId, text, options),
+};
+const usernames = createUsernames({
+  getChat: (chatId) => bot.api.getChat(chatId),
+  // Synthetic users only exist on development databases; production ignores them regardless.
+  syntheticUsername: config.nodeEnv === 'production' ? undefined : DEV_SYNTHETIC_USERNAME,
+});
+const relay = createRelayService({
+  chat,
+  users,
+  content,
+  telegram: relayTelegram,
+  clock,
+  logger,
+  params: DEFAULT_CHAT_PARAMS,
+});
+const chats = createChatService({
+  users,
+  matches,
+  chat,
+  relay,
+  telegram: relayTelegram,
+  content,
+  clock,
+  logger,
+});
+const reveal = createRevealService({
+  reveal: createRevealRepository(db),
+  usernames,
+  clock,
+  logger,
+});
+
 const app = createHttpApp({
   botToken: config.botToken,
   initData: config.initData,
@@ -80,13 +130,22 @@ const app = createHttpApp({
   profile,
   matches: createMatchesService({ users, matches, content, clock }),
   game: createGameService({ users, matches, games, content, clock }),
+  chat: chats,
 });
-const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger, users });
-// The current username, read from Telegram, for the one notification that reveals it.
-const usernames = createUsernames({
-  getChat: (chatId) => bot.api.getChat(chatId),
-  // Synthetic users only exist on development databases; production ignores them regardless.
-  syntheticUsername: config.nodeEnv === 'production' ? undefined : DEV_SYNTHETIC_USERNAME,
+const bot = createBot({
+  token: config.botToken,
+  miniAppUrl: config.miniAppUrl,
+  logger,
+  users,
+  chat: {
+    chat,
+    relay,
+    chats,
+    reveal,
+    content,
+    miniAppUrl: config.miniAppUrl,
+    maxLength: DEFAULT_CHAT_PARAMS.maxLength,
+  },
 });
 
 const matching = createMatchingService({
@@ -136,6 +195,11 @@ const scheduler = createScheduler({
       pool,
       deadlines: createGameDeadlines({ games, clock, logger, params: DEFAULT_GAME_PARAMS }),
     }),
+    createChatDeadlinesJob({
+      pool,
+      deadlines: createChatDeadlines({ chat, clock, logger, params: DEFAULT_CHAT_PARAMS }),
+    }),
+    createRetentionJob({ pool, retention: createRetention({ chat, clock, logger }) }),
     createOutboxJob({ pool, sender }),
   ],
 });
@@ -178,6 +242,10 @@ try {
   logger.fatal({ err: error }, 'bot initialisation failed (check BOT_TOKEN)');
   await shutdown(1);
 }
+// The command menu, per locale. The bot works without it, so a failure is only logged.
+registerCommands(bot.api).catch((error: unknown) =>
+  logger.warn({ err: error }, 'bot commands not registered'),
+);
 
 scheduler.start();
 bot

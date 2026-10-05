@@ -1,7 +1,7 @@
 {
   "bot.start.greeting": "Hi, {name}! This is SameSync. People meet here through shared tastes and opinions, not photos.\n\nOpen the app to get started.",
   "bot.start.open_app": "Open SameSync",
-  "bot.help": "SameSync matches people by shared interests and opinions.\n\n/start — open the app\n/help — this message",
+  "bot.help": "SameSync matches people by shared interests and opinions.\n\n/start — open the app\n/chats — my chats\n/leave — end a chat\n/reveal — exchange usernames (18+)\n/help — this message\n\nTo write in a chat, reply to a message from it or just send text.",
   "bot.match.new": "New match! {teaser}",
   "bot.match.open": "Open",
   "bot.game.turn": "Your turn! {alias} has already guessed your answers. Now you guess theirs.",

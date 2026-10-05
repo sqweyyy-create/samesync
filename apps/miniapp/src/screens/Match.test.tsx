@@ -18,6 +18,7 @@ const MATCH: MatchSummary = {
   resultsReadyAt: null,
   chatDeadlineAt: null,
   game: { questions: 3, youDone: false, theyDone: false },
+  chat: true,
 };
 const WAITING: MatchSummary = { ...MATCH, game: { questions: 3, youDone: true, theyDone: false } };
 const READY: MatchSummary = {
