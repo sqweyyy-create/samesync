@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @samesync/server --filter @samesync/miniapp run dev",
+    "dev:up": "pnpm --filter @samesync/server run dev:up",
+    "dev:down": "pnpm --filter @samesync/server run dev:down",
     "dev:scenario": "pnpm --filter @samesync/server run dev:scenario",
     "dev:initdata": "pnpm --filter @samesync/server run dev:initdata",
     "dev:population": "pnpm --filter @samesync/server run dev:population",

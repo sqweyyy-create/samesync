@@ -10,3 +10,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local dev tooling state (pnpm dev:up): tunnel log, PIDs, the .env backup
+.dev/
