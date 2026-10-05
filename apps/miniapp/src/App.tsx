@@ -195,6 +195,7 @@ export function App({
             api={api}
             matchId={openMatch.id}
             match={openMatch.match}
+            onOpenChat={platform.close}
             onBack={() => setOpenMatch(null)}
           />
         );

@@ -12,6 +12,8 @@ export interface Platform {
   readonly allowsWriteToPm: () => boolean | undefined;
   /** Asks Telegram to let the bot message the user. Resolves true if allowed. */
   readonly requestWriteAccess: () => Promise<boolean>;
+  /** Closes the Mini App: the user is back in the chat it was opened from, the bot's. */
+  readonly close: () => void;
 }
 
 /** Reads a field of the `user` object in raw initData, without trusting it for anything else. */

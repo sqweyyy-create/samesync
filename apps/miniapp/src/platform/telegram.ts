@@ -17,6 +17,7 @@ const OUTSIDE_TELEGRAM: Platform = {
   ready: () => undefined,
   allowsWriteToPm: () => undefined,
   requestWriteAccess: () => Promise.resolve(false),
+  close: () => undefined,
 };
 
 /**
@@ -58,5 +59,6 @@ export function createTelegramPlatform(): Platform {
         return false;
       }
     },
+    close: () => void miniApp.close.ifAvailable(),
   };
 }

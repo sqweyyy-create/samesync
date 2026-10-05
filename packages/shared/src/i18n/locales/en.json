@@ -213,7 +213,6 @@
   "miniapp.results.closing": "You split on this one. Ask why.",
   "miniapp.results.opener": "First message",
   "miniapp.results.send": "Message",
-  "miniapp.results.send_soon": "Chat in the bot opens soon: you'll be able to send it then.",
   "miniapp.results.sent": "Sent! The chat continues in the bot.",
   "miniapp.results.to_chat": "Go to the chat",
   "miniapp.results.chat_active": "The chat is already going on in the bot.",

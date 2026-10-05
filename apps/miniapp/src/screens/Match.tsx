@@ -22,6 +22,10 @@ const STATE_HINT: Partial<Record<Stage, MessageKey>> = {
   results: 'miniapp.match.state.results',
 };
 
+/** What the list says about a match: whose turn it is, or that the chat is going on in the bot. */
+const hintOf = (match: MatchSummary): MessageKey | undefined =>
+  match.status === 'active' ? 'miniapp.match.state.chat' : STATE_HINT[stageOf(match)];
+
 /** The matches the user has right now: who (an alias), what they share, and whose turn it is. */
 export function MatchList({
   api,
@@ -42,7 +46,7 @@ export function MatchList({
     <>
       <h2>{t('miniapp.matches.title')}</h2>
       {matches.map((match) => {
-        const hint = STATE_HINT[stageOf(match)];
+        const hint = hintOf(match);
         return (
           <button key={match.id} type="button" className="choice" onClick={() => onOpen(match)}>
             <span>{`${match.alias.emoji} ${match.alias.name}`}</span>
@@ -57,7 +61,8 @@ export function MatchList({
 
 /**
  * One match, from the teaser to the results: play the game, wait for the other person, then see
- * how well you read each other. Opened from the list, or straight from a bot notification by ID.
+ * how well you read each other and send the first message. Opened from the list, or straight from
+ * a bot notification by ID.
  * While waiting, the match is looked up again whenever the app comes back to the foreground
  * (there are no WebSockets).
  */
@@ -65,11 +70,14 @@ export function Match({
   api,
   match: known,
   matchId,
+  onOpenChat,
   onBack,
 }: {
   api: ApiClient;
   match?: MatchSummary | undefined;
   matchId: string;
+  /** Leaves the Mini App for the bot chat. */
+  onOpenChat: () => void;
   onBack: () => void;
 }) {
   const t = useT();
@@ -118,7 +126,17 @@ export function Match({
 
   const alias = `${match.alias.emoji} ${match.alias.name}`;
   if (stage === 'results') {
-    return <Results api={api} matchId={match.id} alias={alias} onStale={stale} onBack={onBack} />;
+    return (
+      <Results
+        api={api}
+        match={match}
+        alias={alias}
+        onSent={setMatch}
+        onStale={stale}
+        onOpenChat={onOpenChat}
+        onBack={onBack}
+      />
+    );
   }
   if (stage === 'play' && playing) {
     return (

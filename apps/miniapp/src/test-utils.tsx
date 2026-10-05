@@ -68,6 +68,7 @@ export function fakeApi(over: Partial<{ [K in keyof ApiClient]: ApiClient[K] }> 
     game: vi.fn(unused),
     submitPredictions: vi.fn(unused),
     results: vi.fn(unused),
+    sendMessage: vi.fn(unused),
     ...over,
   };
 }
@@ -80,6 +81,7 @@ export function fakePlatform(over: Partial<Platform> = {}): Platform {
     ready: () => undefined,
     allowsWriteToPm: () => true,
     requestWriteAccess: vi.fn(() => Promise.resolve(true)),
+    close: vi.fn(),
     ...over,
   };
 }

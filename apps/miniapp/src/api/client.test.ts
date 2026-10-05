@@ -130,6 +130,46 @@ describe('createApiClient', () => {
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ predictions }));
   });
 
+  it('sends a message to a match and reads the match back, with the new error codes', async () => {
+    const id = '01a10238-d68a-76a8-87cc-960f650dd8c3';
+    const match = {
+      id,
+      alias: { emoji: '🦊', name: 'Лиса' },
+      teaser: 'У кого-то в плейлисте тоже Молчат Дома.',
+      status: 'active',
+      createdAt: '2026-10-03T10:00:00.000Z',
+      gameDeadlineAt: '2026-10-05T10:00:00.000Z',
+      resultsReadyAt: '2026-10-04T10:00:00.000Z',
+      chatDeadlineAt: null,
+      game: { questions: 5, youDone: true, theyDone: true },
+      chat: true,
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(match))
+      .mockResolvedValueOnce(json({ error: 'rate_limited' }, 429))
+      .mockResolvedValueOnce(json({ error: 'unavailable' }, 503))
+      // A match without the chat flag is not what the contract promises.
+      .mockResolvedValueOnce(json({ ...match, chat: undefined }));
+    const api = createApiClient({ getInitData: () => 'x', fetch: fetchMock });
+    expect(await api.sendMessage(id, 'Привет!')).toEqual({ kind: 'ok', data: match });
+    expect(await api.sendMessage(id, 'Привет!')).toEqual({
+      kind: 'error',
+      code: 'rate_limited',
+      details: [],
+    });
+    expect(await api.sendMessage(id, 'Привет!')).toEqual({
+      kind: 'error',
+      code: 'unavailable',
+      details: [],
+    });
+    expect(await api.sendMessage(id, 'Привет!')).toEqual({ kind: 'network' });
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(`/api/matches/${id}/messages`);
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe(JSON.stringify({ text: 'Привет!' }));
+  });
+
   it('maps 401 to unauthorized and does not call fetch without initData', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json({}, 401));
     expect(await createApiClient({ getInitData: () => 'x', fetch: fetchMock }).getMe()).toEqual({

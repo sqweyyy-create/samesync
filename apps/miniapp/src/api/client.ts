@@ -53,6 +53,11 @@ export interface ApiClient {
     predictions: PredictionsRequest['predictions'],
   ) => Promise<ApiResult<MatchSummary>>;
   readonly results: (matchId: string) => Promise<ApiResult<ResultsResponse>>;
+  /**
+   * Sends a message to the other person of a match through the bot (the opener, as the first
+   * message of the chat). Answers with the updated match, never with the message.
+   */
+  readonly sendMessage: (matchId: string, text: string) => Promise<ApiResult<MatchSummary>>;
 }
 
 export interface ApiClientDeps {
@@ -132,5 +137,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
         predictions,
       }),
     results: (id) => call(ResultsResponse, 'GET', `/api/matches/${encodeURIComponent(id)}/results`),
+    sendMessage: (id, text) =>
+      call(MatchSummary, 'POST', `/api/matches/${encodeURIComponent(id)}/messages`, { text }),
   };
 }
