@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** Phase 0 (scaffold), Phase 1 (onboarding), Phase 2 (matching engine) and Phase 3 (game) are done; Phase 4 (anonymous chat) is next. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phase 0 (scaffold), Phase 1 (onboarding), Phase 2 (matching engine) and Phase 3 (game) are done. Phase 4 (anonymous chat) is implemented and waiting for the product owner's manual check of the chat and the username reveal in Telegram, and for their sign-off on its safety changes; see the status table. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -123,6 +123,14 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - The other person's answers and guesses are read only through `getResultsForParticipant`, whose query selects them only once both players have finished. `GET …/game` carries the questions and nothing else.
   - Guesses are submitted once, through `GamesRepository.submitPredictions` (one transaction). The app role can't update or delete a prediction.
   - Every notification kind needs its rule in `dropReason` (`domain/notifications.ts`): what state the match must be in for the message to still be right.
+- **Chat (Phase 4):**
+  - Everything that is relayed goes through `services/relay.ts` (`send`): a message written in the bot, the first message from the Mini App, the dev tooling. It stores the message first (the `messages` insert trigger decides), reads the match and both users again right before every Telegram call, and sends a new `sendMessage` with the alias and the text, nothing else.
+  - `domain/chat/` is pure: `refusal()` says whether a message may go between two users, `chooseRoute()` where it goes (Q24), and `screen()` is the screening hook where Phase 5 plugs in the contact filter.
+  - **No chat in the `u18` band until Phase 5.** `CHAT_BANDS`, the screening hook and the `messages` trigger each refuse it on their own, and none of them looks at `U18_POOL_ENABLED`. Opening it means changing all three, with sign-off.
+  - `users.active_match_id` is a routing hint only. Never base anything on it: the relay checks the match behind it for every message.
+  - A username appears in exactly one place: the `reveal_done` notification, composed by the outbox sender, which reads it from Telegram at that moment (`services/usernames.ts`). Never store, log or pass on a username anywhere else.
+  - The text of a message never goes into a log or an error. The driver's error for a failed insert quotes its parameters, so `ChatRepository.store` replaces it.
+  - Inline button data is built and parsed by `domain/chat/callbacks.ts` (zod). It names an action and a match; the services decide whether the user may do that.
 - **Bot:**
   - Relayed text goes out as plain text with no `parse_mode`.
   - Proactive messages go through the outbox (throttled, retried, de-duplicated). Direct replies to a user's own command can be sent inline.
@@ -150,6 +158,8 @@ pnpm dev:initdata               # signed initData + a URL to open the Mini App i
 pnpm dev:population --pool adult:ru --mode friends --n 500   # synthetic users for one pool × mode
 pnpm dev:match-me <public_id>   # match a real dev user with synthetic ones and send them the bot notification
 pnpm dev:match-me <public_id> --counterpart-plays   # …and let the synthetic counterpart play, so the game can be finished alone
+pnpm dev:say <match id or alias> "<text>"   # the synthetic counterpart writes to you through the real relay (without a text: show that chat)
+pnpm dev:reveal <match id or alias>         # the synthetic counterpart consents to the username reveal
 pnpm bench:matching             # 5,000-user matching run on a throwaway database (manual benchmark)
 pnpm lint && pnpm typecheck && pnpm test
 pnpm test:safety                # pool isolation and minor-safety suites only
@@ -161,7 +171,7 @@ pnpm format                     # Prettier --write (pnpm lint runs --check)
 
 After any content change: bump `content/release.json`, run `pnpm content:lock`, then `pnpm content:seed`. The server checks at startup that the seeded release matches the files. After pulling changes, run `pnpm db:migrate` and `pnpm content:seed` again.
 
-The dev tooling (`dev:*`, `bench:matching`) refuses to run with `NODE_ENV=production`. `<public_id>` is the support code shown in the Mini App settings.
+The dev tooling (`dev:*`, `bench:matching`) refuses to run with `NODE_ENV=production`. `<public_id>` is the support code shown in the Mini App settings. An alias is the counterpart's name as the bot shows it (`Лиса`, `fox`, `a.fox` or `🦊`); `pnpm dev:say` without arguments lists the chats there are.
 
 Tests need Postgres: they read `TEST_DATABASE_URL` (owner connection to the `postgres` maintenance DB) from the environment or the root `.env`. They create and drop their own throwaway databases.
 

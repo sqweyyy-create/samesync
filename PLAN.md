@@ -1,6 +1,6 @@
 # SameSync — Implementation Plan
 
-Last updated: 2026-10-05. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
+Last updated: 2026-10-06. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
@@ -97,19 +97,21 @@ Pool isolation is enforced in six layers, so a bug in one layer can't break it:
      - no block in either direction;
      - a new match starts as `pending_game`.
    - `matches` UPDATE: the pair, the pool (band, locale, mode), the teaser and the aliases never change, and a closed match stays closed. The app role can only update the lifecycle columns.
-   - `messages` INSERT requires an open match, a sender who is a participant, both live bands equal to `matches.band`, and neither user frozen.
+   - `messages` INSERT requires a match whose chat is open (`results_ready` or `active`), a sender who is a participant, both users `active`, both live bands equal to `matches.band`, and no block in either direction. Until the contact filter exists (Phase 5) it refuses every message in a `u18` match, whatever `U18_POOL_ENABLED` says. A new message is never already delivered.
+   - `messages` UPDATE: the sender, the match and the time of a message never change; its text can only be removed (retention); the delivery and the two Telegram message IDs are written once; a message can be marked as not delivered only before it has reached anyone. The app role can write only those columns and can't delete.
    - `game_predictions` INSERT requires a match whose game is still being played (`pending_game`), a predictor who is a participant, both users `active`, both live bands equal to `matches.band`, and a question of that match's game. A player who has finished can't add another.
    - `games` UPDATE: the questions and the answer snapshot never change; a player is finished only with a prediction for every question, and stays finished.
    - `matches` UPDATE to `results_ready`: only from `pending_game`, with both players finished, both users `active` and both live bands equal to `matches.band`. A match never returns to `pending_game`.
-   - `reveal_consents` INSERT requires `matches.band = 'adult'` and both users adult right now.
+   - `matches` UPDATE to `active`: only from `results_ready`, with a delivered message, both users `active` and both live bands equal to `matches.band`. An `active` match, and a match with a delivered message, can't become `expired`.
+   - `reveal_consents` INSERT requires `matches.band = 'adult'`, an open chat, a user who is a participant, both users `active` and adult by birth date right now, and no block. `revealed_at` is set once, by an UPDATE that passes the same checks again and needs the consent of both. The app role can write nothing else of a consent and can't delete one.
 3. **State-change triggers:**
-   - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. From Phase 4 it also clears `active_match_id`. The `username` and the dating fields (gender, seeking, partner age range) are nulled by `admin_set_birth_date()` when the band becomes `u18`.
+   - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. `active_match_id` is deliberately not cleared here (Phase 4 notes): the relay checks the match behind the pointer for every message, and a pointer to a chat that has ended is how it knows to say so instead of sending the text to another chat. The `username` and the dating fields (gender, seeking, partner age range) are nulled by `admin_set_birth_date()` when the band becomes `u18`.
    - `birth_date` is write-once except through `admin_set_birth_date()`.
 4. **Repository API:**
    - Every read of another user's data goes through `getMatchForParticipant(userId, matchId)`. It checks participation, that the match is readable (not closed for `band_change`), and that live bands are equal.
    - The game uses the same scope. The other person's answers and guesses are returned only by `getResultsForParticipant`, and its query selects them only once both players have finished.
    - Candidate queries for matching always take a `PoolKey`.
-5. **Checks at send time:** the outbox sender and the relay re-check everything right before each Telegram call.
+5. **Checks at send time:** the outbox sender and the relay re-check everything right before each Telegram call: the match state, both users `active`, both live bands, and for the relay also the block. A relay retry is checked again like a first try. The one notification that carries a username is sent only for a reveal the database recorded for both users of an adult match.
 6. **Database roles:**
    - The app connects as `samesync_app`: not the owner, cannot `ALTER`, `DISABLE TRIGGER` or `SET session_replication_role`.
    - `admin_actions` is INSERT-only for that role.
@@ -129,7 +131,7 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `users` | `id`, `telegram_id` (unique), `public_id` (unique short support code), `locale`, `birth_date` (nullable until set), `age_band` (cache), `status` (`onboarding` / `active` / `waitlisted` / `ineligible` / `frozen` / `deleted`), `mode`, `gender`, `seeking[]`, `dating_age_min`, `dating_age_max` (Q12), `username` (adults only), `timezone`, `bot_reachable`, `active_match_id` (Phase 4), `onboarded_at`, `synthetic` (dev tooling only), `last_active_at`, `frozen_at` (Phase 5), `created_at` | Write-once trigger on `birth_date`. CHECKs: mode vs band, dating fields null unless `mode = 'dating'`, username vs band. Index on `(age_band, locale, mode, status)`. |
+| `users` | `id`, `telegram_id` (unique), `public_id` (unique short support code), `locale`, `birth_date` (nullable until set), `age_band` (cache), `status` (`onboarding` / `active` / `waitlisted` / `ineligible` / `frozen` / `deleted`), `mode`, `gender`, `seeking[]`, `dating_age_min`, `dating_age_max` (Q12), `username` (adults only), `timezone`, `bot_reachable`, `active_match_id` (the chat plain messages go to; a routing hint only), `onboarded_at`, `synthetic` (dev tooling only), `last_active_at`, `frozen_at` (Phase 5), `created_at` | Write-once trigger on `birth_date`. CHECKs: mode vs band, dating fields null unless `mode = 'dating'`, username vs band. Index on `(age_band, locale, mode, status)`. |
 | `answers` | PK `(user_id, question_id)`, `value` (`agree` / `disagree` / `skip`), `content_release`, `answered_at` | Index on `(question_id, value)` for rarity stats. |
 | `user_interests` | PK `(user_id, item_id)`, `added_at` | Index on `(item_id)`. |
 
@@ -162,8 +164,8 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `messages` | `id`, `match_id`, `sender_id`, `body`, `verdict` (`delivered` / `blocked_by_filter` / `rejected`), `reason`, `sender_tg_message_id`, `recipient_tg_message_id`, `created_at`, `purge_after` | Insert trigger described in §3. `recipient_tg_message_id` makes reply-to routing work. Retention per Q20. |
-| `reveal_consents` | PK `(match_id, user_id)`, `consented_at`, `revealed_at` | Adult-only trigger. |
+| `messages` | `id`, `match_id`, `sender_id`, `body` (null once purged), `verdict` (`delivered` / `blocked_by_filter` / `rejected`), `reason`, `sender_tg_message_id`, `recipient_tg_message_id`, `delivered_at`, `created_at`, `purge_after` | Insert and update triggers described in §3. `verdict = 'delivered'` means accepted for delivery; `delivered_at` is set when Telegram took the message, and a chat has started once one message has it. The two Telegram message IDs make reply-to routing work; `sender_tg_message_id` is the sender's own message, or the bot's copy of a message sent from the Mini App. UNIQUE `(sender_id, sender_tg_message_id)`: an update delivered twice is relayed once. Retention per Q20. |
+| `reveal_consents` | PK `(match_id, user_id)`, `consented_at`, `revealed_at` | Adult-only triggers (§3). No username is stored: the bot reads it from Telegram when it sends it. |
 
 ### Safety & admin
 
@@ -177,7 +179,7 @@ Conventions:
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `outbox` | `id`, `user_id`, `kind` (`match_created`, `game_turn`, `game_results`, `game_reminder`, `game_expired`), `match_id`, `payload jsonb` (i18n key + params, never rendered text), `dedupe_key` (unique), `status` (`pending` / `sent` / `failed` / `cancelled`), `attempts`, `next_attempt_at`, `sent_at`, `last_error`, `cancel_reason`, `created_at` | Rendered in the recipient's locale at send time. `cancel_reason` records why a row was dropped without sending. |
+| `outbox` | `id`, `user_id`, `kind` (`match_created`, `game_turn`, `game_results`, `game_reminder`, `game_expired`, `chat_reminder`, `chat_expired`, `chat_ended`, `reveal_request`, `reveal_done`), `match_id`, `payload jsonb` (i18n key + params, never rendered text), `dedupe_key` (unique), `status` (`pending` / `sent` / `failed` / `cancelled`), `attempts`, `next_attempt_at`, `sent_at`, `last_error`, `cancel_reason`, `created_at` | Rendered in the recipient's locale at send time. `cancel_reason` records why a row was dropped without sending. |
 | `payments` | `id`, `user_id`, `product_id`, `stars_amount`, `invoice_payload` (unique, opaque), `telegram_payment_charge_id` (unique), `status` (`pending` / `paid` / `refunded` / `expired`), `created_at`, `paid_at`, `refunded_at` | Idempotency keys are the two unique columns. |
 | `entitlements` | `id`, `user_id`, `kind`, `amount`, `valid_from`, `valid_until`, `source_payment_id`, `revoked_at` | Paid features are still undecided, so this table is generic. |
 
@@ -667,11 +669,11 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 **Out of scope.** Media in any pool (Q19), group chats, typing or read indicators, syncing edits and deletions, the contact filter and report/block (Phase 5), live chat inside the Mini App.
 
 **Acceptance criteria**
-- [ ] Two test accounts can chat through the bot. The recipient sees only the alias and the text: no "forwarded from", no name, no username, no profile link.
-- [ ] With several open matches, messages always reach the intended match (reply-to and the active pointer both work, and an ambiguous message asks).
-- [ ] A match with no messages expires exactly once at its deadline. The first message stops expiry.
-- [ ] Username reveal works only in adult matches after both consent. In `u18` matches it is impossible through the API, the bot and the DB.
-- [ ] If a participant's band changes mid-conversation, the next message is refused and the match closes, even if the age-transition job hasn't run yet.
+- [ ] Two test accounts can chat through the bot. The recipient sees only the alias and the text: no "forwarded from", no name, no username, no profile link. *(Automated: test/chat/relay.test.ts against a faked Bot API. The one call is `sendMessage`, and its whole payload is the chat, the text "alias, line break, text", the reply button and the switched-off link preview: no `parse_mode`, no entities, never `forwardMessage` or `copyMessage`. Neither side's name, username or Telegram ID appears in any call or log line. Pending: the product owner's check in Telegram, with `pnpm dev:say` as the second account.)*
+- [ ] With several open matches, messages always reach the intended match (reply-to and the active pointer both work, and an ambiguous message asks). *(Automated: src/domain/chat/relay.test.ts for the rule; test/chat/routing.test.ts through the real bot: a reply beats the active chat, a plain message goes to the active chat, a message that could mean several chats is asked about and sent once, and a message into a chat that has ended is refused and never moved to another chat. Pending: the product owner's check in Telegram, because it rests on how Telegram reports replies and button presses.)*
+- [x] A match with no messages expires exactly once at its deadline. The first message stops expiry. *(test/chat/expiry.test.ts: expiry at the deadline and not a millisecond before, one notice each, idempotent reruns, the one reminder, a first message that stops expiry for good, an undelivered message that doesn't; test/safety/chat-isolation.test.ts: the database refuses to expire a chat that has started.)*
+- [ ] Username reveal works only in adult matches after both consent. In `u18` matches it is impossible through the API, the bot and the DB. *(Automated: test/chat/reveal.test.ts: one consent reveals nothing, both do, with the username Telegram reports at that moment; test/safety/u18-no-username.test.ts drives everything two u18 users can do, forged buttons and forged outbox rows included, and finds no username, name or Telegram ID anywhere; test/safety/chat-isolation.test.ts and outbox-recheck.test.ts for the database and the sender. Pending: the product owner's check of the adult flow in Telegram, with `pnpm dev:reveal`.)*
+- [x] If a participant's band changes mid-conversation, the next message is refused and the match closes, even if the age-transition job hasn't run yet. *(test/safety/chat-isolation.test.ts: with a stale cached band the message is refused and the same message closes the match with `band_change`, for the sender's band and the recipient's, by reply, by the active chat and through the API; after an admin correction the match is closed already and nothing is relayed either way.)*
 
 **Tests that prove it**
 - `apps/server/test/chat/relay.test.ts` (grammY harness):
@@ -688,6 +690,57 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
   - nothing is relayed to or from a frozen user.
 - `apps/server/test/safety/u18-no-username.test.ts`: a leak scanner. It drives a full `u18` conversation, including `/reveal` attempts, through the harness and asserts that neither side's username, first name, last name or `telegram_id` appears in any captured outgoing API call or API response.
 - `apps/server/test/safety/u18-text-only.test.ts`: photo, voice, video, sticker, document, contact, location and text with entities are all rejected without delivery; `reveal_consents` insert fails for `u18`.
+
+**Phase 4 implementation notes (2026-10-06).** Deviations from, and additions to, the scope above:
+- **No chat in the `u18` band yet (Phase 4 brief).** Every `u18` message has to pass the contact filter (CLAUDE.md invariant 5), and the filter is Phase 5. Until then nothing is relayed in a `u18` match, and that is refused three times over, none of them looking at `U18_POOL_ENABLED`:
+  - the relay's validation (`CHAT_BANDS` in `domain/chat/params.ts` lists the bands that can chat: `adult`);
+  - the screening hook, which demands a contact filter for `u18` and has none;
+  - the `messages` insert trigger (`message rejected: u18_chat_closed`).
+
+  Phase 5 has to lift all three on purpose; the trigger needs a migration that replaces `messages_guard_insert()`, with sign-off. Consequences now: a `u18` match shows "chat isn't available yet" in the Mini App, gets no reminder, and expires at its chat deadline like a chat nobody wrote in. The planned `u18` conversation tests (the leak scanner and the text-only suite) therefore prove that nothing is delivered and nothing leaks; the screening hook is also tested on its own with a filter plugged in.
+- **Data model (§4 is updated):**
+  - `messages.delivered_at` is new. `verdict = 'delivered'` means the message was accepted for delivery; `delivered_at` is written when Telegram took it (or when it was skipped for a synthetic recipient). A chat has started once one message has it. Without the column a process that died between storing and sending would leave a message that looks delivered, and the match could neither start nor expire.
+  - Only accepted messages are stored. A delivery that fails turns the row into `rejected` with the reason (`unreachable`, `send_failed`, or what the re-check found). `blocked_by_filter` is for Phase 5.
+  - `messages.sender_tg_message_id` is the sender's own Telegram message, or the bot's copy of a message that was sent from the Mini App.
+- **Safety SQL (§3 is updated):**
+  - Migration 0009: the tables `messages` and `reveal_consents`, the column `users.active_match_id`, the CHECK `matches_active_fields` (an `active` match has its first message and no chat deadline) and the index on the chat deadline. It closes any match that claims to be `active` already (none can exist; reason `admin`, like migration 0006).
+  - Migration 0010: the trigger functions `messages_guard_insert()`, `messages_guard_update()`, `reveal_consents_guard_insert()`, `reveal_consents_guard_update()` and `matches_guard_chat_status()` with their triggers, and the grants. They are new; no earlier function or trigger was replaced, dropped or disabled.
+  - Migration 0011: five new `outbox_kind` values.
+  - **`active_match_id` is not cleared when a match ends**, which §3 had planned for the state-change trigger. Clearing it there would make a freeze or a band change take locks on other users' rows while holding the match, the opposite order of the triggers that already exist, and two such transactions could then block each other. It would also lose information: a pointer to a chat that has ended is how the relay knows to tell the user "this chat has ended" instead of sending their text to the one chat that is left. The pointer is a routing hint and nothing else: the relay checks the match behind it for every message, and clears it on first use. Nothing in the database stops it from naming any match, and test/safety/chat-isolation.test.ts shows that this gains nobody anything.
+  - The trigger functions read the two users without locking them, like `matches_guard_game_status()`; only the match row is locked. The relay reads both users again right before the Telegram call.
+- **The relay (`services/relay.ts`):**
+  - The order is the planned one, with the text check moved to the front (a photo needs no routing): text and length, sender, target, validation, rate limit, screening, store, send, start of the chat.
+  - Right before every Telegram call the match and both users are read again, also before a retry. One retry is made, and only after a rate-limit answer of at most 3 seconds. Any other failure, and a recipient the bot can't reach, means "not delivered": the sender is told, without a reason.
+  - A message to a synthetic user is stored and counted as delivered, and never sent.
+  - A live band that differs from the band of the match closes the match with the message that finds out (`band_change`): the match first, then both users' cached bands, so that a cache that can't be rewritten doesn't keep the match open.
+  - Adults' entities are dropped, not refused: the recipient gets the characters. Link previews are switched off. A NUL character counts as "not text".
+  - The text of a message never goes into an error message: the driver's error for a failed insert quotes its parameters, so the repository replaces it.
+- **Routing (Q24):**
+  - The active chat is set by sending the opener from the Mini App, by choosing in the picker, by the "Ответить" button under a relayed message, by `/chats`, and by the first message when only one chat is open. A reply does not move it.
+  - When the active chat has ended, the sender is told and asked where to send the message. It is never moved to another chat on its own, also when only one is left.
+  - The picker keeps no state: its question is a reply to the user's message, and the button that is pressed finds the text through it. One Telegram message is relayed at most once (the UNIQUE on `messages`), whichever buttons are pressed afterwards.
+  - One line "→ alias" tells the sender where a message went when it went to another chat than the latest message in their bot chat (Q39).
+- **Bot:**
+  - `/chats`, `/leave`, `/reveal`, and the menu registered for `ru`, `en` and as the default (English). `/leave` and `/reveal` always ask to confirm, and with several chats they ask which one first.
+  - `/leave` ends a chat (`results_ready` or `active`), not a game that is still being played. The other person gets "This chat has ended (alias)" once, through the outbox.
+  - A command the bot doesn't have is answered and never relayed. An edit is answered only if the message had been relayed. Messages Telegram writes itself (a granted write access, a pinned message…) are ignored.
+  - Button data is `c:<action>:<match id>`, validated with zod; it names an action and a match and nothing else.
+- **First message from the Mini App:**
+  - `POST /api/matches/:id/messages` with `{ text }` answers with the match as it is afterwards, never with the message. New error codes: `rate_limited` (429) and `unavailable` (503, Telegram didn't take the message). A match that isn't readable for the caller answers 404, like the other endpoints of a match.
+  - `MatchSummary.chat` says whether the match can have a chat at all. The composer is shown while the status is `results_ready`; afterwards the screen points to the bot ("Перейти в чат" closes the Mini App).
+  - The sender's bot chat gets a copy ("Ты → alias", then the text), so the conversation that continues there has its first line, and a reply to the copy is routed to that chat.
+  - Initial JS is 97.1 KB gzip.
+- **Reveal (Q25):**
+  - `/reveal` shows a question that names the alias; "Согласиться" records the consent, "Не сейчас" stores nothing and tells nobody (Q38). The first consent queues one question to the other person, once per match.
+  - A consent of someone without a username is recorded, and nothing else happens until they have one and send `/reveal` again: the other person is not asked yet.
+  - No username passes through a service or the database. When both have consented, the service asks Telegram whether each has a username, the database marks both consents revealed in one statement (the trigger checks both live bands again), and two `reveal_done` notifications are queued. The outbox sender reads the other person's username from Telegram at that moment, and it is the only code that puts a username into a message. If the username is gone by then, that one message is dropped.
+  - There is no reveal in the HTTP API. After a reveal the chat stays open and still shows aliases only.
+- **Notifications:** five new kinds, each with its rule in `dropReason`. A reveal kind is dropped in any band but `adult`; `chat_ended` is sent only for a chat the other person left; the chat reminder only while nobody has written and only where the recipient could write.
+- **Jobs:** `chat-deadlines` every minute (start a chat whose first message was delivered just before a crash, expire, remind) and `retention` every hour, each under its own advisory lock. Expiry leaves a match alone while a message is on its way (accepted less than two minutes ago).
+- **Dev tooling:** `pnpm dev:say <match id or alias> "<text>"` lets the synthetic counterpart write through the real relay (without a text it prints the chat, which is how to see what the synthetic side "received"); `pnpm dev:reveal <match id or alias>` makes it consent through the real reveal service. Outside production a synthetic user "has" the username `@synthetic_user`; in production it has none.
+- **Tests beyond the planned list:** test/chat/leave.test.ts (leaving, the command menu), test/scripts/dev-chat.test.ts, a block of chat kinds in test/safety/outbox-recheck.test.ts, the upgrade and grants tests in test/db/migrations.test.ts, and the Mini App tests of the results screen.
+- **Open questions:** Q1, Q20 and Q25 are implemented as their provisional defaults. Q36–Q39 were raised in this phase and are implemented as their provisional defaults.
+- **Local setup after pulling Phase 4:** run `pnpm db:migrate` (migrations 0009–0011) before `pnpm dev`; a server that is already running with the new code logs errors from the chat jobs until then. The content did not change. Right after the migration the chat deadlines apply to matches whose results were already ready (their deadline was set in Phase 3): one whose results are older than 48 hours expires at the first run of the job and both users get the expiry notice, and one in its last 12 hours gets the reminder at once.
 
 ---
 
@@ -837,7 +890,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 Each question lists a *provisional* default used until it is answered (implemented as config or content where possible) and the phase that needs the answer.
 
 **Product & core loop**
-- **Q1. Is the game required before chatting?** The loop implies yes, but it isn't stated. *Provisional:* yes; chat opens at `results_ready`. Phase 3 is built this way. *Needed by:* Phase 4.
+- **Q1. Is the game required before chatting?** The loop implies yes, but it isn't stated. *Provisional:* yes; chat opens at `results_ready`. Phases 3 and 4 are built this way. *Needed by:* Phase 4.
 - **Q2. When does the 48h clock start, and what about later silence?** ✅ **Decided (2026-10-02, product owner):** the game has 48h from match creation; chat has 48h from `results_ready` if no message is sent; nothing expires after the first message; one reminder each.
 - **Q3. How many game questions?** "Several". *Provisional:* 5, including the closing split (a constant in `domain/game/params.ts`, implemented in Phase 3). *Needed by:* G1.
 - **Q4. Is the opener template-based or LLM-generated, and can the user edit it?** "Pre-generated" is ambiguous, and no LLM is in the stack. An LLM would also send minors' data to a third party. *Provisional:* per-take templates in `content/`, editable before sending (implemented in Phase 3; the product owner authored an opener for each side of every take). *Needed by:* Phase 4.
@@ -860,14 +913,18 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q17. Policy for birth-date corrections.** How do users ask (provisional `/support`), what proof is needed, and do adult → `u18` corrections (a grooming vector) need extra scrutiny, such as a second admin? *Needed by:* Phase 5.
 - **Q18. Auto-freeze settings.** The value of N, the window, a lower threshold for `u18`, and whether age-misrepresentation reports freeze sooner. *Provisional:* 3 distinct reporters in 30 days (adults), 2 (`u18`); age-misrepresentation reports alert admins immediately but count normally. *Needed by:* Phase 5.
 - **Q19. 18+ chat content.** The spec restricts media only for `u18`. Is adult chat text-only too? Should contacts be filtered in adult chat before a reveal? ✅ **Decided (2026-10-05, product owner):** the provisional answer is accepted. Adult chat is plain text only, the same as `u18`, and contacts are not filtered in adult chat.
-- **Q20. Retention.** How long are message bodies, report evidence and filtered (blocked) message bodies kept? Moderation needs evidence, and privacy argues for less. *Provisional:* messages 30 days; evidence until the report is resolved + 90 days; filtered bodies stored with the same retention and shown to admins only inside reports. *Needed by:* Phase 4.
+- **Q20. Retention.** How long are message bodies, report evidence and filtered (blocked) message bodies kept? Moderation needs evidence, and privacy argues for less. *Provisional:* messages 30 days; evidence until the report is resolved + 90 days; filtered bodies stored with the same retention and shown to admins only inside reports. Phase 4 implements the 30 days for messages (a constant in `domain/chat/params.ts`; the hourly purge removes the text and keeps the row). *Needed by:* Phase 4.
 - **Q21. Age verification beyond self-declaration.** Adults posing as minors is the biggest residual risk (§9). *Provisional:* none in the MVP; the risk is accepted, documented and reduced as §9 describes. *Needed by:* G3.
 - **Q22. Quiet hours.** Should there be no notifications at night, especially for minors? That needs the user's timezone, which Telegram doesn't provide. ✅ **Decided (2026-10-03, product owner), differently from the provisional answer:** notifications are never held. Between 23:00 and 08:00 in the user's local time they are sent immediately but silently (`disable_notification: true`); at other times they are sent normally. The local time comes from the IANA timezone the Mini App reports (`Intl`).
 - **Q23. Account deletion and data export.** Not in the spec, but likely legally required. *Provisional:* `/delete` in Phase 5 (anonymize, keep only safety and audit records); export postponed. *Needed by:* Phase 5.
 
 **Chat**
 - **Q24. Routing between several chats in one bot DM.** Bot API 9.3 added topics in private chats with bots (one topic per match would be the cleanest UX), but there are reports of regressions in 2026. ✅ **Decided (2026-10-05, product owner):** the provisional answer is accepted. All chats share one bot DM. Every relayed message is labeled with the counterpart's alias. A reply is routed by the message it replies to, and a message that isn't a reply goes to the `active_match_id` pointer. Telegram's private-chat topics are not used.
-- **Q25. Reveal edge cases.** What if a user has no username? Does the relay chat stay open after a reveal? *Provisional:* a username is required (the user is asked to set one); the chat stays open until someone leaves. *Needed by:* Phase 4.
+- **Q25. Reveal edge cases.** What if a user has no username? Does the relay chat stay open after a reveal? *Provisional:* a username is required (the user is asked to set one); the chat stays open until someone leaves. Phase 4 is built this way. *Needed by:* Phase 4.
+- **Q36. Does a chat stop when one of the two switches language?** The Phase 4 brief asks the relay to re-check "same locale" before every call, and Q13 (decided) says a language change affects future matches only. *Provisional:* Q13 wins. An existing chat goes on after a switch, and each side gets the alias and the buttons in their own current language. The check exists as one switch (`requireSameLocale` in `domain/chat/params.ts`, off), and both behaviours are tested. *Needed by:* the Phase 4 sign-off.
+- **Q37. When is the chat reminder sent, and to whom?** Q2 decided "one reminder each" but not the moment. *Provisional:* 12 hours before the chat deadline, to both (either of them can write first), like the game reminder (Q34); a constant in `domain/chat/params.ts`. *Needed by:* G1.
+- **Q38. Can a consent to reveal be taken back before the other person agrees?** *Provisional:* no. "Not now" stores nothing. A consent that was given stands while the chat is open, and leaving the chat voids it, because a chat that has ended reveals nothing. *Needed by:* G2.
+- **Q39. Is the sender told where a message went when several chats are open?** Q24 sends a plain message to the active chat, also when another chat wrote last. *Provisional:* the bot answers with one line ("→ alias") when a message went to another chat than the latest message in the user's bot chat, and stays quiet otherwise. *Needed by:* G1.
 
 **Monetization**
 - **Q26. Are purchases allowed in the under-18 pool?** (Raised in the spec.) *Provisional:* off, through a per-band `bands_allowed` on each product. *Needed by:* G4.
