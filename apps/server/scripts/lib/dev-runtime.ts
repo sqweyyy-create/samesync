@@ -20,8 +20,13 @@ export function fail(message: string): never {
   process.exit(1);
 }
 
-/** The app-role connection the server itself uses, and the content it serves. */
-export async function connect(): Promise<{ db: pg.Pool; content: ContentStore }> {
+/**
+ * The app-role connection the server itself uses, and the content it serves. `max` is the size of
+ * the connection pool: a script that holds advisory locks while it works needs a few more.
+ */
+export async function connect(
+  options: { max?: number } = {},
+): Promise<{ db: pg.Pool; content: ContentStore }> {
   const env = z
     .object({
       DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//),
@@ -33,7 +38,7 @@ export async function connect(): Promise<{ db: pg.Pool; content: ContentStore }>
   }
   const bundle = await loadValidContent(env.data.CONTENT_DIR);
   const content = createContentStore(bundle, contentChecksum(bundle));
-  const db = new pg.Pool({ connectionString: env.data.DATABASE_URL, max: 4 });
+  const db = new pg.Pool({ connectionString: env.data.DATABASE_URL, max: options.max ?? 4 });
   try {
     await assertContentSeeded(db, content.release, content.checksum);
   } catch (error) {

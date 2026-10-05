@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "db:migrate": "tsx --env-file-if-exists=../../.env scripts/migrate.ts",
     "db:generate": "drizzle-kit generate",
+    "dev:scenario": "tsx --env-file-if-exists=../../.env scripts/dev-scenario.ts",
     "dev:initdata": "tsx --env-file-if-exists=../../.env scripts/dev-initdata.ts",
     "dev:population": "tsx --env-file-if-exists=../../.env scripts/dev-population.ts",
     "dev:match-me": "tsx --env-file-if-exists=../../.env scripts/dev-match-me.ts",
