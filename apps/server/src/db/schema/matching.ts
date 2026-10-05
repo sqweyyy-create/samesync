@@ -128,6 +128,15 @@ export const matches = pgTable(
     index('matches_open_b_idx')
       .on(t.userBId)
       .where(sql`${t.status} IN ${OPEN}`),
+    // A chat that has started has its first message and no deadline any more (Q2).
+    check(
+      'matches_active_fields',
+      sql`${t.status} <> 'active' OR (${t.firstMessageAt} IS NOT NULL AND ${t.chatDeadlineAt} IS NULL)`,
+    ),
+    // The deadlines job looks every minute for chats nobody wrote in before the window closed.
+    index('matches_chat_deadline_idx')
+      .on(t.chatDeadlineAt)
+      .where(sql`${t.status} = 'results_ready'`),
     // The deadlines job looks every minute for games that are overdue or about to be.
     index('matches_game_deadline_idx')
       .on(t.gameDeadlineAt)

@@ -11,6 +11,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createGamesRepository } from '../../src/db/repositories/games';
+import { insertDeliveredMessage, startChat } from '../support/chat';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import {
   GAME_QUESTIONS,
@@ -378,12 +379,14 @@ describe('results become ready', () => {
   });
 
   it('once: the game cannot start over, and results cannot be "ready" again from another state', async () => {
-    const { matchId } = await finished();
+    const { matchId, a } = await finished();
     await toResultsReady(testDb.appPool, matchId);
     await expect(
       testDb.appPool.query("UPDATE matches SET status = 'pending_game' WHERE id = $1", [matchId]),
     ).rejects.toMatchObject(statusRefused('game_cannot_restart'));
-    await testDb.appPool.query("UPDATE matches SET status = 'active' WHERE id = $1", [matchId]);
+    // Since Phase 4 a match becomes active only when its chat starts with a delivered message.
+    await insertDeliveredMessage(testDb.appPool, { matchId, senderId: a });
+    await startChat(testDb.appPool, matchId);
     await expect(toResultsReady(testDb.appPool, matchId)).rejects.toMatchObject(
       statusRefused('not_pending_game'),
     );

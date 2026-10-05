@@ -64,6 +64,20 @@
       "when": 1791140184208,
       "tag": "0008_game_deadline_index",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791218981288,
+      "tag": "0009_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791218981561,
+      "tag": "0010_chat_safety",
+      "breakpoints": true
     }
   ]
 }

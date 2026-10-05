@@ -169,6 +169,84 @@ describe('upgrading a Phase 2 database (migration 0006)', () => {
   });
 });
 
+describe('upgrading a Phase 3 database (migration 0009)', () => {
+  let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
+  let owner: pg.Pool;
+  let phase3: string;
+
+  beforeAll(async () => {
+    db = await createEmptyDatabase();
+    owner = new pg.Pool({ connectionString: db.url, max: 1 });
+    phase3 = await migrationsUpTo(9);
+  });
+  afterAll(async () => {
+    await owner.end();
+    await db.drop();
+    await rm(phase3, { recursive: true, force: true });
+  });
+
+  it('closes a match that claims to be active without a chat, and keeps every other match', async () => {
+    await runMigrations(db.url, phase3);
+    const user = async (telegramId: number) =>
+      (
+        await owner.query<{ id: string }>(
+          `INSERT INTO users (id, telegram_id, public_id, locale, status, birth_date, mode, last_active_at)
+           VALUES (gen_random_uuid(), $1, $2, 'ru', 'active', $3, 'friends', now()) RETURNING id`,
+          [telegramId, String(telegramId).padStart(10, '0'), birthDateYearsAgo(25)],
+        )
+      ).rows[0]!.id;
+    // Before the chat existed nothing guarded the status, so a plain UPDATE could set anything.
+    const match = async (first: string, second: string, status: string) => {
+      const [a, b] = first < second ? [first, second] : [second, first];
+      const { rows } = await owner.query<{ id: string }>(
+        `INSERT INTO matches (id, band, locale, mode, user_a_id, user_b_id, tier, score, teaser,
+           alias_a, alias_b, game_deadline_at)
+         VALUES (gen_random_uuid(), 'adult', 'ru', 'friends', $1, $2, 1, 1, '{}', 'a.fox', 'a.owl',
+           now() + interval '48 hours') RETURNING id`,
+        [a, b],
+      );
+      const id = rows[0]!.id;
+      await owner.query('ALTER TABLE matches DISABLE TRIGGER matches_20_guard_game_status');
+      await owner.query(
+        `UPDATE matches SET status = $2, results_ready_at = now(),
+           chat_deadline_at = now() + interval '48 hours' WHERE id = $1`,
+        [id, status],
+      );
+      await owner.query('ALTER TABLE matches ENABLE TRIGGER matches_20_guard_game_status');
+      await owner.query(
+        `INSERT INTO outbox (id, user_id, kind, match_id, dedupe_key)
+         VALUES (gen_random_uuid(), $1, 'game_results', $2, $3)`,
+        [a, id, `game_results:${id}:${a}`],
+      );
+      return id;
+    };
+    const [u1, u2, u3] = [await user(1), await user(2), await user(3)];
+    const active = await match(u1, u2, 'active');
+    const ready = await match(u1, u3, 'results_ready');
+
+    await runMigrations(db.url);
+
+    const matches = await owner.query(
+      'SELECT id, status::text AS status, close_reason::text AS close_reason FROM matches ORDER BY id',
+    );
+    expect(matches.rows).toEqual(
+      [
+        { id: active, status: 'closed', close_reason: 'admin' },
+        { id: ready, status: 'results_ready', close_reason: null },
+      ].sort((x, y) => (x.id < y.id ? -1 : 1)),
+    );
+    const outbox = await owner.query(
+      'SELECT match_id, status::text AS status, cancel_reason FROM outbox ORDER BY match_id',
+    );
+    expect(outbox.rows).toEqual(
+      [
+        { match_id: active, status: 'cancelled', cancel_reason: 'admin' },
+        { match_id: ready, status: 'pending', cancel_reason: null },
+      ].sort((x, y) => (x.match_id < y.match_id ? -1 : 1)),
+    );
+  });
+});
+
 describe('migrations', () => {
   let db: Awaited<ReturnType<typeof createEmptyDatabase>>;
   let owner: pg.Pool;
@@ -208,8 +286,10 @@ describe('migrations', () => {
       'interest_items',
       'match_runs',
       'matches',
+      'messages',
       'outbox',
       'questions',
+      'reveal_consents',
       'user_interests',
       'users',
     ]);
@@ -339,6 +419,43 @@ describe('migrations', () => {
       await expectDenied('ALTER TABLE matches DISABLE TRIGGER matches_20_guard_game_status');
     });
 
+    it('can store a message and record its delivery, and never rewrite or delete one', async () => {
+      await app.query('SELECT 1 FROM messages');
+      await app.query(
+        "INSERT INTO messages (id, match_id, sender_id, body, verdict, purge_after) SELECT gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'x', 'delivered', now() WHERE false",
+      );
+      await app.query(
+        "UPDATE messages SET body = NULL, verdict = 'rejected', reason = 'x', sender_tg_message_id = 1, recipient_tg_message_id = 1, delivered_at = now() WHERE false",
+      );
+      await expectDenied('UPDATE messages SET match_id = match_id');
+      await expectDenied('UPDATE messages SET sender_id = sender_id');
+      await expectDenied('UPDATE messages SET created_at = now()');
+      await expectDenied('UPDATE messages SET purge_after = now()');
+      await expectDenied('DELETE FROM messages');
+      await expectDenied('TRUNCATE messages');
+      await expectDenied('ALTER TABLE messages DISABLE TRIGGER messages_10_guard_insert');
+      await expectDenied('ALTER TABLE messages DISABLE TRIGGER messages_10_guard_update');
+      await expectDenied('ALTER TABLE matches DISABLE TRIGGER matches_30_guard_chat_status');
+    });
+
+    it('can record a consent to reveal and mark it revealed, and nothing else', async () => {
+      await app.query('SELECT 1 FROM reveal_consents');
+      await app.query(
+        'INSERT INTO reveal_consents (match_id, user_id, consented_at) SELECT gen_random_uuid(), gen_random_uuid(), now() WHERE false',
+      );
+      await app.query('UPDATE reveal_consents SET revealed_at = now() WHERE false');
+      await expectDenied('UPDATE reveal_consents SET consented_at = now()');
+      await expectDenied('UPDATE reveal_consents SET user_id = user_id');
+      await expectDenied('DELETE FROM reveal_consents');
+      await expectDenied('TRUNCATE reveal_consents');
+      await expectDenied(
+        'ALTER TABLE reveal_consents DISABLE TRIGGER reveal_consents_10_guard_insert',
+      );
+      await expectDenied(
+        'ALTER TABLE reveal_consents DISABLE TRIGGER reveal_consents_10_guard_update',
+      );
+    });
+
     it('can only read blocks (they are written from Phase 5)', async () => {
       await app.query('SELECT 1 FROM blocks');
       await expectDenied(
@@ -361,6 +478,11 @@ describe('migrations', () => {
       await expectDenied('SELECT game_predictions_guard_insert()');
       await expectDenied('SELECT games_guard_update()');
       await expectDenied('SELECT matches_guard_game_status()');
+      await expectDenied('SELECT messages_guard_insert()');
+      await expectDenied('SELECT messages_guard_update()');
+      await expectDenied('SELECT reveal_consents_guard_insert()');
+      await expectDenied('SELECT reveal_consents_guard_update()');
+      await expectDenied('SELECT matches_guard_chat_status()');
     });
 
     it('cannot read the migrations journal', async () => {

@@ -5,3 +5,4 @@ export * from './profile';
 export * from './admin';
 export * from './matching';
 export * from './game';
+export * from './chat';

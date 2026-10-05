@@ -10,9 +10,11 @@ import {
   text,
   timestamp,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { datingOptions } from './content';
 import { bandEnum, localeEnum, modeEnum, userStatusEnum } from './enums';
+import { matches } from './matching';
 
 export { localeEnum, userStatusEnum } from './enums';
 
@@ -42,6 +44,11 @@ export const users = pgTable(
     username: text('username'),
     timezone: text('timezone'),
     botReachable: boolean('bot_reachable').notNull().default(true),
+    /**
+     * The chat a message goes to when it isn't a reply (Q24). Only a routing hint: the relay checks
+     * the match again for every message. Cleared by a trigger when the match ends.
+     */
+    activeMatchId: uuid('active_match_id').references((): AnyPgColumn => matches.id),
     onboardedAt: timestamp('onboarded_at', { withTimezone: true }),
     /** Created by dev tooling (`pnpm dev:population`). The bot never messages these users. */
     synthetic: boolean('synthetic').notNull().default(false),
