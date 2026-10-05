@@ -32,6 +32,7 @@ import { createLogger } from '../src/logger';
 import { createGamePlay } from '../src/services/game';
 import { createMatchingService } from '../src/services/matching';
 import { createOutboxSender } from '../src/services/outbox-sender';
+import { DEV_SYNTHETIC_USERNAME, createUsernames } from '../src/services/usernames';
 import { connect, fail, refuseInProduction } from './lib/dev-runtime';
 import { INELIGIBLE_HINT, matchMe } from './lib/match-me';
 
@@ -160,6 +161,10 @@ try {
         telegram: {
           sendMessage: (chatId, text, options) => api.sendMessage(chatId, text, options),
         },
+        usernames: createUsernames({
+          getChat: (chatId) => api.getChat(chatId),
+          syntheticUsername: DEV_SYNTHETIC_USERNAME,
+        }),
         clock: systemClock,
         logger,
         miniAppUrl: config.miniAppUrl,

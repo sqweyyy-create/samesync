@@ -4,6 +4,7 @@ import { fixedClock } from '../../src/clock';
 import { createOutboxRepository } from '../../src/db/repositories/outbox';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { createOutboxSender } from '../../src/services/outbox-sender';
+import { createUsernames } from '../../src/services/usernames';
 import { realContent } from './app';
 import type { TestDatabase } from './db';
 import { TEST_BOT_INFO, TEST_BOT_TOKEN, TEST_MINIAPP_URL, memoryLogger } from './fixtures';
@@ -25,6 +26,11 @@ export async function buildSender(
     /** Defaults to a weekday afternoon in every time zone used by the tests. */
     now?: Date;
     answer?: (call: SentMessage, attempt: number) => ApiAnswer;
+    /**
+     * What Telegram would report as the current username of an account. Without it no username
+     * may be asked for at all: a notification that does is a bug.
+     */
+    usernames?: ReadonlyMap<number, string>;
   } = {},
 ) {
   const bot = new Bot(TEST_BOT_TOKEN, { botInfo: TEST_BOT_INFO });
@@ -50,6 +56,9 @@ export async function buildSender(
   });
   const clock = fixedClock(options.now ?? new Date('2026-10-03T12:00:00Z'));
   const { logger, lines } = memoryLogger();
+  /** The accounts whose username was asked for. */
+  const asked: number[] = [];
+  const known = options.usernames;
   const sender = createOutboxSender({
     outbox: createOutboxRepository(testDb.db),
     users: createUsersRepository(testDb.db),
@@ -57,6 +66,14 @@ export async function buildSender(
     telegram: {
       sendMessage: (chatId, text, other) => bot.api.sendMessage(chatId, text, other),
     },
+    usernames: createUsernames({
+      getChat(chatId) {
+        asked.push(chatId);
+        if (!known) return Promise.reject(new Error('getChat must not be called'));
+        const username = known.get(chatId);
+        return Promise.resolve(username === undefined ? {} : { username });
+      },
+    }),
     clock,
     logger,
     miniAppUrl: TEST_MINIAPP_URL,
@@ -65,5 +82,5 @@ export async function buildSender(
     perChatMs: 0,
     sleep: () => Promise.resolve(),
   });
-  return { sender, calls, clock, logLines: lines };
+  return { sender, calls, clock, logLines: lines, asked };
 }

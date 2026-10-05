@@ -12,9 +12,10 @@
 import type { Locale } from '@samesync/shared';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import type { Clock } from '../clock';
-import { aliasLabel, type ContentStore } from '../content/store';
+import { aliasText, type ContentStore } from '../content/store';
 import type { ClaimedMessage, OutboxRepository } from '../db/repositories/outbox';
 import type { UsersRepository } from '../db/repositories/users';
+import { encodeCallback } from '../domain/chat/callbacks';
 import { parseTeaser, renderTeaser } from '../domain/matching/teaser';
 import {
   MAX_SEND_ATTEMPTS,
@@ -26,6 +27,12 @@ import {
   type SendContext,
 } from '../domain/notifications';
 import type { Logger } from '../logger';
+import { classifyTelegramError } from './telegram-errors';
+import type { Usernames } from './usernames';
+
+/** A button under a notification: it opens the Mini App, or reports back to the bot. */
+export type NotificationButton =
+  { text: string; web_app: { url: string } } | { text: string; callback_data: string };
 
 /** The one Bot API call the sender makes. Never forwardMessage or copyMessage. */
 export interface TelegramSender {
@@ -33,7 +40,7 @@ export interface TelegramSender {
     chatId: number,
     text: string,
     options: {
-      reply_markup: { inline_keyboard: Array<Array<{ text: string; web_app: { url: string } }>> };
+      reply_markup?: { inline_keyboard: NotificationButton[][] };
       disable_notification?: boolean;
     },
   ): Promise<unknown>;
@@ -44,6 +51,8 @@ export interface OutboxSenderDeps {
   users: Pick<UsersRepository, 'setBotReachable'>;
   content: ContentStore;
   telegram: TelegramSender;
+  /** Reads the other person's current username for the one message that reveals it. */
+  usernames: Usernames;
   clock: Clock;
   logger: Logger;
   miniAppUrl: string;
@@ -80,40 +89,6 @@ export function matchUrl(miniAppUrl: string, matchId: string): string {
   return url.toString();
 }
 
-/** What a failed Bot API call means for the row. Works on grammY's errors without importing it. */
-function classify(
-  error: unknown,
-):
-  | { kind: 'unreachable' | 'permanent' | 'transient'; detail: string }
-  | { kind: 'rate_limited'; detail: string; retryAfterSec: number } {
-  const e = error as {
-    error_code?: unknown;
-    description?: unknown;
-    parameters?: { retry_after?: unknown };
-  } | null;
-  const code = typeof e?.error_code === 'number' ? e.error_code : null;
-  // Telegram's descriptions name the problem ("Forbidden: bot was blocked by the user"), not the user.
-  const detail =
-    code === null
-      ? 'network'
-      : `${code}: ${typeof e?.description === 'string' ? e.description : ''}`;
-  if (code === 403 || (code === 400 && /chat not found/i.test(detail))) {
-    return { kind: 'unreachable', detail };
-  }
-  if (code === 429) {
-    const retryAfter = e?.parameters?.retry_after;
-    return {
-      kind: 'rate_limited',
-      detail,
-      retryAfterSec: typeof retryAfter === 'number' ? retryAfter : 5,
-    };
-  }
-  if (code !== null && code >= 400 && code < 500 && code !== 401 && code !== 409) {
-    return { kind: 'permanent', detail };
-  }
-  return { kind: 'transient', detail };
-}
-
 export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
   const { outbox, content, telegram, clock, logger } = deps;
   const spacingMs = deps.spacingMs ?? 40; // about 25 messages a second overall
@@ -121,30 +96,34 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const lastSentTo = new Map<number, number>();
 
-  /** The text and the button of one message, in the recipient's language. */
+  /**
+   * The text and the buttons of one message, in the recipient's language. `username` is only
+   * there for `reveal_done`, the one message that carries one (CLAUDE.md invariant 6).
+   */
   function compose(
     kind: NotificationKind,
     recipient: NonNullable<SendContext['recipient']>,
     match: NonNullable<SendContext['match']>,
-  ): { text: string; button: { text: string; web_app: { url: string } } } {
+    username: string | null,
+  ): { text: string; buttons: NotificationButton[] } {
     const { locale } = recipient;
     const { t } = translatorFor(locale);
     const toMatch = { url: matchUrl(deps.miniAppUrl, match.id) };
+    const toApp = { text: t('bot.start.open_app'), web_app: { url: deps.miniAppUrl } };
     // The other person appears only under their per-match alias, never by name or username.
-    const { emoji, name } = aliasLabel(content, match.counterpartAlias, locale);
-    const alias = `${emoji} ${name}`;
+    const alias = aliasText(content, match.counterpartAlias, locale);
     switch (kind) {
       case 'match_created': {
         const teaser = renderTeaser(parseTeaser(match.teaser), locale, content.teaser, t);
         return {
           text: t('bot.match.new', { teaser }),
-          button: { text: t('bot.match.open'), web_app: toMatch },
+          buttons: [{ text: t('bot.match.open'), web_app: toMatch }],
         };
       }
       case 'game_turn':
         return {
           text: t('bot.game.turn', { alias }),
-          button: { text: t('bot.game.play'), web_app: toMatch },
+          buttons: [{ text: t('bot.game.play'), web_app: toMatch }],
         };
       case 'game_reminder':
         return {
@@ -152,12 +131,12 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
             alias,
             count: hoursLeft(clock.now(), match.gameDeadlineAt),
           }),
-          button: { text: t('bot.game.play'), web_app: toMatch },
+          buttons: [{ text: t('bot.game.play'), web_app: toMatch }],
         };
       case 'game_results':
         return {
           text: t('bot.game.results', { alias }),
-          button: { text: t('bot.game.see_results'), web_app: toMatch },
+          buttons: [{ text: t('bot.game.see_results'), web_app: toMatch }],
         };
       case 'game_expired':
         // The match is over: the button opens the app, not the match. A player who had sent
@@ -167,21 +146,33 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
           text: t(match.recipientDone === true ? 'bot.game.expired.played' : 'bot.game.expired', {
             alias,
           }),
-          button: { text: t('bot.start.open_app'), web_app: { url: deps.miniAppUrl } },
+          buttons: [toApp],
         };
+      case 'chat_reminder':
+        // The button opens the results, where the ready-made first message waits.
+        return {
+          text: t('bot.chat.reminder', {
+            alias,
+            count: hoursLeft(clock.now(), match.chatDeadlineAt ?? clock.now().getTime()),
+          }),
+          buttons: [{ text: t('bot.chat.write'), web_app: toMatch }],
+        };
+      case 'chat_expired':
+        return { text: t('bot.chat.expired', { alias }), buttons: [toApp] };
+      case 'chat_ended':
+        // Neutral on purpose: it says that the chat is over, never why.
+        return { text: t('bot.chat.ended.other', { alias }), buttons: [toApp] };
+      case 'reveal_request':
+        return {
+          text: t('bot.reveal.request', { alias }),
+          buttons: [
+            { text: t('bot.reveal.agree'), callback_data: encodeCallback('reveal_yes', match.id) },
+            { text: t('bot.reveal.not_now'), callback_data: encodeCallback('reveal_no', match.id) },
+          ],
+        };
+      case 'reveal_done':
+        return { text: t('bot.reveal.done', { alias, username: username ?? '' }), buttons: [] };
     }
-  }
-
-  function render(
-    kind: NotificationKind,
-    recipient: NonNullable<SendContext['recipient']>,
-    match: NonNullable<SendContext['match']>,
-  ) {
-    return {
-      chatId: recipient.telegramId,
-      ...compose(kind, recipient, match),
-      silent: isQuietHour(clock.now(), recipient.timezone, deps.fallbackTimeZone[recipient.locale]),
-    };
   }
 
   async function deliver(message: ClaimedMessage): Promise<Outcome> {
@@ -195,16 +186,38 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
       return 'cancelled';
     }
 
-    const { chatId, text, button, silent } = render(message.kind, context.recipient, context.match);
+    const { recipient, match } = context;
+    // The one message that carries a username: adults only, after both consented (dropReason has
+    // just checked both against the database). The username is read from Telegram now.
+    let username: string | null = null;
+    if (message.kind === 'reveal_done') {
+      username = match.counterpart ? await deps.usernames.current(match.counterpart) : null;
+      if (username === null) {
+        await outbox.cancel(message.id, 'username_missing');
+        logger.info(
+          { outboxId: message.id, userId: message.userId, reason: 'username_missing' },
+          'notification dropped',
+        );
+        return 'cancelled';
+      }
+    }
+
+    const chatId = recipient.telegramId;
+    const { text, buttons } = compose(message.kind, recipient, match, username);
+    const silent = isQuietHour(
+      clock.now(),
+      recipient.timezone,
+      deps.fallbackTimeZone[recipient.locale],
+    );
     const wait = (lastSentTo.get(chatId) ?? 0) + perChatMs - clock.now().getTime();
     if (wait > 0) await sleep(wait);
     try {
       await telegram.sendMessage(chatId, text, {
-        reply_markup: { inline_keyboard: [[button]] },
+        ...(buttons.length > 0 ? { reply_markup: { inline_keyboard: [buttons] } } : {}),
         ...(silent ? { disable_notification: true } : {}),
       });
     } catch (error) {
-      const failure = classify(error);
+      const failure = classifyTelegramError(error);
       const log = { outboxId: message.id, userId: message.userId, error: failure.detail };
       if (failure.kind === 'unreachable') {
         // The user blocked the bot or never started it: stop matching them until they come back.

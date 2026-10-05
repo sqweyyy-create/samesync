@@ -3,12 +3,16 @@
  * two senders never take the same row, and every state change only touches rows that are still
  * pending (a row cancelled by the state-change trigger stays cancelled).
  */
-import type { Band, Locale, MatchStatus } from '@samesync/shared';
+import type { Band, Locale, MatchCloseReason, MatchStatus } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
 import { and, eq, sql } from 'drizzle-orm';
 import type { NotificationKind, SendContext } from '../../domain/notifications';
 import type { Db } from '../client';
 import { outbox } from '../schema/index';
+
+/** Dedupe key of a notification about a match: one per kind, match and user, whatever is retried. */
+export const notificationKey = (kind: NotificationKind, matchId: string, userId: string) =>
+  `${kind}:${matchId}:${userId}`;
 
 export interface ClaimedMessage {
   id: string;
@@ -50,6 +54,13 @@ interface ContextRow extends Record<string, unknown> {
   counterpart_band: Band | null;
   recipient_done: boolean | null;
   game_deadline_at_ms: number | null;
+  close_reason: MatchCloseReason | null;
+  chat_deadline_at_ms: number | null;
+  recipient_consented: boolean;
+  counterpart_consented: boolean;
+  revealed: boolean;
+  counterpart_telegram_id: string | number | null;
+  counterpart_synthetic: boolean | null;
 }
 
 export function createOutboxRepository(db: Db): OutboxRepository {
@@ -102,7 +113,13 @@ export function createOutboxRepository(db: Db): OutboxRepository {
             WHEN m.user_a_id = r.id THEN g.a_done_at IS NOT NULL
             WHEN m.user_b_id = r.id THEN g.b_done_at IS NOT NULL
           END AS recipient_done,
-          (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms
+          (extract(epoch FROM m.game_deadline_at) * 1000)::float8 AS game_deadline_at_ms,
+          m.close_reason,
+          (extract(epoch FROM m.chat_deadline_at) * 1000)::float8 AS chat_deadline_at_ms,
+          rc.user_id IS NOT NULL AS recipient_consented,
+          cc.user_id IS NOT NULL AS counterpart_consented,
+          (rc.revealed_at IS NOT NULL AND cc.revealed_at IS NOT NULL) AS revealed,
+          c.telegram_id AS counterpart_telegram_id, c.synthetic AS counterpart_synthetic
         FROM users r
         LEFT JOIN matches m ON m.id = ${matchId}::uuid
         LEFT JOIN games g ON g.match_id = m.id
@@ -110,6 +127,8 @@ export function createOutboxRepository(db: Db): OutboxRepository {
           WHEN m.user_a_id = r.id THEN m.user_b_id
           WHEN m.user_b_id = r.id THEN m.user_a_id
         END
+        LEFT JOIN reveal_consents rc ON rc.match_id = m.id AND rc.user_id = r.id
+        LEFT JOIN reveal_consents cc ON cc.match_id = m.id AND cc.user_id = c.id
         WHERE r.id = ${userId}::uuid`);
       const row = result.rows[0];
       if (!row) return { recipient: null, match: null };
@@ -135,6 +154,20 @@ export function createOutboxRepository(db: Db): OutboxRepository {
                 counterpartLiveBand: row.counterpart_band,
                 recipientDone: row.recipient_done,
                 gameDeadlineAt: row.game_deadline_at_ms,
+                closeReason: row.close_reason,
+                chatDeadlineAt: row.chat_deadline_at_ms,
+                reveal: {
+                  recipientConsented: row.recipient_consented,
+                  counterpartConsented: row.counterpart_consented,
+                  revealed: row.revealed,
+                },
+                counterpart:
+                  row.counterpart_telegram_id === null || row.counterpart_synthetic === null
+                    ? null
+                    : {
+                        telegramId: Number(row.counterpart_telegram_id),
+                        synthetic: row.counterpart_synthetic,
+                      },
               }
             : null,
       };

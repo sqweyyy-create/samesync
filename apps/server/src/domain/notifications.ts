@@ -3,8 +3,15 @@
  * every Telegram call (CLAUDE.md invariant 3): a message queued while everything was fine must not
  * go out after a match closed, a user was frozen or a band changed.
  */
-import { OPEN_MATCH_STATUSES, type Band, type Locale, type MatchStatus } from '@samesync/shared';
+import {
+  OPEN_MATCH_STATUSES,
+  type Band,
+  type Locale,
+  type MatchCloseReason,
+  type MatchStatus,
+} from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
+import { chatOpenIn, revealAllowedIn } from './chat/params';
 
 /** The kinds of queued messages: the values of the `outbox_kind` enum. Later phases add theirs. */
 export const NOTIFICATION_KINDS = [
@@ -15,6 +22,13 @@ export const NOTIFICATION_KINDS = [
   'game_results',
   'game_reminder',
   'game_expired',
+  // The chat (Phase 4): the one reminder before the chat window closes; nobody wrote in time; the
+  // other person left; the other person asks to exchange usernames; both agreed to.
+  'chat_reminder',
+  'chat_expired',
+  'chat_ended',
+  'reveal_request',
+  'reveal_done',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -43,6 +57,16 @@ export interface SendContext {
     recipientDone: boolean | null;
     /** Epoch milliseconds. */
     gameDeadlineAt: number;
+    closeReason: MatchCloseReason | null;
+    /** Epoch milliseconds; null before results are ready and once the chat has started. */
+    chatDeadlineAt: number | null;
+    /** Who has consented to exchange usernames, and whether both have. */
+    reveal: { recipientConsented: boolean; counterpartConsented: boolean; revealed: boolean };
+    /**
+     * The other participant's Telegram account, only to read their current username for a
+     * reveal. Never part of a message. Null if the recipient isn't in the match.
+     */
+    counterpart: { telegramId: number; synthetic: boolean } | null;
   } | null;
 }
 
@@ -58,7 +82,11 @@ export type DropReason =
   | 'match_closed'
   | 'outdated'
   | 'band_mismatch'
-  | 'counterpart_not_active';
+  | 'counterpart_not_active'
+  /** A username exchange in a band that has none (CLAUDE.md invariant 6). */
+  | 'reveal_not_allowed'
+  /** The other person has no username right now: there is nothing to reveal. */
+  | 'username_missing';
 
 const isOpen = (status: MatchStatus) => (OPEN_MATCH_STATUSES as readonly string[]).includes(status);
 
@@ -69,7 +97,7 @@ const isOpen = (status: MatchStatus) => (OPEN_MATCH_STATUSES as readonly string[
 function stateProblem(
   kind: NotificationKind,
   match: NonNullable<SendContext['match']>,
-): 'match_closed' | 'outdated' | null {
+): 'match_closed' | 'outdated' | 'reveal_not_allowed' | null {
   switch (kind) {
     case 'match_created':
       return isOpen(match.status) ? null : 'match_closed';
@@ -84,6 +112,35 @@ function stateProblem(
     case 'game_expired':
       // The one notice about a match that is over: only for a game that ran out of time.
       return match.status === 'expired' ? null : 'outdated';
+    case 'chat_reminder':
+      if (!isOpen(match.status)) return 'match_closed';
+      // Only while nobody has written, and only where the recipient could write at all.
+      return match.status === 'results_ready' && chatOpenIn(match.band) ? null : 'outdated';
+    case 'chat_expired':
+      return match.status === 'expired' ? null : 'outdated';
+    case 'chat_ended':
+      // Only for a chat the other person left. Every other ending has its own notice or none.
+      return match.status === 'closed' && match.closeReason === 'left' ? null : 'outdated';
+    case 'reveal_request':
+      if (!isOpen(match.status)) return 'match_closed';
+      if (match.status === 'pending_game') return 'outdated';
+      if (!revealAllowedIn(match.band)) return 'reveal_not_allowed';
+      // Only while the other person's consent stands and the recipient's is still missing.
+      return match.reveal.counterpartConsented &&
+        !match.reveal.recipientConsented &&
+        !match.reveal.revealed
+        ? null
+        : 'outdated';
+    case 'reveal_done':
+      if (!isOpen(match.status)) return 'match_closed';
+      if (match.status === 'pending_game') return 'outdated';
+      if (!revealAllowedIn(match.band)) return 'reveal_not_allowed';
+      // A username is sent only for a reveal the database has recorded for both.
+      return match.reveal.revealed &&
+        match.reveal.recipientConsented &&
+        match.reveal.counterpartConsented
+        ? null
+        : 'outdated';
   }
 }
 

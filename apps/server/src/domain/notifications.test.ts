@@ -30,6 +30,10 @@ const match: NonNullable<SendContext['match']> = {
   counterpartLiveBand: 'adult',
   recipientDone: false,
   gameDeadlineAt: Date.UTC(2026, 9, 6, 12),
+  closeReason: null,
+  chatDeadlineAt: null,
+  reveal: { recipientConsented: false, counterpartConsented: false, revealed: false },
+  counterpart: { telegramId: 43, synthetic: false },
 };
 const reason = (
   r: Partial<typeof recipient> | null,
@@ -100,6 +104,17 @@ describe('dropReason for the game notifications', () => {
     game_reminder: {},
     game_results: { status: 'results_ready', recipientDone: true },
     game_expired: { status: 'expired', recipientDone: false },
+    chat_reminder: { status: 'results_ready' },
+    chat_expired: { status: 'expired', closeReason: 'expired' },
+    chat_ended: { status: 'closed', closeReason: 'left' },
+    reveal_request: {
+      status: 'active',
+      reveal: { recipientConsented: false, counterpartConsented: true, revealed: false },
+    },
+    reveal_done: {
+      status: 'active',
+      reveal: { recipientConsented: true, counterpartConsented: true, revealed: true },
+    },
   };
 
   it('sends "your turn" and the reminder only while the game is on and the recipient has not played', () => {
@@ -146,6 +161,103 @@ describe('dropReason for the game notifications', () => {
       expect(reason({ botReachable: false }, valid, kind)).toBe('bot_unreachable');
       expect(reason({}, { ...valid, counterpartAlias: null }, kind)).toBe('not_participant');
       expect(reason({}, null, kind)).toBe('match_missing');
+    },
+  );
+});
+
+describe('dropReason for the chat notifications', () => {
+  it('reminds about the first message only while nobody has written, where a chat is possible', () => {
+    expect(reason({}, { status: 'results_ready' }, 'chat_reminder')).toBeNull();
+    expect(reason({}, { status: 'active' }, 'chat_reminder')).toBe('outdated');
+    expect(reason({}, { status: 'pending_game' }, 'chat_reminder')).toBe('outdated');
+    expect(reason({}, { status: 'expired' }, 'chat_reminder')).toBe('match_closed');
+    expect(reason({}, { status: 'closed' }, 'chat_reminder')).toBe('match_closed');
+    // Nobody can write in a u18 chat yet, so nobody is told to.
+    expect(
+      reason(
+        { liveBand: 'u18' },
+        { status: 'results_ready', band: 'u18', counterpartLiveBand: 'u18' },
+        'chat_reminder',
+      ),
+    ).toBe('outdated');
+  });
+
+  it('sends the chat expiry notice only for an expired match', () => {
+    expect(reason({}, { status: 'expired', closeReason: 'expired' }, 'chat_expired')).toBeNull();
+    for (const status of ['pending_game', 'results_ready', 'active', 'closed'] as const) {
+      expect(reason({}, { status }, 'chat_expired')).toBe('outdated');
+    }
+  });
+
+  it('says that a chat has ended only when the other person left it', () => {
+    expect(reason({}, { status: 'closed', closeReason: 'left' }, 'chat_ended')).toBeNull();
+    for (const closeReason of ['band_change', 'frozen', 'blocked', 'admin', 'deleted'] as const) {
+      expect(reason({}, { status: 'closed', closeReason }, 'chat_ended')).toBe('outdated');
+    }
+    expect(reason({}, { status: 'expired', closeReason: 'expired' }, 'chat_ended')).toBe(
+      'outdated',
+    );
+    expect(reason({}, { status: 'active' }, 'chat_ended')).toBe('outdated');
+  });
+
+  const asked = { recipientConsented: false, counterpartConsented: true, revealed: false };
+  const done = { recipientConsented: true, counterpartConsented: true, revealed: true };
+  const u18 = { band: 'u18' as const, counterpartLiveBand: 'u18' as const };
+
+  it('asks for consent only while the other consent stands and the recipient has not answered', () => {
+    for (const status of ['results_ready', 'active'] as const) {
+      expect(reason({}, { status, reveal: asked }, 'reveal_request')).toBeNull();
+    }
+    expect(reason({}, { status: 'active' }, 'reveal_request')).toBe('outdated');
+    expect(
+      reason(
+        {},
+        { status: 'active', reveal: { ...asked, recipientConsented: true } },
+        'reveal_request',
+      ),
+    ).toBe('outdated');
+    expect(reason({}, { status: 'active', reveal: done }, 'reveal_request')).toBe('outdated');
+    expect(reason({}, { status: 'pending_game', reveal: asked }, 'reveal_request')).toBe(
+      'outdated',
+    );
+    expect(reason({}, { status: 'closed', reveal: asked }, 'reveal_request')).toBe('match_closed');
+  });
+
+  it('sends a username only for a reveal recorded for both, in an open chat', () => {
+    for (const status of ['results_ready', 'active'] as const) {
+      expect(reason({}, { status, reveal: done }, 'reveal_done')).toBeNull();
+    }
+    expect(reason({}, { status: 'active', reveal: asked }, 'reveal_done')).toBe('outdated');
+    expect(
+      reason({}, { status: 'active', reveal: { ...done, revealed: false } }, 'reveal_done'),
+    ).toBe('outdated');
+    expect(
+      reason(
+        {},
+        { status: 'active', reveal: { ...done, recipientConsented: false } },
+        'reveal_done',
+      ),
+    ).toBe('outdated');
+    expect(reason({}, { status: 'closed', reveal: done }, 'reveal_done')).toBe('match_closed');
+    expect(reason({}, { status: 'expired', reveal: done }, 'reveal_done')).toBe('match_closed');
+  });
+
+  it.each(['reveal_request', 'reveal_done'] as const)(
+    'never sends %s in a u18 match, whatever the consent rows say',
+    (kind) => {
+      for (const reveal of [asked, done]) {
+        expect(reason({ liveBand: 'u18' }, { status: 'active', ...u18, reveal }, kind)).toBe(
+          'reveal_not_allowed',
+        );
+      }
+      // And never to or about someone who is under 18 by birth date in an "adult" match.
+      const valid = kind === 'reveal_request' ? asked : done;
+      expect(reason({ liveBand: 'u18' }, { status: 'active', reveal: valid }, kind)).toBe(
+        'band_mismatch',
+      );
+      expect(
+        reason({}, { status: 'active', reveal: valid, counterpartLiveBand: 'u18' }, kind),
+      ).toBe('band_mismatch');
     },
   );
 });

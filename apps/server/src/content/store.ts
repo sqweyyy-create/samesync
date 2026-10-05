@@ -79,6 +79,16 @@ export function aliasLabel(
   return { emoji: alias?.emoji ?? '👤', name: alias ? localized(alias.text, locale) : '—' };
 }
 
+/** The alias as one piece of text ("🦊 Лиса"): the only name the other person ever has. */
+export function aliasText(
+  content: Pick<ContentStore, 'alias'>,
+  aliasId: string | null,
+  locale: Locale,
+): string {
+  const { emoji, name } = aliasLabel(content, aliasId, locale);
+  return `${emoji} ${name}`;
+}
+
 export function createContentStore(bundle: ContentBundle, checksum: string): ContentStore {
   if (!bundle.release) throw new Error('content has no release.json');
   const byId = <T extends { id: string }>(list: T[]) =>

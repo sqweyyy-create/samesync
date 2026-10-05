@@ -35,6 +35,7 @@ import { createMatchesService } from './services/matches';
 import { createMatchingService } from './services/matching';
 import { createOutboxSender } from './services/outbox-sender';
 import { createProfileService } from './services/profile';
+import { DEV_SYNTHETIC_USERNAME, createUsernames } from './services/usernames';
 
 let config: Config;
 try {
@@ -81,6 +82,12 @@ const app = createHttpApp({
   game: createGameService({ users, matches, games, content, clock }),
 });
 const bot = createBot({ token: config.botToken, miniAppUrl: config.miniAppUrl, logger, users });
+// The current username, read from Telegram, for the one notification that reveals it.
+const usernames = createUsernames({
+  getChat: (chatId) => bot.api.getChat(chatId),
+  // Synthetic users only exist on development databases; production ignores them regardless.
+  syntheticUsername: config.nodeEnv === 'production' ? undefined : DEV_SYNTHETIC_USERNAME,
+});
 
 const matching = createMatchingService({
   pool,
@@ -104,6 +111,7 @@ const sender = createOutboxSender({
   content,
   // New plain-text messages only: no parse_mode, never forwardMessage or copyMessage.
   telegram: { sendMessage: (chatId, text, options) => bot.api.sendMessage(chatId, text, options) },
+  usernames,
   clock,
   logger,
   miniAppUrl: config.miniAppUrl,
