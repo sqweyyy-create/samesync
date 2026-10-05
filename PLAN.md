@@ -1,6 +1,6 @@
 # SameSync — Implementation Plan
 
-Last updated: 2026-10-04. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
+Last updated: 2026-10-05. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
@@ -859,14 +859,14 @@ Each question lists a *provisional* default used until it is answered (implement
 - **Q16. Under-14 users.** Should their birth date be kept (so they can't retry with another) or nothing stored? Do they become eligible automatically at 14? ✅ **Decided (2026-10-03, product owner):** keep `birth_date` with status `ineligible` and nothing else (so they can't retry with another date); they become eligible on their 14th birthday.
 - **Q17. Policy for birth-date corrections.** How do users ask (provisional `/support`), what proof is needed, and do adult → `u18` corrections (a grooming vector) need extra scrutiny, such as a second admin? *Needed by:* Phase 5.
 - **Q18. Auto-freeze settings.** The value of N, the window, a lower threshold for `u18`, and whether age-misrepresentation reports freeze sooner. *Provisional:* 3 distinct reporters in 30 days (adults), 2 (`u18`); age-misrepresentation reports alert admins immediately but count normally. *Needed by:* Phase 5.
-- **Q19. 18+ chat content.** The spec restricts media only for `u18`. Is adult chat text-only too? Should contacts be filtered in adult chat before a reveal? *Provisional:* text-only in both pools, no contact filter for adults. *Needed by:* Phase 4.
+- **Q19. 18+ chat content.** The spec restricts media only for `u18`. Is adult chat text-only too? Should contacts be filtered in adult chat before a reveal? ✅ **Decided (2026-10-05, product owner):** the provisional answer is accepted. Adult chat is plain text only, the same as `u18`, and contacts are not filtered in adult chat.
 - **Q20. Retention.** How long are message bodies, report evidence and filtered (blocked) message bodies kept? Moderation needs evidence, and privacy argues for less. *Provisional:* messages 30 days; evidence until the report is resolved + 90 days; filtered bodies stored with the same retention and shown to admins only inside reports. *Needed by:* Phase 4.
 - **Q21. Age verification beyond self-declaration.** Adults posing as minors is the biggest residual risk (§9). *Provisional:* none in the MVP; the risk is accepted, documented and reduced as §9 describes. *Needed by:* G3.
 - **Q22. Quiet hours.** Should there be no notifications at night, especially for minors? That needs the user's timezone, which Telegram doesn't provide. ✅ **Decided (2026-10-03, product owner), differently from the provisional answer:** notifications are never held. Between 23:00 and 08:00 in the user's local time they are sent immediately but silently (`disable_notification: true`); at other times they are sent normally. The local time comes from the IANA timezone the Mini App reports (`Intl`).
 - **Q23. Account deletion and data export.** Not in the spec, but likely legally required. *Provisional:* `/delete` in Phase 5 (anonymize, keep only safety and audit records); export postponed. *Needed by:* Phase 5.
 
 **Chat**
-- **Q24. Routing between several chats in one bot DM.** Bot API 9.3 added topics in private chats with bots (one topic per match would be the cleanest UX), but there are reports of regressions in 2026. *Provisional:* `active_match_id` pointer plus reply-to routing; re-evaluate topics after Phase 4. *Needed by:* Phase 4.
+- **Q24. Routing between several chats in one bot DM.** Bot API 9.3 added topics in private chats with bots (one topic per match would be the cleanest UX), but there are reports of regressions in 2026. ✅ **Decided (2026-10-05, product owner):** the provisional answer is accepted. All chats share one bot DM. Every relayed message is labeled with the counterpart's alias. A reply is routed by the message it replies to, and a message that isn't a reply goes to the `active_match_id` pointer. Telegram's private-chat topics are not used.
 - **Q25. Reveal edge cases.** What if a user has no username? Does the relay chat stay open after a reveal? *Provisional:* a username is required (the user is asked to set one); the chat stays open until someone leaves. *Needed by:* Phase 4.
 
 **Monetization**
