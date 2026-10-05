@@ -131,6 +131,11 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - A username appears in exactly one place: the `reveal_done` notification, composed by the outbox sender, which reads it from Telegram at that moment (`services/usernames.ts`). Never store, log or pass on a username anywhere else.
   - The text of a message never goes into a log or an error. The driver's error for a failed insert quotes its parameters, so `ChatRepository.store` replaces it.
   - Inline button data is built and parsed by `domain/chat/callbacks.ts` (zod). It names an action and a match; the services decide whether the user may do that.
+- **Dev tooling:**
+  - Scripts live in `apps/server/scripts/`, their libraries in `scripts/lib/`. They refuse to run with `NODE_ENV=production`, before they touch anything.
+  - `pnpm dev:up` reads `.env` only for `BOT_TOKEN` and `DATABASE_URL`, never prints, logs or copies a value (except the one backup in `.dev/`), and doesn't load `.env` into its own environment, so the processes it starts read the updated file themselves.
+  - Scenarios (`scripts/lib/scenarios.ts`) act only through the existing dev tools and the real services, as the app role, never with SQL that bypasses a trigger. They touch only the developer's matches and synthetic users, and refuse when another real user is active in the same pool. Their checklists render the expected texts from the catalogs.
+  - `reset` retires synthetic users (status `deleted`, so the state-change trigger closes their matches) instead of deleting them: the app role has no DELETE.
 - **Bot:**
   - Relayed text goes out as plain text with no `parse_mode`.
   - Proactive messages go through the outbox (throttled, retried, de-duplicated). Direct replies to a user's own command can be sent inline.
@@ -154,6 +159,9 @@ docker compose up -d db         # local Postgres 17; creates samesync_app from A
 pnpm db:migrate                 # as the owner role (MIGRATION_DATABASE_URL)
 pnpm content:seed               # content IDs + release into the DB (owner role); the server won't start without it
 pnpm dev                        # server (bot long-polling + API + jobs) and Vite dev server
+pnpm dev:up                     # everything for a check in Telegram: Docker + db, migrate + seed, a cloudflared tunnel, MINIAPP_URL in .env and the bot's menu button, then pnpm dev (Ctrl+C stops it and the tunnel)
+pnpm dev:down                   # stops pnpm dev, the tunnel and the db container (volumes are kept)
+pnpm dev:scenario <phase2|phase3|phase4|reset> [support code]   # a ready-to-look-at state for the manual check of a phase, and its checklist
 pnpm dev:initdata               # signed initData + a URL to open the Mini App in a plain browser
 pnpm dev:population --pool adult:ru --mode friends --n 500   # synthetic users for one pool × mode
 pnpm dev:match-me <public_id>   # match a real dev user with synthetic ones and send them the bot notification
@@ -171,11 +179,11 @@ pnpm format                     # Prettier --write (pnpm lint runs --check)
 
 After any content change: bump `content/release.json`, run `pnpm content:lock`, then `pnpm content:seed`. The server checks at startup that the seeded release matches the files. After pulling changes, run `pnpm db:migrate` and `pnpm content:seed` again.
 
-The dev tooling (`dev:*`, `bench:matching`) refuses to run with `NODE_ENV=production`. `<public_id>` is the support code shown in the Mini App settings. An alias is the counterpart's name as the bot shows it (`Лиса`, `fox`, `a.fox` or `🦊`); `pnpm dev:say` without arguments lists the chats there are.
+The dev tooling (`dev:*`, `bench:matching`) refuses to run with `NODE_ENV=production`. `pnpm dev:scenario` defaults to the only real user of the local database; every phase scenario starts with `reset`, so running it twice leaves one set of matches. `<public_id>` is the support code shown in the Mini App settings. An alias is the counterpart's name as the bot shows it (`Лиса`, `fox`, `a.fox` or `🦊`); `pnpm dev:say` without arguments lists the chats there are.
 
 Tests need Postgres: they read `TEST_DATABASE_URL` (owner connection to the `postgres` maintenance DB) from the environment or the root `.env`. They create and drop their own throwaway databases.
 
-To test inside Telegram, create a separate dev bot in @BotFather. The Mini App URL must be HTTPS, so point it at a tunnel (e.g. cloudflared) to the Vite dev server on port 5173, and add the tunnel's domain to `MINIAPP_DEV_ALLOWED_HOSTS`. Vite proxies `/api` to the server, so one tunnel is enough. Production (Phase 6) runs the bot through a webhook with a secret token, and the same process serves the built Mini App.
+To test inside Telegram, create a separate dev bot in @BotFather. The Mini App URL must be HTTPS, so it points at a tunnel to the Vite dev server on port 5173; `MINIAPP_DEV_ALLOWED_HOSTS` must allow the tunnel's domain (`.trycloudflare.com`). Vite proxies `/api` to the server, so one tunnel is enough. `pnpm dev:up` does all of it: it starts a cloudflared quick tunnel, changes only the `MINIAPP_URL` line of `.env` (the previous file is kept in `.dev/env.backup`) and points the bot's menu button at the tunnel, so @BotFather is needed only once, to create the bot. `.dev/` is gitignored. Production (Phase 6) runs the bot through a webhook with a secret token, and the same process serves the built Mini App.
 
 pnpm enforces a minimum release age for new package versions. Don't add `minimumReleaseAgeExclude` entries to get around it: pin the previous release instead. Only packages listed under `allowBuilds` in `pnpm-workspace.yaml` may run install scripts.
 
@@ -187,4 +195,5 @@ pnpm enforces a minimum release age for new package versions. Don't add `minimum
 - If something is ambiguous, don't guess. Add it to PLAN.md "Open questions" (with a provisional default if work has to continue) and tell the user.
 - In a PR that touches auth, relay, filters, matching eligibility, DB triggers or `test/safety/`, say which invariant is affected and how it stays intact.
 - Keep this file and PLAN.md up to date when decisions change.
+- Every phase that adds user-visible behavior also adds a pnpm dev:scenario <phaseN> with a printed checklist, and the phase report's manual steps use it.
 - Do not spawn subagents, parallel reviewers or multi-agent reviews unless the user explicitly asks for it. Do one careful self-check instead. The user watches usage limits.
