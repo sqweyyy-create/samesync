@@ -355,10 +355,17 @@ describe('phase4', () => {
     expect(texts).toHaveLength(6);
     expect(texts.join('\n')).not.toContain('dev_real_user');
 
-    expect(run.checklist).toHaveLength(9);
+    expect(run.checklist).toHaveLength(10);
     expect(run.checklist[1]).toContain('«Кому отправить это сообщение?»');
+    expect(run.checklist[2]).toContain('the ✓ in the list moves to');
+    // With a username, agreeing to the counterpart's request reveals at once.
+    expect(run.checklist[4]).toContain('«Согласие есть с обеих сторон. Сейчас пришлю ник (');
+    expect(run.checklist[4]).not.toContain('no username');
     expect(run.checklist[5]).toContain('your consent in');
     expect(run.checklist[5]).toContain('в Telegram: @synthetic_user');
+    expect(run.checklist[9]).toContain('«Твоё согласие записано.');
+    expect(run.checklist[9]).toContain('«Передумать»');
+    expect(run.checklist[9]).toContain('согласие отозвано');
     expect(run.later?.inMs).toBe(15_000);
 
     // A few seconds later the counterpart of B agrees, and the username arrives.
@@ -384,7 +391,14 @@ describe('phase4', () => {
   it('keeps my consent waiting when my account has no username, and says what to do', async () => {
     const { telegram, deps, dev } = await setup({ username: null });
     const run = await SCENARIOS.phase4(deps, dev);
+    // Both reveal items, and the withdrawal, say that a consent waits for the username first.
+    expect(run.checklist[4]).toContain('your Telegram account has no username');
+    expect(run.checklist[4]).toContain('«У тебя в Telegram не задано имя пользователя');
+    expect(run.checklist[4]).not.toContain('tap «Согласиться»: «Согласие есть');
     expect(run.checklist[5]).toContain('your Telegram account has no username');
+    expect(run.checklist[5]).not.toContain('tap «Согласиться»');
+    expect(run.checklist[9]).toContain('«У тебя в Telegram не задано имя пользователя');
+    expect(run.checklist[9]).toContain('«Передумать»');
     expect(await run.later!.run()).toContain('your account has no Telegram username');
     expect(count(sent(telegram, dev), / в Telegram: @/)).toBe(0);
   });

@@ -685,10 +685,18 @@ async function phase4(deps: ScenarioDeps, user: Developer): Promise<ScenarioRun>
   const username = deps.syntheticUsername;
   const said = (m: Made) => `«${name(m)} / ${texts.get(m.id) ?? ''}»`;
   const later = Math.round(COUNTERPART_CONSENT_DELAY_MS / SECOND);
-  const youFirst =
-    yours.status === 'waiting'
-      ? `Reveal, you first: your consent in ${B} is recorded already. About ${later} s after this list its counterpart agrees: «${t('bot.reveal.done', { alias: B, username })}».`
-      : `Reveal, you first: your Telegram account has no username, so your consent in ${B} waits («${t('bot.reveal.username_needed')}»). Set a username in Telegram, send /reveal, pick ${B} and tap «${t('bot.reveal.agree')}»: «${t('bot.reveal.done', { alias: B, username })}».`;
+  // Whether the developer's Telegram account has a username: without one a consent is recorded
+  // and waits (Q25), and the reveal items say so.
+  const hasUsername = yours.status === 'waiting';
+  const agree = t('bot.reveal.agree');
+  const withdraw = t('bot.reveal.withdraw');
+  const counterpartFirst = hasUsername
+    ? `Reveal, the counterpart first: under «${t('bot.reveal.request', { alias: A })}» tap «${agree}»: «${t('bot.reveal.on_the_way', { alias: A })}», then «${t('bot.reveal.done', { alias: A, username })}».`
+    : `Reveal, the counterpart first: under «${t('bot.reveal.request', { alias: A })}» tap «${agree}»: «${t('bot.reveal.username_needed')}» (your Telegram account has no username). Set one in Telegram, send /reveal and pick ${A}: «${t('bot.reveal.on_the_way', { alias: A })}», then «${t('bot.reveal.done', { alias: A, username })}».`;
+  const youFirst = hasUsername
+    ? `Reveal, you first: your consent in ${B} is recorded already. About ${later} s after this list its counterpart agrees: «${t('bot.reveal.done', { alias: B, username })}».`
+    : `Reveal, you first: your Telegram account has no username, so your consent in ${B} waits («${t('bot.reveal.username_needed')}»). Set a username in Telegram, send /reveal and pick ${B}: «${t('bot.reveal.on_the_way', { alias: B })}», then «${t('bot.reveal.done', { alias: B, username })}».`;
+  const withdrawal = `Withdrawal (Q38): send /reveal, pick ${D}, tap «${agree}»: «${hasUsername ? t('bot.reveal.waiting', { alias: D }) : t('bot.reveal.username_needed')}» with «${withdraw}». Tap it: «${t('bot.reveal.withdrawn', { alias: D })}». Send /reveal and pick ${D}: «${t('bot.reveal.ask', { alias: D })}» is offered again.`;
 
   return {
     summary: [
@@ -700,13 +708,14 @@ async function phase4(deps: ScenarioDeps, user: Developer): Promise<ScenarioRun>
     checklist: [
       `Reply routing: swipe-reply to ${said(a)}. The reply goes to ${A}: the bot notes «${t('bot.chat.sent_to', { alias: A })}», and \`pnpm dev:say ${a.alias}\` shows it as \`you [delivered]\`. A reply to ${said(b)} lands in \`pnpm dev:say ${b.alias}\`.`,
       `The chooser: send a plain message (not a reply): «${t('bot.chat.pick')}» with ${A}, ${B} and ${D}. Tap ${B}: «${t('bot.chat.picked', { alias: B })}». The next plain message goes to ${B} without a question.`,
-      `/chats: «${t('bot.chats.list')}», ${B} marked ✓. Tap ${A}: «${t('bot.chat.now', { alias: A })}». A plain message now goes to ${A}, and the bot notes «${t('bot.chat.sent_to', { alias: A })}».`,
+      `/chats: «${t('bot.chats.list')}», ${B} marked ✓. Tap ${A}: «${t('bot.chat.now', { alias: A })}», and the ✓ in the list moves to ${A}. A plain message now goes to ${A}, and the bot notes «${t('bot.chat.sent_to', { alias: A })}».`,
       `Edits and media: edit one of your sent messages: «${t('bot.chat.edit')}». Send a sticker or a photo: «${t('bot.chat.text_only')}».`,
-      `Reveal, the counterpart first: under «${t('bot.reveal.request', { alias: A })}» tap «${t('bot.reveal.agree')}»: «${t('bot.reveal.on_the_way', { alias: A })}», then «${t('bot.reveal.done', { alias: A, username })}».`,
+      counterpartFirst,
       youFirst,
       `A chat the counterpart ended: «${t('bot.chat.ended.other', { alias: C })}». Reply to ${said(c)}: «${t('bot.chat.ended')}».`,
       `/leave: «${t('bot.leave.pick')}», pick ${A}: «${t('bot.leave.confirm', { alias: A })}», tap «${t('bot.leave.yes')}»: «${t('bot.leave.done', { alias: A })}».`,
       `The Mini App: under «${t('bot.game.results', { alias: D })}» tap «${t('bot.game.see_results')}». Edit the first message, tap «${t('miniapp.results.send')}»: «${t('miniapp.results.sent')}», and «${t('miniapp.results.to_chat')}» closes the app. In the bot: «${t('bot.chat.you_to', { alias: D })}» and your text.`,
+      withdrawal,
     ],
     later: {
       inMs: COUNTERPART_CONSENT_DELAY_MS,
