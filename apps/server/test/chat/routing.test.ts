@@ -258,6 +258,35 @@ describe('a reply and the active chat', () => {
     // The list itself sends nothing to anyone else.
     expect(texts(app, w.bear.id)).toEqual([]);
     expect(texts(app, w.wolf.id)).toEqual([]);
+
+    // Tapping a chat in the list moves the ✓ to it, in that very list.
+    app.telegram.clear();
+    await press(app, w.me, `c:to:${w.wolfChat}`, { text: list?.text });
+    expect(app.telegram.of('answerCallbackQuery').map((c) => c.payload['text'])).toEqual([
+      'Теперь сообщения идут сюда: 🐺 Волк',
+    ]);
+    expect(await activeMatchOf(testDb.ownerPool, w.meId)).toBe(w.wolfChat);
+    const [edited] = app.telegram.of('editMessageReplyMarkup');
+    expect(edited?.payload).toMatchObject({ chat_id: w.me.id, message_id: 7000 });
+    const moved = (edited?.payload['reply_markup'] as { inline_keyboard: unknown[] })
+      .inline_keyboard;
+    expect(moved).toHaveLength(2);
+    expect(moved).toEqual(
+      expect.arrayContaining([
+        button('✓ 🐺 Волк', `c:to:${w.wolfChat}`),
+        button('🐻 Медведь', `c:to:${w.bearChat}`),
+      ]),
+    );
+    expect(app.telegram.calls.map((c) => c.method)).toEqual([
+      'answerCallbackQuery',
+      'editMessageReplyMarkup',
+    ]);
+
+    // The same button under a relayed message is not a list: nothing is edited there.
+    app.telegram.clear();
+    await press(app, w.me, `c:to:${w.bearChat}`, { text: '🐻 Медведь\nпривет' });
+    expect(app.telegram.calls.map((c) => c.method)).toEqual(['answerCallbackQuery']);
+    expect(await activeMatchOf(testDb.ownerPool, w.meId)).toBe(w.bearChat);
   });
 
   it('answers /chats without chats with a way into the app', async () => {
@@ -349,11 +378,17 @@ describe('a chat that has ended', () => {
     const app = await buildChatApp(testDb);
     const w = await world();
     await app.chat.leave(w.bearId, w.bearChat, new Date());
-    await press(app, w.me, `c:to:${w.bearChat}`);
+    await press(app, w.me, `c:to:${w.bearChat}`, {
+      text: 'Твои чаты. Нажми на чат, и сообщения без ответа пойдут в него:',
+    });
     expect(app.telegram.of('answerCallbackQuery').map((c) => c.payload['text'])).toEqual([
       'Этот чат завершён.',
     ]);
     expect(await activeMatchOf(testDb.ownerPool, w.meId)).toBeNull();
+    // The list it was tapped in is brought up to date: the ended chat is gone from it.
+    expect(app.telegram.of('editMessageReplyMarkup').map((c) => c.payload['reply_markup'])).toEqual(
+      [{ inline_keyboard: [button('🐺 Волк', `c:to:${w.wolfChat}`)] }],
+    );
 
     await app.handle(textUpdate(w.me, 'в закрытый чат'));
     const asked = lastIncomingId();

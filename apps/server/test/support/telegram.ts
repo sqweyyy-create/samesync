@@ -165,13 +165,18 @@ export function editUpdate(from: TestUser, messageId: number, text: string): Upd
 }
 
 /**
- * The user pressed an inline button under a message of the bot. `question` is that message; when
- * it was a reply to one of the user's messages, `original` is the message it replied to.
+ * The user pressed an inline button under a message of the bot. `question` is that message (with
+ * its text, where a handler looks at it); when it was a reply to one of the user's messages,
+ * `original` is the message it replied to.
  */
 export function callbackUpdate(
   from: TestUser,
   data: string,
-  question: { messageId: number; original?: { messageId: number; text?: string; fromId?: number } },
+  question: {
+    messageId: number;
+    text?: string;
+    original?: { messageId: number; text?: string; fromId?: number };
+  },
 ): Update {
   const original = question.original;
   return {
@@ -186,7 +191,7 @@ export function callbackUpdate(
         date: 1_790_000_000,
         chat: privateChat(from),
         from: { id: TEST_BOT_INFO.id, is_bot: true, first_name: TEST_BOT_INFO.first_name },
-        text: '…',
+        text: question.text ?? '…',
         ...(original
           ? {
               reply_to_message: {

@@ -17,7 +17,7 @@ import { LOCALES, type Locale } from '@samesync/shared';
 import type { Translator } from '@samesync/shared/i18n';
 import { translatorFor } from '@samesync/shared/i18n/static';
 import type { Api, ChatTypeContext, Composer, Context } from 'grammy';
-import type { InlineKeyboardButton, Message } from 'grammy/types';
+import type { InlineKeyboardButton, MaybeInaccessibleMessage, Message } from 'grammy/types';
 import { aliasText, type ContentStore } from '../content/store';
 import type { ChatRepository, ChatUser } from '../db/repositories/chat';
 import { encodeCallback, parseCallback, type ChatAction } from '../domain/chat/callbacks';
@@ -84,6 +84,13 @@ const SERVICE_KEYS = [
 function isServiceMessage(message: Message): boolean {
   const keys = message as unknown as Record<string, unknown>;
   return SERVICE_KEYS.some((key) => keys[key] !== undefined);
+}
+
+/** Whether the message a button hangs under is a /chats list, in any of the bot's languages. */
+function isChatsList(message: MaybeInaccessibleMessage | undefined): boolean {
+  if (!message || !('text' in message) || typeof message.text !== 'string') return false;
+  const { text } = message;
+  return LOCALES.some((locale) => translatorFor(locale).t('bot.chats.list') === text);
 }
 
 /** All the relay may know about a message: its text, or that it has none. */
@@ -395,6 +402,20 @@ export function registerChat(dm: Composer<ChatContext>, deps: ChatBotDeps): void
             ? ctx.t('bot.chat.now', { alias: alias(ctx, ref.alias) })
             : ctx.t('bot.chat.over'),
         });
+        // Pressed in a /chats list: the ✓ moves to the chat that is active now, in that list.
+        if (isChatsList(ctx.callbackQuery.message)) {
+          const { chats, activeMatchId } = await deps.chats.overview({
+            ...user,
+            activeMatchId: ref ? matchId : user.activeMatchId,
+          });
+          try {
+            await ctx.editMessageReplyMarkup({
+              reply_markup: { inline_keyboard: chatButtons(ctx, chats, 'to', activeMatchId) },
+            });
+          } catch {
+            // An old list, or nothing changed: the answer above said what happened.
+          }
+        }
         return;
       }
       case 'send': {
