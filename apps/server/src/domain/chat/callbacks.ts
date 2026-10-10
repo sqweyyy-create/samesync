@@ -18,6 +18,8 @@ export const CHAT_ACTIONS = [
   'reveal',
   'reveal_yes',
   'reveal_no',
+  /** Takes a consent back, while the reveal has not happened (Q38). */
+  'reveal_withdraw',
   /** Puts the question away. */
   'cancel',
 ] as const;
@@ -31,7 +33,7 @@ export interface ChatCallback {
 const PREFIX = 'c';
 const Callback = z.object({ action: z.enum(CHAT_ACTIONS), matchId: z.uuid() });
 
-/** At most 49 bytes: Telegram allows 64. */
+/** At most 54 bytes: Telegram allows 64. */
 export function encodeCallback(action: ChatAction, matchId: string): string {
   return `${PREFIX}:${action}:${matchId}`;
 }

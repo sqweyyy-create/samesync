@@ -60,8 +60,16 @@ export interface SendContext {
     closeReason: MatchCloseReason | null;
     /** Epoch milliseconds; null before results are ready and once the chat has started. */
     chatDeadlineAt: number | null;
-    /** Who has consented to exchange usernames, and whether both have. */
-    reveal: { recipientConsented: boolean; counterpartConsented: boolean; revealed: boolean };
+    /**
+     * Who has consented to exchange usernames, whether both have, and whether the recipient has
+     * been asked to in this match before (a consent can be taken back and given again, Q38).
+     */
+    reveal: {
+      recipientConsented: boolean;
+      counterpartConsented: boolean;
+      revealed: boolean;
+      recipientAsked: boolean;
+    };
     /**
      * The other participant's Telegram account, only to read their current username for a
      * reveal. Never part of a message. Null if the recipient isn't in the match.
@@ -85,6 +93,8 @@ export type DropReason =
   | 'counterpart_not_active'
   /** A username exchange in a band that has none (CLAUDE.md invariant 6). */
   | 'reveal_not_allowed'
+  /** The recipient was asked to consent in this match already: nobody is asked twice. */
+  | 'already_asked'
   /** The other person has no username right now: there is nothing to reveal. */
   | 'username_missing';
 
@@ -97,7 +107,7 @@ const isOpen = (status: MatchStatus) => (OPEN_MATCH_STATUSES as readonly string[
 function stateProblem(
   kind: NotificationKind,
   match: NonNullable<SendContext['match']>,
-): 'match_closed' | 'outdated' | 'reveal_not_allowed' | null {
+): 'match_closed' | 'outdated' | 'reveal_not_allowed' | 'already_asked' | null {
   switch (kind) {
     case 'match_created':
       return isOpen(match.status) ? null : 'match_closed';
@@ -126,11 +136,16 @@ function stateProblem(
       if (match.status === 'pending_game') return 'outdated';
       if (!revealAllowedIn(match.band)) return 'reveal_not_allowed';
       // Only while the other person's consent stands and the recipient's is still missing.
-      return match.reveal.counterpartConsented &&
-        !match.reveal.recipientConsented &&
-        !match.reveal.revealed
-        ? null
-        : 'outdated';
+      if (
+        !match.reveal.counterpartConsented ||
+        match.reveal.recipientConsented ||
+        match.reveal.revealed
+      ) {
+        return 'outdated';
+      }
+      // Once per match: a consent that was taken back and given again (Q38) queues a new
+      // question, and it goes out only if the first one never did.
+      return match.reveal.recipientAsked ? 'already_asked' : null;
     case 'reveal_done':
       if (!isOpen(match.status)) return 'match_closed';
       if (match.status === 'pending_game') return 'outdated';

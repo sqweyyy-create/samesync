@@ -5,7 +5,7 @@
  * What can never happen in the u18 band is in test/safety/u18-no-username.test.ts.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { consentRows, insertAdult, insertChat, telegramUser } from '../support/chat';
+import { consentRows, insertAdult, insertChat, insertConsent, telegramUser } from '../support/chat';
 import { buildChatApp, type ChatApp } from '../support/chat-app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
 import type { TestUser } from '../support/fixtures';
@@ -295,6 +295,178 @@ describe('"Not now"', () => {
     await app.sender.tick();
     expect(texts(app, owl.id)).toHaveLength(1);
     expect((await outboxOf(matchId)).map((r) => r.kind)).toEqual(['reveal_request']);
+  });
+});
+
+describe('"Передумать" (Q38): a consent can be taken back until the reveal', () => {
+  const withdrawRow = (matchId: string) => ({
+    inline_keyboard: [[{ text: 'Передумать', callback_data: `c:reveal_withdraw:${matchId}` }]],
+  });
+  const WITHDRAWN =
+    'Хорошо, согласие отозвано: ники остаются скрытыми (🦉 Сова). Если передумаешь снова, отправь /reveal.';
+  const REQUEST_FROM_OWL =
+    '🦉 Сова предлагает обменяться никами в Telegram. Ники откроются, только если согласятся обе стороны.';
+  /** Moves the clock on: a consent is told from an earlier one of the same person by its time. */
+  const later = (app: ChatApp, ms: number) =>
+    (app.clock as { set(next: Date): void }).set(new Date(app.clock.now().getTime() + ms));
+
+  it('is offered under every answer that leaves a consent standing, and never after the reveal', async () => {
+    const { app, matchId, a, b, fox, owl } = await pair();
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    expect(app.telegram.of('editMessageText').at(-1)?.payload).toMatchObject({
+      text: 'Твоё согласие записано. Ники откроются, когда придёт второе согласие (🦉 Сова).',
+      reply_markup: withdrawRow(matchId),
+    });
+    // /reveal shows the standing consent with the same button.
+    app.telegram.clear();
+    await app.handle(textUpdate(fox, '/reveal'));
+    expect(app.telegram.sentTo(fox.id).map((m) => m.payload)).toEqual([
+      expect.objectContaining({ reply_markup: withdrawRow(matchId) }),
+    ]);
+    // A consent that waits for its owner's username stands too.
+    app.telegram.usernames.delete(owl.id);
+    await press(app, owl, `c:reveal_yes:${matchId}`);
+    const needed = app.telegram.of('editMessageText').at(-1)?.payload;
+    expect(needed?.['text']).toContain('У тебя в Telegram не задано имя пользователя');
+    expect(needed?.['reply_markup']).toEqual(withdrawRow(matchId));
+    // So does one that waits for the other person's username.
+    app.telegram.usernames.set(owl.id, OWL_NAME);
+    app.telegram.usernames.delete(fox.id);
+    app.telegram.clear();
+    await app.handle(textUpdate(owl, '/reveal'));
+    const [missing] = app.telegram.sentTo(owl.id);
+    expect(missing?.text).toContain('Пока не получилось');
+    expect(missing?.payload['reply_markup']).toEqual(withdrawRow(matchId));
+    // Once the reveal has happened there is nothing to take back, and no button.
+    app.telegram.usernames.set(fox.id, FOX_NAME);
+    app.telegram.clear();
+    await app.handle(textUpdate(owl, '/reveal'));
+    const [onTheWay] = app.telegram.sentTo(owl.id);
+    expect(onTheWay?.text).toBe('Согласие есть с обеих сторон. Сейчас пришлю ник (🦊 Лиса).');
+    expect(onTheWay?.payload).not.toHaveProperty('reply_markup');
+    await app.handle(textUpdate(fox, '/reveal'));
+    const already = app.telegram.sentTo(fox.id).at(-1);
+    expect(already?.text).toBe('Вы уже обменялись никами (🦉 Сова).');
+    expect(already?.payload).not.toHaveProperty('reply_markup');
+    // A forged button changes nothing either.
+    await press(app, fox, `c:reveal_withdraw:${matchId}`);
+    expect(lastEdit(app)).toBe('Вы уже обменялись никами (🦉 Сова).');
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual(
+      [a, b].sort().map((user_id) => ({ user_id, revealed: true })),
+    );
+    expect(await app.sender.tick()).toMatchObject({ sent: 2 });
+  });
+
+  it('removes the consent and tells the other person nothing; their question stays answerable', async () => {
+    const { app, matchId, a, b, fox, owl } = await pair();
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    expect(await app.sender.tick()).toMatchObject({ sent: 1 });
+    app.telegram.clear();
+
+    await press(app, fox, `c:reveal_withdraw:${matchId}`);
+    expect(lastEdit(app)).toBe(WITHDRAWN);
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual([]);
+    expect(await app.sender.tick()).toMatchObject({ sent: 0 });
+    expect(texts(app, owl.id)).toEqual([]);
+    // Again: there is nothing to take back.
+    await press(app, fox, `c:reveal_withdraw:${matchId}`);
+    expect(lastEdit(app)).toBe(
+      'Хорошо, ники остаются скрытыми. Если передумаешь, отправь /reveal.',
+    );
+    // /reveal is an offer again.
+    app.telegram.clear();
+    await app.handle(textUpdate(fox, '/reveal'));
+    expect(app.telegram.sentTo(fox.id)[0]?.payload).toMatchObject({
+      text: 'Обменяться никами в Telegram (🦉 Сова)? Ники откроются, только если согласятся обе стороны.',
+      reply_markup: agreeOrNot(matchId),
+    });
+
+    // The owl still has the question in their chat. Agreeing now is a consent of their own, and
+    // the fox, who has none any more, is the one who is asked.
+    app.telegram.clear();
+    await press(app, owl, `c:reveal_yes:${matchId}`);
+    expect(lastEdit(app)).toBe(
+      'Твоё согласие записано. Ники откроются, когда придёт второе согласие (🦊 Лиса).',
+    );
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual([{ user_id: b, revealed: false }]);
+    expect(await app.sender.tick()).toMatchObject({ sent: 1 });
+    expect(texts(app, fox.id)).toEqual([REQUEST_FROM_OWL]);
+    expect(everythingSent(app)).not.toContain(FOX_NAME);
+    expect(everythingSent(app)).not.toContain(OWL_NAME);
+
+    // And agreeing again reveals, as it would have the first time.
+    app.telegram.clear();
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    expect(await app.sender.tick()).toMatchObject({ sent: 2 });
+    expect(texts(app, fox.id)).toEqual([`🦉 Сова в Telegram: @${OWL_NAME}`]);
+    expect(texts(app, owl.id)).toEqual([`🦊 Лиса в Telegram: @${FOX_NAME}`]);
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual(
+      [a, b].sort().map((user_id) => ({ user_id, revealed: true })),
+    );
+  });
+
+  it('asks the other person once when a consent is taken back and given again before the question went out', async () => {
+    const { app, matchId, fox, owl } = await pair();
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    await press(app, fox, `c:reveal_withdraw:${matchId}`);
+    later(app, 1000);
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    // Two questions were queued; the first goes out, the second is dropped for it.
+    expect(await app.sender.tick()).toMatchObject({ sent: 1, cancelled: 1 });
+    expect(texts(app, owl.id)).toHaveLength(1);
+    expect((await outboxOf(matchId)).map((r) => [r.kind, r.status, r.cancel_reason])).toEqual([
+      ['reveal_request', 'sent', null],
+      ['reveal_request', 'cancelled', 'already_asked'],
+    ]);
+  });
+
+  it('asks the other person when the question of the first consent was dropped before it went out', async () => {
+    const { app, matchId, fox, owl } = await pair();
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    await press(app, fox, `c:reveal_withdraw:${matchId}`);
+    expect(await app.sender.tick()).toMatchObject({ sent: 0, cancelled: 1 });
+    expect(texts(app, owl.id)).toEqual([]);
+    later(app, 1000);
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    expect(await app.sender.tick()).toMatchObject({ sent: 1 });
+    expect(texts(app, owl.id)).toHaveLength(1);
+    expect((await outboxOf(matchId)).map((r) => [r.kind, r.status, r.cancel_reason])).toEqual([
+      ['reveal_request', 'cancelled', 'outdated'],
+      ['reveal_request', 'sent', null],
+    ]);
+  });
+
+  it('never asks the other person twice in one match', async () => {
+    const { app, matchId, fox, owl } = await pair();
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    expect(await app.sender.tick()).toMatchObject({ sent: 1 });
+    for (const step of [1, 2]) {
+      await press(app, fox, `c:reveal_withdraw:${matchId}`);
+      later(app, 1000 * step);
+      await press(app, fox, `c:reveal_yes:${matchId}`);
+      await app.handle(textUpdate(fox, '/reveal'));
+    }
+    expect(await app.sender.tick()).toMatchObject({ sent: 0, cancelled: 2 });
+    expect(texts(app, owl.id)).toHaveLength(1);
+    expect((await outboxOf(matchId)).map((r) => r.status)).toEqual([
+      'sent',
+      'cancelled',
+      'cancelled',
+    ]);
+  });
+
+  it('is not available for a chat of other people or a chat that has ended', async () => {
+    const { app, matchId, fox, owl } = await pair();
+    const others = await insertChat(testDb.appPool);
+    await insertConsent(testDb.appPool, others.matchId, others.a);
+    await press(app, fox, `c:reveal_withdraw:${others.matchId}`);
+    expect(lastEdit(app)).toBe('Обмен никами недоступен.');
+    expect(await consentRows(testDb.ownerPool, others.matchId)).toHaveLength(1);
+
+    await press(app, fox, `c:reveal_yes:${matchId}`);
+    await app.chat.leave((await app.chat.user(owl.id))!.id, matchId, app.clock.now());
+    await press(app, fox, `c:reveal_withdraw:${matchId}`);
+    expect(lastEdit(app)).toBe('Обмен никами недоступен.');
   });
 });
 

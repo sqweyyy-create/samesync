@@ -63,6 +63,8 @@
   "bot.reveal.waiting": "Your consent is recorded. The usernames are revealed once the other person agrees too ({alias}).",
   "bot.reveal.request": "{alias} suggests exchanging Telegram usernames. They are revealed only if both sides agree.",
   "bot.reveal.declined": "OK, the usernames stay hidden. Send /reveal if you change your mind.",
+  "bot.reveal.withdraw": "Withdraw",
+  "bot.reveal.withdrawn": "OK, your consent is withdrawn: the usernames stay hidden ({alias}). Send /reveal if you change your mind again.",
   "bot.reveal.username_needed": "You don't have a Telegram username yet, so there's nothing to exchange. Set one in Telegram's settings and send /reveal again: your consent is saved.",
   "bot.reveal.other_username_missing": "It didn't work yet: the other person has no Telegram username right now ({alias}). Try again later with /reveal.",
   "bot.reveal.on_the_way": "Both sides agreed. The username is on its way ({alias}).",

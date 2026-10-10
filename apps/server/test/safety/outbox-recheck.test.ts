@@ -391,6 +391,25 @@ describe('the chat notifications are re-checked like every other', () => {
     },
   );
 
+  it('a request to consent goes to one person once per match, whatever was queued after it', async () => {
+    const { b, match, rows } = await queuedChat('reveal_request');
+    const { sentTo } = await sendChat([b]);
+    expect(sentTo).toEqual([b.telegramId]);
+    // A consent that was taken back and given again (Q38) queues a question of its own.
+    const again = await insertOutbox(testDb.appPool, {
+      userId: b.id,
+      matchId: match.id,
+      kind: 'reveal_request',
+      dedupeKey: `reveal_request:${match.id}:${b.id}:again`,
+    });
+    expect((await sendChat([b])).sentTo).toEqual([]);
+    expect(await outboxRow(testDb.ownerPool, rows[0]!.id)).toMatchObject({ status: 'sent' });
+    expect(await outboxRow(testDb.ownerPool, again.id)).toMatchObject({
+      status: 'cancelled',
+      cancel_reason: 'already_asked',
+    });
+  });
+
   it('a username is sent only for a reveal the database recorded for both', async () => {
     // One consent only; then two consents that are not marked revealed.
     for (const consents of [1, 2]) {

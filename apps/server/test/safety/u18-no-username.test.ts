@@ -162,6 +162,7 @@ describe('a u18 conversation', () => {
         const meId = me.id === ANNA.id ? chat.first.id : chat.second.id;
         expect(await app.reveal.state(meId, matchId)).toEqual({ status: 'unavailable' });
         expect(await app.reveal.consent(meId, matchId)).toEqual({ status: 'unavailable' });
+        expect(await app.reveal.withdraw(meId, matchId)).toEqual({ status: 'unavailable' });
 
         // The API, with initData that carries the caller's own name and username.
         expect(await record.api(me, 'get', '/api/me')).toBe(200);

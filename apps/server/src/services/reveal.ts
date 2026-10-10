@@ -7,6 +7,8 @@
  *   refuses a consent row for anyone under 18 by birth date on its own.
  * - Nothing is revealed until both users have consented, and the database records that for both
  *   rows at once (`revealed_at`), checking both live bands again.
+ * - A consent can be taken back at any time until then, and never afterwards (Q38): the
+ *   database refuses to remove a revealed consent.
  * - No username passes through here. This service only asks Telegram whether each user has one
  *   right now. The usernames are sent by the outbox sender, which reads them again at that moment
  *   and re-checks the match, both bands and both consents first.
@@ -38,10 +40,21 @@ export type ConsentOutcome =
   /** Both consented: each of them is being sent the other's username. */
   | { status: 'revealed'; alias: string; already: boolean };
 
+export type WithdrawOutcome =
+  | { status: 'unavailable' }
+  /** The consent is gone. The other person is told nothing. */
+  | { status: 'withdrawn'; alias: string }
+  /** There was no consent of the caller to take back. */
+  | { status: 'not_consented'; alias: string }
+  /** Too late: the reveal has happened. */
+  | { status: 'revealed'; alias: string };
+
 export interface RevealService {
   state(userId: string, matchId: string): Promise<RevealState>;
   /** Records the caller's consent and, when both have consented, reveals. Safe to repeat. */
   consent(userId: string, matchId: string): Promise<ConsentOutcome>;
+  /** Takes the caller's consent back, unless the reveal has happened (Q38). Safe to repeat. */
+  withdraw(userId: string, matchId: string): Promise<WithdrawOutcome>;
 }
 
 export function createRevealService(deps: {
@@ -91,7 +104,7 @@ export function createRevealService(deps: {
       if ((await usernames.current(view.you)) === null) return { status: 'username_needed' };
 
       if (!view.theyConsented) {
-        await reveal.ask(matchId, view.they.id, clock.now());
+        await reveal.ask(matchId, userId, view.they.id, clock.now());
         return { status: 'waiting', alias };
       }
       if ((await usernames.current(view.they)) === null) {
@@ -104,9 +117,32 @@ export function createRevealService(deps: {
       }
       // Refused by the trigger, or done by the other person's request at the same moment.
       const after = await possible(userId, matchId);
-      return after?.revealed
-        ? { status: 'revealed', alias, already: true }
-        : { status: 'unavailable' };
+      if (!after) return { status: 'unavailable' };
+      if (after.revealed) return { status: 'revealed', alias, already: true };
+      if (after.youConsented && !after.theyConsented) {
+        // The other person took their consent back just now (Q38): they are asked again.
+        await reveal.ask(matchId, userId, after.they.id, clock.now());
+        return { status: 'waiting', alias };
+      }
+      return { status: 'unavailable' };
+    },
+
+    async withdraw(userId, matchId) {
+      const view = await possible(userId, matchId);
+      if (!view) return { status: 'unavailable' };
+      const alias = view.counterpartAlias;
+      if (view.revealed) return { status: 'revealed', alias };
+      if (!view.youConsented) return { status: 'not_consented', alias };
+
+      // The delete trigger decides once more: nothing is removed once the reveal has happened.
+      const result = await reveal.withdraw(userId, matchId);
+      if (result === 'withdrawn') {
+        logger.info({ userId, matchId }, 'reveal consent withdrawn');
+        return { status: 'withdrawn', alias };
+      }
+      // Revealed, or taken back already, in the meantime.
+      const after = await possible(userId, matchId);
+      return after?.revealed ? { status: 'revealed', alias } : { status: 'not_consented', alias };
     },
   };
 }

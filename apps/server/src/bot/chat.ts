@@ -9,7 +9,8 @@
  *   sender goes beyond the lookup of their own row.
  * - Everything the bot says here names the other person by alias only.
  * - /reveal answers "not available" to anyone who is not an adult by birth date, before any
- *   lookup (CLAUDE.md invariant 6). The reveal service and the database refuse again.
+ *   lookup (CLAUDE.md invariant 6). The reveal service and the database refuse again. A consent
+ *   can be taken back ("Передумать") until the reveal has happened (Q38).
  * - Button data is validated; it only names an action and a match.
  */
 import { LOCALES, type Locale } from '@samesync/shared';
@@ -23,7 +24,7 @@ import { encodeCallback, parseCallback, type ChatAction } from '../domain/chat/c
 import type { IncomingContent } from '../domain/chat/relay';
 import type { ChatService } from '../services/chat';
 import type { ChatRef, RelayRefusedReason, RelayResult, RelayService } from '../services/relay';
-import type { ConsentOutcome, RevealService } from '../services/reveal';
+import type { ConsentOutcome, RevealService, WithdrawOutcome } from '../services/reveal';
 
 export interface ChatBotDeps {
   chat: Pick<ChatRepository, 'user' | 'wasRelayed'>;
@@ -218,21 +219,57 @@ export function registerChat(dm: Composer<ChatContext>, deps: ChatBotDeps): void
   const mayReveal = (user: ChatUser | null): user is ChatUser =>
     user !== null && user.status === 'active' && user.liveBand === 'adult';
 
-  function consentText(ctx: ChatContext, outcome: ConsentOutcome): string {
+  /** "Передумать": under every answer that leaves a consent standing before the reveal (Q38). */
+  const withdrawRow = (ctx: ChatContext, matchId: string): Keyboard => [
+    [
+      {
+        text: ctx.t('bot.reveal.withdraw'),
+        callback_data: encodeCallback('reveal_withdraw', matchId),
+      },
+    ],
+  ];
+
+  function consentReply(
+    ctx: ChatContext,
+    matchId: string,
+    outcome: ConsentOutcome,
+  ): { text: string; keyboard?: Keyboard } {
+    const standing = withdrawRow(ctx, matchId);
+    switch (outcome.status) {
+      case 'unavailable':
+        return { text: ctx.t('bot.reveal.unavailable') };
+      case 'username_needed':
+        return { text: ctx.t('bot.reveal.username_needed'), keyboard: standing };
+      case 'waiting':
+        return {
+          text: ctx.t('bot.reveal.waiting', { alias: alias(ctx, outcome.alias) }),
+          keyboard: standing,
+        };
+      case 'other_username_missing':
+        return {
+          text: ctx.t('bot.reveal.other_username_missing', { alias: alias(ctx, outcome.alias) }),
+          keyboard: standing,
+        };
+      case 'revealed':
+        // The usernames themselves come in a message of their own, from the outbox.
+        return {
+          text: ctx.t(outcome.already ? 'bot.reveal.already' : 'bot.reveal.on_the_way', {
+            alias: alias(ctx, outcome.alias),
+          }),
+        };
+    }
+  }
+
+  function withdrawText(ctx: ChatContext, outcome: WithdrawOutcome): string {
     switch (outcome.status) {
       case 'unavailable':
         return ctx.t('bot.reveal.unavailable');
-      case 'username_needed':
-        return ctx.t('bot.reveal.username_needed');
-      case 'waiting':
-        return ctx.t('bot.reveal.waiting', { alias: alias(ctx, outcome.alias) });
-      case 'other_username_missing':
-        return ctx.t('bot.reveal.other_username_missing', { alias: alias(ctx, outcome.alias) });
+      case 'withdrawn':
+        return ctx.t('bot.reveal.withdrawn', { alias: alias(ctx, outcome.alias) });
+      case 'not_consented':
+        return ctx.t('bot.reveal.declined');
       case 'revealed':
-        // The usernames themselves come in a message of their own, from the outbox.
-        return ctx.t(outcome.already ? 'bot.reveal.already' : 'bot.reveal.on_the_way', {
-          alias: alias(ctx, outcome.alias),
-        });
+        return ctx.t('bot.reveal.already', { alias: alias(ctx, outcome.alias) });
     }
   }
 
@@ -251,11 +288,13 @@ export function registerChat(dm: Composer<ChatContext>, deps: ChatBotDeps): void
       case 'revealed':
         await say(ctx, how, ctx.t('bot.reveal.already', { alias: alias(ctx, state.alias) }));
         return;
-      case 'pending':
+      case 'pending': {
         // Consent is given already: see whether the reveal can go through now (a username that
         // was missing may have been set since).
-        await say(ctx, how, consentText(ctx, await deps.reveal.consent(user.id, matchId)));
+        const reply = consentReply(ctx, matchId, await deps.reveal.consent(user.id, matchId));
+        await say(ctx, how, reply.text, reply.keyboard);
         return;
+      }
       case 'offer':
         await say(
           ctx,
@@ -407,17 +446,27 @@ export function registerChat(dm: Composer<ChatContext>, deps: ChatBotDeps): void
         if (mayReveal(user)) await showReveal(ctx, user, matchId, 'edit');
         else await edit(ctx, ctx.t('bot.reveal.unavailable'));
         break;
-      case 'reveal_yes':
-        await edit(
-          ctx,
-          mayReveal(user)
-            ? consentText(ctx, await deps.reveal.consent(user.id, matchId))
-            : ctx.t('bot.reveal.unavailable'),
-        );
+      case 'reveal_yes': {
+        if (!mayReveal(user)) {
+          await edit(ctx, ctx.t('bot.reveal.unavailable'));
+          break;
+        }
+        const reply = consentReply(ctx, matchId, await deps.reveal.consent(user.id, matchId));
+        await edit(ctx, reply.text, reply.keyboard);
         break;
+      }
       case 'reveal_no':
         // Nothing is stored and the other person is told nothing.
         await edit(ctx, ctx.t('bot.reveal.declined'));
+        break;
+      case 'reveal_withdraw':
+        // The consent is removed, if the reveal has not happened; the other person is told nothing.
+        await edit(
+          ctx,
+          mayReveal(user)
+            ? withdrawText(ctx, await deps.reveal.withdraw(user.id, matchId))
+            : ctx.t('bot.reveal.unavailable'),
+        );
         break;
       case 'cancel':
         await edit(ctx, ctx.t('bot.cancelled'));

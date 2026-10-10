@@ -32,7 +32,12 @@ const match: NonNullable<SendContext['match']> = {
   gameDeadlineAt: Date.UTC(2026, 9, 6, 12),
   closeReason: null,
   chatDeadlineAt: null,
-  reveal: { recipientConsented: false, counterpartConsented: false, revealed: false },
+  reveal: {
+    recipientConsented: false,
+    counterpartConsented: false,
+    revealed: false,
+    recipientAsked: false,
+  },
   counterpart: { telegramId: 43, synthetic: false },
 };
 const reason = (
@@ -109,11 +114,21 @@ describe('dropReason for the game notifications', () => {
     chat_ended: { status: 'closed', closeReason: 'left' },
     reveal_request: {
       status: 'active',
-      reveal: { recipientConsented: false, counterpartConsented: true, revealed: false },
+      reveal: {
+        recipientConsented: false,
+        counterpartConsented: true,
+        revealed: false,
+        recipientAsked: false,
+      },
     },
     reveal_done: {
       status: 'active',
-      reveal: { recipientConsented: true, counterpartConsented: true, revealed: true },
+      reveal: {
+        recipientConsented: true,
+        counterpartConsented: true,
+        revealed: true,
+        recipientAsked: true,
+      },
     },
   };
 
@@ -200,8 +215,18 @@ describe('dropReason for the chat notifications', () => {
     expect(reason({}, { status: 'active' }, 'chat_ended')).toBe('outdated');
   });
 
-  const asked = { recipientConsented: false, counterpartConsented: true, revealed: false };
-  const done = { recipientConsented: true, counterpartConsented: true, revealed: true };
+  const asked = {
+    recipientConsented: false,
+    counterpartConsented: true,
+    revealed: false,
+    recipientAsked: false,
+  };
+  const done = {
+    recipientConsented: true,
+    counterpartConsented: true,
+    revealed: true,
+    recipientAsked: true,
+  };
   const u18 = { band: 'u18' as const, counterpartLiveBand: 'u18' as const };
 
   it('asks for consent only while the other consent stands and the recipient has not answered', () => {
@@ -221,6 +246,31 @@ describe('dropReason for the chat notifications', () => {
       'outdated',
     );
     expect(reason({}, { status: 'closed', reveal: asked }, 'reveal_request')).toBe('match_closed');
+  });
+
+  it('asks nobody twice in one match, however often a consent was taken back and given again', () => {
+    expect(
+      reason(
+        {},
+        { status: 'active', reveal: { ...asked, recipientAsked: true } },
+        'reveal_request',
+      ),
+    ).toBe('already_asked');
+    // A question that is outdated is dropped for that, whether or not one went out before.
+    expect(
+      reason(
+        {},
+        {
+          status: 'active',
+          reveal: { ...asked, counterpartConsented: false, recipientAsked: true },
+        },
+        'reveal_request',
+      ),
+    ).toBe('outdated');
+    // The username itself does not care whether a question went out.
+    expect(
+      reason({}, { status: 'active', reveal: { ...done, recipientAsked: false } }, 'reveal_done'),
+    ).toBeNull();
   });
 
   it('sends a username only for a reveal recorded for both, in an open chat', () => {

@@ -59,6 +59,7 @@ interface ContextRow extends Record<string, unknown> {
   recipient_consented: boolean;
   counterpart_consented: boolean;
   revealed: boolean;
+  recipient_asked: boolean;
   counterpart_telegram_id: string | number | null;
   counterpart_synthetic: boolean | null;
 }
@@ -119,6 +120,11 @@ export function createOutboxRepository(db: Db): OutboxRepository {
           rc.user_id IS NOT NULL AS recipient_consented,
           cc.user_id IS NOT NULL AS counterpart_consented,
           (rc.revealed_at IS NOT NULL AND cc.revealed_at IS NOT NULL) AS revealed,
+          EXISTS (
+            SELECT 1 FROM outbox o
+            WHERE o.match_id = m.id AND o.user_id = r.id
+              AND o.kind = 'reveal_request' AND o.status = 'sent'
+          ) AS recipient_asked,
           c.telegram_id AS counterpart_telegram_id, c.synthetic AS counterpart_synthetic
         FROM users r
         LEFT JOIN matches m ON m.id = ${matchId}::uuid
@@ -160,6 +166,7 @@ export function createOutboxRepository(db: Db): OutboxRepository {
                   recipientConsented: row.recipient_consented,
                   counterpartConsented: row.counterpart_consented,
                   revealed: row.revealed,
+                  recipientAsked: row.recipient_asked,
                 },
                 counterpart:
                   row.counterpart_telegram_id === null || row.counterpart_synthetic === null

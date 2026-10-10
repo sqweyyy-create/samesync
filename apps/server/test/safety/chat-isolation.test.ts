@@ -12,6 +12,8 @@
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createRevealRepository } from '../../src/db/repositories/reveal';
+import { createRevealService } from '../../src/services/reveal';
 import {
   activeMatchOf,
   consentRows,
@@ -26,6 +28,7 @@ import {
 } from '../support/chat';
 import { buildChatApp, type ChatApp } from '../support/chat-app';
 import { createTestDatabase, type TestDatabase } from '../support/db';
+import { memoryLogger } from '../support/fixtures';
 import { insertGame } from '../support/games';
 import {
   insertActiveUser,
@@ -1006,5 +1009,67 @@ describe('the relay and other people', () => {
       expect(sent).not.toContain(secret);
     }
     expect(call?.payload['chat_id']).toBe(owl.id);
+  });
+});
+
+describe('a withdrawal that crosses the other person consent (Q38)', () => {
+  const FOX_NAME = 'fox_handle_for_telegram';
+  const OWL_NAME = 'owl_handle_for_telegram';
+
+  it('reveals nothing, sends no username, and asks the one who withdrew instead', async () => {
+    const { app, matchId, a, b, fox, owl } = await talking();
+    app.telegram.usernames.set(fox.id, FOX_NAME);
+    app.telegram.usernames.set(owl.id, OWL_NAME);
+    expect(await app.reveal.consent(a, matchId)).toEqual({ status: 'waiting', alias: 'a.owl' });
+
+    // The owl's consent through the real service, with the fox's withdrawal landing in the
+    // middle of it: after the owl's consent is stored and the match was read with the fox's
+    // consent still in it, right before the reveal.
+    let crossed = false;
+    const racing = createRevealService({
+      reveal: createRevealRepository(testDb.db),
+      usernames: {
+        current: async (account) => {
+          if (!crossed) {
+            crossed = true;
+            expect(await app.reveal.withdraw(a, matchId)).toEqual({
+              status: 'withdrawn',
+              alias: 'a.owl',
+            });
+          }
+          return app.usernames.current(account);
+        },
+      },
+      clock: app.clock,
+      logger: memoryLogger().logger,
+    });
+    expect(await racing.consent(b, matchId)).toEqual({ status: 'waiting', alias: 'a.fox' });
+    expect(crossed).toBe(true);
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual([{ user_id: b, revealed: false }]);
+
+    // The question the fox's consent had queued for the owl is outdated; the owl's consent asks
+    // the fox; no username goes anywhere.
+    await app.sender.tick();
+    const everything = JSON.stringify(app.telegram.calls);
+    expect(everything).not.toContain(FOX_NAME);
+    expect(everything).not.toContain(OWL_NAME);
+    expect(texts(app, owl.id)).toEqual([]);
+    expect(texts(app, fox.id)).toEqual([
+      '🦉 Сова предлагает обменяться никами в Telegram. Ники откроются, только если согласятся обе стороны.',
+    ]);
+    const { rows } = await testDb.ownerPool.query<{
+      kind: string;
+      status: string;
+      cancel_reason: string | null;
+      to_fox: boolean;
+    }>(
+      `SELECT kind::text AS kind, status::text AS status, cancel_reason, user_id = $2 AS to_fox
+       FROM outbox WHERE match_id = $1 ORDER BY created_at`,
+      [matchId, a],
+    );
+    expect(rows).toEqual([
+      { kind: 'reveal_request', status: 'cancelled', cancel_reason: 'outdated', to_fox: false },
+      { kind: 'reveal_request', status: 'sent', cancel_reason: null, to_fox: true },
+    ]);
   });
 });

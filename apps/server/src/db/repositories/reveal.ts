@@ -3,8 +3,9 @@
  *
  * Safety: the read is participant-scoped like every other read of a match (the caller is in it,
  * it was not closed for a band change, both live bands equal its band), and the writes pass the
- * triggers of migration 0010: consent exists only between two adults by birth date, in an open
- * chat, and `revealed_at` is set only when both have consented.
+ * triggers of migrations 0010 and 0012: consent exists only between two adults by birth date, in
+ * an open chat, `revealed_at` is set only when both have consented, and a consent can be taken
+ * back only until then (Q38).
  * No username is read or written here. The usernames themselves come from Telegram at the moment
  * they are sent (services/usernames.ts).
  */
@@ -40,8 +41,17 @@ export interface RevealRepository {
   view(userId: string, matchId: string): Promise<RevealView | null>;
   /** Records the caller's consent. `refused`: the insert trigger said no. */
   consent(userId: string, matchId: string, now: Date): Promise<'stored' | 'exists' | 'refused'>;
-  /** Asks `userId` to consent too, once per match. */
-  ask(matchId: string, userId: string, now: Date): Promise<void>;
+  /**
+   * Takes the caller's consent back, while the reveal has not happened. `kept`: there was no
+   * consent to remove, or it is revealed. `refused`: the delete trigger said no.
+   */
+  withdraw(userId: string, matchId: string): Promise<'withdrawn' | 'kept' | 'refused'>;
+  /**
+   * Asks `userId` to consent too, once per consent of `askerId`: a consent that was taken back and
+   * given again asks again. Nothing is queued when the asker's consent is gone. The sender makes
+   * sure nobody is asked twice in one match (`already_asked`).
+   */
+  ask(matchId: string, askerId: string, userId: string, now: Date): Promise<void>;
   /**
    * One transaction: marks both consents revealed and queues, for each user, the message that
    * carries the other's username. False if the update trigger refused or there was nothing to do.
@@ -51,6 +61,8 @@ export interface RevealRepository {
 
 /** Refusals of the reveal triggers. */
 const REVEAL_REFUSED = new Set(['SS040', 'SS041']);
+/** The delete trigger: a consent cannot be withdrawn after the reveal. */
+const WITHDRAWAL_REFUSED = 'SS042';
 
 interface Row extends Record<string, unknown> {
   id: string;
@@ -128,19 +140,40 @@ export function createRevealRepository(db: Db): RevealRepository {
       }
     },
 
-    async ask(matchId, userId, now) {
-      await db
-        .insert(outbox)
-        .values({
-          id: uuidv7(),
-          userId,
-          kind: 'reveal_request',
-          matchId,
-          dedupeKey: notificationKey('reveal_request', matchId, userId),
-          nextAttemptAt: now,
-          createdAt: now,
-        })
-        .onConflictDoNothing({ target: outbox.dedupeKey });
+    async withdraw(userId, matchId) {
+      try {
+        // "revealed_at IS NULL" is the rule; the delete trigger holds it even without it.
+        const removed = await db
+          .delete(revealConsents)
+          .where(
+            and(
+              eq(revealConsents.matchId, matchId),
+              eq(revealConsents.userId, userId),
+              isNull(revealConsents.revealedAt),
+            ),
+          )
+          .returning({ userId: revealConsents.userId });
+        return removed.length > 0 ? 'withdrawn' : 'kept';
+      } catch (error) {
+        const pgError = pgErrorOf(error);
+        if (pgError?.code === WITHDRAWAL_REFUSED) return 'refused';
+        throw error;
+      }
+    },
+
+    async ask(matchId, askerId, userId, now) {
+      // The question is keyed by the consent it comes from (its time), and it is queued only
+      // while that consent stands.
+      const key = notificationKey('reveal_request', matchId, userId);
+      await db.execute(sql`
+        INSERT INTO outbox (id, user_id, kind, match_id, dedupe_key, next_attempt_at, created_at)
+        SELECT ${uuidv7()}::uuid, ${userId}::uuid, 'reveal_request', ${matchId}::uuid,
+          ${key} || ':' || (extract(epoch FROM c.consented_at) * 1000)::bigint,
+          ${now.toISOString()}::timestamptz, ${now.toISOString()}::timestamptz
+        FROM reveal_consents c
+        WHERE c.match_id = ${matchId}::uuid AND c.user_id = ${askerId}::uuid
+          AND c.revealed_at IS NULL
+        ON CONFLICT (dedupe_key) DO NOTHING`);
     },
 
     async reveal(matchId, now) {
