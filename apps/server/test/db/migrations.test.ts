@@ -438,21 +438,25 @@ describe('migrations', () => {
       await expectDenied('ALTER TABLE matches DISABLE TRIGGER matches_30_guard_chat_status');
     });
 
-    it('can record a consent to reveal and mark it revealed, and nothing else', async () => {
+    it('can record a consent to reveal, mark it revealed or withdraw it, and nothing else', async () => {
       await app.query('SELECT 1 FROM reveal_consents');
       await app.query(
         'INSERT INTO reveal_consents (match_id, user_id, consented_at) SELECT gen_random_uuid(), gen_random_uuid(), now() WHERE false',
       );
       await app.query('UPDATE reveal_consents SET revealed_at = now() WHERE false');
+      // A withdrawal is a delete; the trigger limits it to a consent that was not revealed.
+      await app.query('DELETE FROM reveal_consents WHERE false');
       await expectDenied('UPDATE reveal_consents SET consented_at = now()');
       await expectDenied('UPDATE reveal_consents SET user_id = user_id');
-      await expectDenied('DELETE FROM reveal_consents');
       await expectDenied('TRUNCATE reveal_consents');
       await expectDenied(
         'ALTER TABLE reveal_consents DISABLE TRIGGER reveal_consents_10_guard_insert',
       );
       await expectDenied(
         'ALTER TABLE reveal_consents DISABLE TRIGGER reveal_consents_10_guard_update',
+      );
+      await expectDenied(
+        'ALTER TABLE reveal_consents DISABLE TRIGGER reveal_consents_10_guard_delete',
       );
     });
 
@@ -482,6 +486,7 @@ describe('migrations', () => {
       await expectDenied('SELECT messages_guard_update()');
       await expectDenied('SELECT reveal_consents_guard_insert()');
       await expectDenied('SELECT reveal_consents_guard_update()');
+      await expectDenied('SELECT reveal_consents_guard_delete()');
       await expectDenied('SELECT matches_guard_chat_status()');
     });
 

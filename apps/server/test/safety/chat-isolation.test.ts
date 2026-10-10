@@ -4,12 +4,13 @@
  * The first part skips the app and attacks the database directly as the app role: only a
  * participant of a match whose chat is open can store a message, both live bands must equal the
  * match band even when the cached `age_band` is stale, nothing is stored in a u18 match, a stored
- * message never changes, a chat starts only with a delivered message, and usernames can be
- * revealed only between two adults who both consented.
+ * message never changes, a chat starts only with a delivered message, usernames can be revealed
+ * only between two adults who both consented, and a consent can be taken back only until then.
  * The second part drives the real relay through the bot and the API: it reads both users again
  * immediately before every Telegram call, so nothing is relayed to or from a frozen user or across
  * bands, and a match whose live bands no longer fit is closed by the very message that finds out.
  */
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   activeMatchOf,
@@ -407,11 +408,40 @@ describe('the start of a chat', () => {
 describe('consent to reveal usernames', () => {
   const consent = (matchId: string, userId: string) =>
     insertConsent(testDb.appPool, matchId, userId);
-  const reveal = (matchId: string) =>
-    testDb.appPool.query(
-      'UPDATE reveal_consents SET revealed_at = now() WHERE match_id = $1 AND revealed_at IS NULL',
-      [matchId],
+  /** The reveal and the withdrawal as the app writes them. */
+  const REVEAL =
+    'UPDATE reveal_consents SET revealed_at = now() WHERE match_id = $1 AND revealed_at IS NULL';
+  const WITHDRAW =
+    'DELETE FROM reveal_consents WHERE match_id = $1 AND user_id = $2 AND revealed_at IS NULL';
+  const reveal = (matchId: string) => testDb.appPool.query(REVEAL, [matchId]);
+  const withdraw = (matchId: string, userId: string) =>
+    testDb.appPool.query(WITHDRAW, [matchId, userId]);
+  const WITHDRAWAL_REFUSED = {
+    code: 'SS042',
+    message: 'reveal_consents: a consent cannot be withdrawn after the reveal',
+  };
+
+  /** The error a query that is still waiting for a lock will end with, caught right away. */
+  const outcomeOf = (query: Promise<unknown>) =>
+    query.then(
+      () => new Error('the query went through'),
+      (error: unknown) => error,
     );
+
+  /** Resolves once a session of this database is waiting for a lock another session holds. */
+  async function waitForLockWait(): Promise<void> {
+    for (let tries = 0; tries < 250; tries++) {
+      const { rows } = await testDb.ownerPool.query<{ waiting: number }>(
+        `SELECT count(*)::int AS waiting FROM pg_locks l
+         JOIN pg_stat_activity s ON s.pid = l.pid
+         WHERE NOT l.granted AND s.datname = $1`,
+        [testDb.name],
+      );
+      if ((rows[0]?.waiting ?? 0) > 0) return;
+      await sleep(20);
+    }
+    throw new Error('no session is waiting for a lock');
+  }
 
   it('can be given by each participant of an adult chat, once', async () => {
     const { matchId, a, b } = await chat();
@@ -544,7 +574,7 @@ describe('consent to reveal usernames', () => {
     }
   });
 
-  it('cannot be rewritten or deleted by the app', async () => {
+  it('cannot be rewritten by the app', async () => {
     const { matchId, a, b } = await chat();
     await consent(matchId, a);
     await expect(
@@ -558,9 +588,6 @@ describe('consent to reveal usernames', () => {
         b,
       ]),
     ).rejects.toMatchObject(DENIED);
-    await expect(
-      testDb.appPool.query('DELETE FROM reveal_consents WHERE match_id = $1', [matchId]),
-    ).rejects.toMatchObject(DENIED);
     // The trigger refuses even the owner: a second consent can't be made out of the first.
     await expect(
       testDb.ownerPool.query('UPDATE reveal_consents SET user_id = $2 WHERE match_id = $1', [
@@ -568,6 +595,129 @@ describe('consent to reveal usernames', () => {
         b,
       ]),
     ).rejects.toMatchObject({ code: 'SS041' });
+  });
+
+  // Q38 (decided): a consent can be taken back until the reveal has happened, never afterwards.
+  it('can be withdrawn until the reveal, and given again', async () => {
+    const { matchId, a, b } = await chat();
+    await consent(matchId, a);
+    await consent(matchId, b);
+    const withdrawn = await withdraw(matchId, a);
+    expect(withdrawn.rowCount).toBe(1);
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual([{ user_id: b, revealed: false }]);
+    // With one consent left there is nothing to reveal.
+    await expect(reveal(matchId)).rejects.toMatchObject(revealRefused('not_mutual'));
+    // A new consent is a new row, and the reveal works with it.
+    await consent(matchId, a);
+    await reveal(matchId);
+    expect((await consentRows(testDb.ownerPool, matchId)).map((r) => r.revealed)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('can be withdrawn in a chat that has ended: the rule is about the reveal only', async () => {
+    const { matchId, a } = await chat();
+    await consent(matchId, a);
+    await testDb.appPool.query(
+      "UPDATE matches SET status = 'closed', close_reason = 'left', closed_at = now() WHERE id = $1",
+      [matchId],
+    );
+    expect((await withdraw(matchId, a)).rowCount).toBe(1);
+    expect(await consentRows(testDb.ownerPool, matchId)).toEqual([]);
+  });
+
+  it('cannot be withdrawn once the reveal has happened, by anyone', async () => {
+    const { matchId, a, b } = await chat();
+    await consent(matchId, a);
+    await consent(matchId, b);
+    await reveal(matchId);
+    // The withdrawal as the app writes it finds nothing to remove…
+    for (const userId of [a, b]) {
+      expect((await withdraw(matchId, userId)).rowCount).toBe(0);
+    }
+    // …and a delete that does not look at `revealed_at` is refused by the trigger, for the app
+    // role and for the owner alike.
+    for (const userId of [a, b]) {
+      await expect(
+        testDb.appPool.query('DELETE FROM reveal_consents WHERE match_id = $1 AND user_id = $2', [
+          matchId,
+          userId,
+        ]),
+      ).rejects.toMatchObject(WITHDRAWAL_REFUSED);
+    }
+    await expect(
+      testDb.appPool.query('DELETE FROM reveal_consents WHERE match_id = $1', [matchId]),
+    ).rejects.toMatchObject(WITHDRAWAL_REFUSED);
+    await expect(
+      testDb.ownerPool.query('DELETE FROM reveal_consents WHERE match_id = $1', [matchId]),
+    ).rejects.toMatchObject(WITHDRAWAL_REFUSED);
+    // Not even when the chat is over: the record of the reveal stays.
+    await testDb.appPool.query(
+      "UPDATE matches SET status = 'closed', close_reason = 'left', closed_at = now() WHERE id = $1",
+      [matchId],
+    );
+    await expect(
+      testDb.appPool.query('DELETE FROM reveal_consents WHERE match_id = $1', [matchId]),
+    ).rejects.toMatchObject(WITHDRAWAL_REFUSED);
+    expect((await consentRows(testDb.ownerPool, matchId)).map((r) => r.revealed)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('refuses the later of a withdrawal and a reveal that cross, in both orders', async () => {
+    // The withdrawal is under way (its transaction is open) when the reveal arrives: the reveal
+    // waits for it, then finds one consent and is refused. Nothing is revealed to anyone.
+    {
+      const { matchId, a, b } = await chat();
+      await consent(matchId, a);
+      await consent(matchId, b);
+      const withdrawing = await testDb.appPool.connect();
+      try {
+        await withdrawing.query('BEGIN');
+        expect((await withdrawing.query(WITHDRAW, [matchId, a])).rowCount).toBe(1);
+        const revealing = outcomeOf(reveal(matchId));
+        await waitForLockWait();
+        await withdrawing.query('COMMIT');
+        expect(await revealing).toMatchObject(revealRefused('not_mutual'));
+      } finally {
+        withdrawing.release();
+      }
+      expect(await consentRows(testDb.ownerPool, matchId)).toEqual([
+        { user_id: b, revealed: false },
+      ]);
+    }
+    // The reveal is under way when the withdrawal arrives: the withdrawal waits for it, then
+    // finds a revealed consent and is refused. Both consents stay revealed.
+    {
+      const { matchId, a, b } = await chat();
+      await consent(matchId, a);
+      await consent(matchId, b);
+      const revealing = await testDb.appPool.connect();
+      try {
+        await revealing.query('BEGIN');
+        await revealing.query(REVEAL, [matchId]);
+        // Without "revealed_at IS NULL": the trigger alone decides.
+        const withdrawing = outcomeOf(
+          testDb.appPool.query('DELETE FROM reveal_consents WHERE match_id = $1 AND user_id = $2', [
+            matchId,
+            a,
+          ]),
+        );
+        await waitForLockWait();
+        await revealing.query('COMMIT');
+        expect(await withdrawing).toMatchObject(WITHDRAWAL_REFUSED);
+      } finally {
+        revealing.release();
+      }
+      expect((await consentRows(testDb.ownerPool, matchId)).map((r) => r.revealed)).toEqual([
+        true,
+        true,
+      ]);
+      // The withdrawal as the app writes it finds nothing to remove either.
+      expect((await withdraw(matchId, a)).rowCount).toBe(0);
+    }
   });
 });
 

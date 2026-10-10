@@ -91,6 +91,8 @@ export const messages = pgTable(
 /**
  * One row per user who agreed to exchange usernames in a match. Adults only (trigger). The
  * usernames themselves are never stored here: the bot reads them from Telegram when it reveals.
+ * A consent is withdrawn by deleting its row, which the delete trigger of migration 0012 allows
+ * only while the reveal of the match has not happened (Q38).
  */
 export const revealConsents = pgTable(
   'reveal_consents',
@@ -102,7 +104,7 @@ export const revealConsents = pgTable(
       .notNull()
       .references(() => users.id),
     consentedAt: timestamp('consented_at', { withTimezone: true }).notNull(),
-    /** Set on both rows at once, when both users have consented. */
+    /** Set on both rows at once, when both users have consented. From then on the rows stay. */
     revealedAt: timestamp('revealed_at', { withTimezone: true }),
   },
   (t) => [primaryKey({ columns: [t.matchId, t.userId] })],

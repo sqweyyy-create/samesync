@@ -85,6 +85,13 @@
       "when": 1791219527015,
       "tag": "0011_chat_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791654923077,
+      "tag": "0012_reveal_withdrawal",
+      "breakpoints": true
     }
   ]
 }
