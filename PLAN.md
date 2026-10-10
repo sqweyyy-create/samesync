@@ -1,6 +1,6 @@
 # SameSync — Implementation Plan
 
-Last updated: 2026-10-06. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
+Last updated: 2026-10-10. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
@@ -10,7 +10,7 @@ Last updated: 2026-10-06. Project context and the non-negotiable safety rules ar
 | 1 | Onboarding | done (2026-10-03) |
 | 2 | Matching engine | done (2026-10-04) |
 | 3 | Game | done (2026-10-04) |
-| 4 | Anonymous chat | not started |
+| 4 | Anonymous chat | done (2026-10-10) |
 | 5 | Safety & admin | not started |
 | 6 | Payments, limits, visual pass, deploy | not started |
 
@@ -103,7 +103,7 @@ Pool isolation is enforced in six layers, so a bug in one layer can't break it:
    - `games` UPDATE: the questions and the answer snapshot never change; a player is finished only with a prediction for every question, and stays finished.
    - `matches` UPDATE to `results_ready`: only from `pending_game`, with both players finished, both users `active` and both live bands equal to `matches.band`. A match never returns to `pending_game`.
    - `matches` UPDATE to `active`: only from `results_ready`, with a delivered message, both users `active` and both live bands equal to `matches.band`. An `active` match, and a match with a delivered message, can't become `expired`.
-   - `reveal_consents` INSERT requires `matches.band = 'adult'`, an open chat, a user who is a participant, both users `active` and adult by birth date right now, and no block. `revealed_at` is set once, by an UPDATE that passes the same checks again and needs the consent of both. The app role can write nothing else of a consent and can't delete one.
+   - `reveal_consents` INSERT requires `matches.band = 'adult'`, an open chat, a user who is a participant, both users `active` and adult by birth date right now, and no block. `revealed_at` is set once, by an UPDATE that passes the same checks again, needs the consent of both and locks both consent rows first. A consent can be withdrawn (its row deleted) only while no row of its match has `revealed_at` (Q38); a revealed consent stays for good. The app role can write nothing else of a consent.
 3. **State-change triggers:**
    - When a user's `birth_date` or `age_band` changes, or their `status` becomes `frozen` or `deleted`, the same transaction closes all their open matches and cancels their pending outbox rows and those of the closed matches. `active_match_id` is deliberately not cleared here (Phase 4 notes): the relay checks the match behind the pointer for every message, and a pointer to a chat that has ended is how it knows to say so instead of sending the text to another chat. The `username` and the dating fields (gender, seeking, partner age range) are nulled by `admin_set_birth_date()` when the band becomes `u18`.
    - `birth_date` is write-once except through `admin_set_birth_date()`.
@@ -165,7 +165,7 @@ Conventions:
 | Table | Key fields | Notes |
 |---|---|---|
 | `messages` | `id`, `match_id`, `sender_id`, `body` (null once purged), `verdict` (`delivered` / `blocked_by_filter` / `rejected`), `reason`, `sender_tg_message_id`, `recipient_tg_message_id`, `delivered_at`, `created_at`, `purge_after` | Insert and update triggers described in §3. `verdict = 'delivered'` means accepted for delivery; `delivered_at` is set when Telegram took the message, and a chat has started once one message has it. The two Telegram message IDs make reply-to routing work; `sender_tg_message_id` is the sender's own message, or the bot's copy of a message sent from the Mini App. UNIQUE `(sender_id, sender_tg_message_id)`: an update delivered twice is relayed once. Retention per Q20. |
-| `reveal_consents` | PK `(match_id, user_id)`, `consented_at`, `revealed_at` | Adult-only triggers (§3). No username is stored: the bot reads it from Telegram when it sends it. |
+| `reveal_consents` | PK `(match_id, user_id)`, `consented_at`, `revealed_at` | Adult-only triggers (§3). A consent is withdrawn by deleting its row, allowed only until `revealed_at` is set (Q38). No username is stored: the bot reads it from Telegram when it sends it. |
 
 ### Safety & admin
 
@@ -662,17 +662,18 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - Mutual reveal (adults only):
   - the first consent sends the other user an "Agree / Not now" prompt;
   - when both agree, the bot reads each user's **current** username via `getChat` and sends each one the other's;
-  - a user without a username is asked to set one, and their consent stays pending (Q25).
+  - a user without a username is asked to set one, and their consent stays pending (Q25);
+  - a consent can be taken back at any time until the reveal has happened, and never afterwards (Q38, decided 2026-10-10): "Передумать" / "Withdraw" in the `/reveal` flow, enforced by the database.
   - In the `u18` band there is no button, the command answers "not available", and the DB trigger rejects consent rows.
 - Retention purge job for message bodies (Q20; provisional 30 days).
 
 **Out of scope.** Media in any pool (Q19), group chats, typing or read indicators, syncing edits and deletions, the contact filter and report/block (Phase 5), live chat inside the Mini App.
 
 **Acceptance criteria**
-- [ ] Two test accounts can chat through the bot. The recipient sees only the alias and the text: no "forwarded from", no name, no username, no profile link. *(Automated: test/chat/relay.test.ts against a faked Bot API. The one call is `sendMessage`, and its whole payload is the chat, the text "alias, line break, text", the reply button and the switched-off link preview: no `parse_mode`, no entities, never `forwardMessage` or `copyMessage`. Neither side's name, username or Telegram ID appears in any call or log line. Pending: the product owner's check in Telegram, with `pnpm dev:say` as the second account.)*
-- [ ] With several open matches, messages always reach the intended match (reply-to and the active pointer both work, and an ambiguous message asks). *(Automated: src/domain/chat/relay.test.ts for the rule; test/chat/routing.test.ts through the real bot: a reply beats the active chat, a plain message goes to the active chat, a message that could mean several chats is asked about and sent once, and a message into a chat that has ended is refused and never moved to another chat. Pending: the product owner's check in Telegram, because it rests on how Telegram reports replies and button presses.)*
+- [x] Two test accounts can chat through the bot. The recipient sees only the alias and the text: no "forwarded from", no name, no username, no profile link. *(Automated: test/chat/relay.test.ts against a faked Bot API. The one call is `sendMessage`, and its whole payload is the chat, the text "alias, line break, text", the reply button and the switched-off link preview: no `parse_mode`, no entities, never `forwardMessage` or `copyMessage`. Neither side's name, username or Telegram ID appears in any call or log line. Checked by the product owner in Telegram Web on 2026-10-10 with `pnpm dev:scenario phase4` and `pnpm dev:say` as the second account.)*
+- [x] With several open matches, messages always reach the intended match (reply-to and the active pointer both work, and an ambiguous message asks). *(Automated: src/domain/chat/relay.test.ts for the rule; test/chat/routing.test.ts through the real bot: a reply beats the active chat, a plain message goes to the active chat, a message that could mean several chats is asked about and sent once, and a message into a chat that has ended is refused and never moved to another chat. Checked by the product owner in Telegram Web on 2026-10-10: replies, the chooser, `/chats` and the active pointer.)*
 - [x] A match with no messages expires exactly once at its deadline. The first message stops expiry. *(test/chat/expiry.test.ts: expiry at the deadline and not a millisecond before, one notice each, idempotent reruns, the one reminder, a first message that stops expiry for good, an undelivered message that doesn't; test/safety/chat-isolation.test.ts: the database refuses to expire a chat that has started.)*
-- [ ] Username reveal works only in adult matches after both consent. In `u18` matches it is impossible through the API, the bot and the DB. *(Automated: test/chat/reveal.test.ts: one consent reveals nothing, both do, with the username Telegram reports at that moment; test/safety/u18-no-username.test.ts drives everything two u18 users can do, forged buttons and forged outbox rows included, and finds no username, name or Telegram ID anywhere; test/safety/chat-isolation.test.ts and outbox-recheck.test.ts for the database and the sender. Pending: the product owner's check of the adult flow in Telegram, with `pnpm dev:reveal`.)*
+- [x] Username reveal works only in adult matches after both consent. In `u18` matches it is impossible through the API, the bot and the DB. *(Automated: test/chat/reveal.test.ts: one consent reveals nothing, both do, with the username Telegram reports at that moment, and a consent can be taken back until then (Q38); test/safety/u18-no-username.test.ts drives everything two u18 users can do, forged buttons and forged outbox rows included, and finds no username, name or Telegram ID anywhere; test/safety/chat-isolation.test.ts and outbox-recheck.test.ts for the database and the sender. The product owner's account in Telegram Web had no username on 2026-10-10, so the flow was checked up to "set a username first"; the reveal end to end with a real username is a deferred live check (§7).)*
 - [x] If a participant's band changes mid-conversation, the next message is refused and the match closes, even if the age-transition job hasn't run yet. *(test/safety/chat-isolation.test.ts: with a stale cached band the message is refused and the same message closes the match with `band_change`, for the sender's band and the recipient's, by reply, by the active chat and through the API; after an admin correction the match is closed already and nothing is relayed either way.)*
 
 **Tests that prove it**
@@ -683,11 +684,12 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
   - the message is stored and the status flips on the first message.
 - `apps/server/test/chat/routing.test.ts`: reply-to beats the pointer; an ambiguous message triggers the picker; a closed match is refused politely.
 - `apps/server/test/chat/expiry.test.ts`: deadlines, idempotency, notifications.
-- `apps/server/test/chat/reveal.test.ts`: needs both consents; uses the current username; handles a missing username; a closed match can't reveal.
+- `apps/server/test/chat/reveal.test.ts`: needs both consents; uses the current username; handles a missing username; a closed match can't reveal; a consent can be taken back until the reveal, and the other person is asked at most once per match (Q38).
 - `apps/server/test/safety/chat-isolation.test.ts`:
   - the DB rejects messages for closed matches, from non-participants, and with a live band mismatch (with a stale cache);
   - the relay refuses and closes the match after an admin birth-date correction;
-  - nothing is relayed to or from a frozen user.
+  - nothing is relayed to or from a frozen user;
+  - a consent can be withdrawn only until the reveal, never afterwards, and a withdrawal that crosses the reveal (two sessions) or the other person's consent (through the services) ends with the later one refused and no username sent (Q38).
 - `apps/server/test/safety/u18-no-username.test.ts`: a leak scanner. It drives a full `u18` conversation, including `/reveal` attempts, through the harness and asserts that neither side's username, first name, last name or `telegram_id` appears in any captured outgoing API call or API response.
 - `apps/server/test/safety/u18-text-only.test.ts`: photo, voice, video, sticker, document, contact, location and text with entities are all rejected without delivery; `reveal_consents` insert fails for `u18`.
 
@@ -706,6 +708,7 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
   - Migration 0009: the tables `messages` and `reveal_consents`, the column `users.active_match_id`, the CHECK `matches_active_fields` (an `active` match has its first message and no chat deadline) and the index on the chat deadline. It closes any match that claims to be `active` already (none can exist; reason `admin`, like migration 0006).
   - Migration 0010: the trigger functions `messages_guard_insert()`, `messages_guard_update()`, `reveal_consents_guard_insert()`, `reveal_consents_guard_update()` and `matches_guard_chat_status()` with their triggers, and the grants. They are new; no earlier function or trigger was replaced, dropped or disabled.
   - Migration 0011: five new `outbox_kind` values.
+  - Migration 0012 (Q38, 2026-10-10): the trigger function `reveal_consents_guard_delete()` with its trigger (a consent row can be deleted only while no row of its match has `revealed_at`, `SS042`), `reveal_consents_guard_update()` replaced by `CREATE OR REPLACE` with one change (the reveal locks both consent rows `FOR UPDATE` before it counts them, so a withdrawal and a reveal that cross are serialized and the later one is refused), and `GRANT DELETE ON reveal_consents` to the app role.
   - **`active_match_id` is not cleared when a match ends**, which §3 had planned for the state-change trigger. Clearing it there would make a freeze or a band change take locks on other users' rows while holding the match, the opposite order of the triggers that already exist, and two such transactions could then block each other. It would also lose information: a pointer to a chat that has ended is how the relay knows to tell the user "this chat has ended" instead of sending their text to the one chat that is left. The pointer is a routing hint and nothing else: the relay checks the match behind it for every message, and clears it on first use. Nothing in the database stops it from naming any match, and test/safety/chat-isolation.test.ts shows that this gains nobody anything.
   - The trigger functions read the two users without locking them, like `matches_guard_game_status()`; only the match row is locked. The relay reads both users again right before the Telegram call.
 - **The relay (`services/relay.ts`):**
@@ -731,7 +734,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
   - The sender's bot chat gets a copy ("Ты → alias", then the text), so the conversation that continues there has its first line, and a reply to the copy is routed to that chat.
   - Initial JS is 97.1 KB gzip.
 - **Reveal (Q25):**
-  - `/reveal` shows a question that names the alias; "Согласиться" records the consent, "Не сейчас" stores nothing and tells nobody (Q38). The first consent queues one question to the other person, once per match.
+  - `/reveal` shows a question that names the alias; "Согласиться" records the consent, "Не сейчас" stores nothing and tells nobody. The first consent queues one question to the other person, and the other person is asked at most once per match (the sender drops a later question as `already_asked`).
+  - **Withdrawal (Q38, decided 2026-10-10).** Every answer that leaves a consent standing ("your consent is recorded", "set a username first", "the other person has no username yet") carries "Передумать" / "Withdraw". It deletes the consent row; the other person is told nothing, like after "Не сейчас", and the question they got stays answerable (their consent then asks the one who withdrew). A consent given again queues a new question, keyed by the time of the consent, which goes out only if the first one never did. After the reveal (`revealed_at` set) the button is gone, and the database refuses the delete (migration 0012), whether the chat is still open or not.
   - A consent of someone without a username is recorded, and nothing else happens until they have one and send `/reveal` again: the other person is not asked yet.
   - No username passes through a service or the database. When both have consented, the service asks Telegram whether each has a username, the database marks both consents revealed in one statement (the trigger checks both live bands again), and two `reveal_done` notifications are queued. The outbox sender reads the other person's username from Telegram at that moment, and it is the only code that puts a username into a message. If the username is gone by then, that one message is dropped.
   - There is no reveal in the HTTP API. After a reveal the chat stays open and still shows aliases only.
@@ -739,8 +743,9 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - **Jobs:** `chat-deadlines` every minute (start a chat whose first message was delivered just before a crash, expire, remind) and `retention` every hour, each under its own advisory lock. Expiry leaves a match alone while a message is on its way (accepted less than two minutes ago).
 - **Dev tooling:** `pnpm dev:say <match id or alias> "<text>"` lets the synthetic counterpart write through the real relay (without a text it prints the chat, which is how to see what the synthetic side "received"); `pnpm dev:reveal <match id or alias>` makes it consent through the real reveal service. Outside production a synthetic user "has" the username `@synthetic_user`; in production it has none.
 - **Tests beyond the planned list:** test/chat/leave.test.ts (leaving, the command menu), test/scripts/dev-chat.test.ts, a block of chat kinds in test/safety/outbox-recheck.test.ts, the upgrade and grants tests in test/db/migrations.test.ts, and the Mini App tests of the results screen.
-- **Open questions:** Q1, Q20 and Q25 are implemented as their provisional defaults. Q36–Q39 were raised in this phase and are implemented as their provisional defaults.
-- **Local setup after pulling Phase 4:** run `pnpm db:migrate` (migrations 0009–0011) before `pnpm dev`; a server that is already running with the new code logs errors from the chat jobs until then. The content did not change. Right after the migration the chat deadlines apply to matches whose results were already ready (their deadline was set in Phase 3): one whose results are older than 48 hours expires at the first run of the job and both users get the expiry notice, and one in its last 12 hours gets the reminder at once.
+- **Open questions:** Q1, Q20 and Q25 are implemented as their provisional defaults. Q36–Q39 were raised in this phase; on 2026-10-10 the product owner decided Q36, Q37 and Q39 as their provisional defaults and Q38 differently (withdrawal, above).
+- **Manual check (2026-10-10).** The product owner ran `pnpm dev:scenario phase4` in Telegram Web: items 1–4 and 7–9 pass. Items 5 and 6 (the reveal with a real username) and "Перейти в чат" closing the Mini App could not be verified there and are covered by automated tests; they are the deferred live checks of §7.
+- **Local setup after pulling Phase 4:** run `pnpm db:migrate` (migrations 0009–0012) before `pnpm dev`; a server that is already running with the new code logs errors from the chat jobs until then. The content did not change. Right after the migration the chat deadlines apply to matches whose results were already ready (their deadline was set in Phase 3): one whose results are older than 48 hours expires at the first run of the job and both users get the expiry notice, and one in its last 12 hours gets the reminder at once.
 
 ---
 
@@ -883,6 +888,10 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 | **G3 — Enable `u18` pool in production** | G2 plus: Q28 review of minors' data and consent; filter corpus at acceptance level; admin response time for `u18` reports defined and staffed; Q17, Q18 and Q21 answered (Q14–Q16 are decided); launch coverage counting per band × locale revisited (Q6); a dry run in staging with test accounts |
 | **G4 — Payments live** | Phase 6 done; Q26 and Q27 answered |
 
+**Deferred live checks (on a phone, before G2).** Two Phase 4 items could not be verified in Telegram Web on 2026-10-10 and are covered by automated tests only; they must be run live on a phone with a real username before the public launch:
+- [ ] The mutual username reveal end to end, with a real username, in both orders: the counterpart consents first (`pnpm dev:reveal`, then "Согласиться"), and the user consents first (`/reveal`, then `pnpm dev:reveal`). Each side receives the other's current username and nothing else.
+- [ ] "Перейти в чат" on the results screen closes the Mini App and lands in the bot chat.
+
 **Launch scope.** The realistic public launch (G2) is the **adult pool only**. The `u18` pool is fully built and tested in Phases 1–5, but `U18_POOL_ENABLED` stays `false` in production until G3 is signed off. Until then, `u18` users who onboard are `waitlisted`.
 
 ## 8. Open questions
@@ -921,10 +930,10 @@ Each question lists a *provisional* default used until it is answered (implement
 **Chat**
 - **Q24. Routing between several chats in one bot DM.** Bot API 9.3 added topics in private chats with bots (one topic per match would be the cleanest UX), but there are reports of regressions in 2026. ✅ **Decided (2026-10-05, product owner):** the provisional answer is accepted. All chats share one bot DM. Every relayed message is labeled with the counterpart's alias. A reply is routed by the message it replies to, and a message that isn't a reply goes to the `active_match_id` pointer. Telegram's private-chat topics are not used.
 - **Q25. Reveal edge cases.** What if a user has no username? Does the relay chat stay open after a reveal? *Provisional:* a username is required (the user is asked to set one); the chat stays open until someone leaves. Phase 4 is built this way. *Needed by:* Phase 4.
-- **Q36. Does a chat stop when one of the two switches language?** The Phase 4 brief asks the relay to re-check "same locale" before every call, and Q13 (decided) says a language change affects future matches only. *Provisional:* Q13 wins. An existing chat goes on after a switch, and each side gets the alias and the buttons in their own current language. The check exists as one switch (`requireSameLocale` in `domain/chat/params.ts`, off), and both behaviours are tested. *Needed by:* the Phase 4 sign-off.
-- **Q37. When is the chat reminder sent, and to whom?** Q2 decided "one reminder each" but not the moment. *Provisional:* 12 hours before the chat deadline, to both (either of them can write first), like the game reminder (Q34); a constant in `domain/chat/params.ts`. *Needed by:* G1.
-- **Q38. Can a consent to reveal be taken back before the other person agrees?** *Provisional:* no. "Not now" stores nothing. A consent that was given stands while the chat is open, and leaving the chat voids it, because a chat that has ended reveals nothing. *Needed by:* G2.
-- **Q39. Is the sender told where a message went when several chats are open?** Q24 sends a plain message to the active chat, also when another chat wrote last. *Provisional:* the bot answers with one line ("→ alias") when a message went to another chat than the latest message in the user's bot chat, and stays quiet otherwise. *Needed by:* G1.
+- **Q36. Does a chat stop when one of the two switches language?** The Phase 4 brief asks the relay to re-check "same locale" before every call, and Q13 (decided) says a language change affects future matches only. ✅ **Decided (2026-10-10, product owner):** the provisional default is accepted: Q13 wins. An existing chat goes on after a switch, and each side gets the alias and the buttons in their own current language. The check exists as one switch (`requireSameLocale` in `domain/chat/params.ts`, off), and both behaviours are tested.
+- **Q37. When is the chat reminder sent, and to whom?** Q2 decided "one reminder each" but not the moment. ✅ **Decided (2026-10-10, product owner):** the provisional default is accepted: 12 hours before the chat deadline, to both (either of them can write first), like the game reminder (Q34); a constant in `domain/chat/params.ts`.
+- **Q38. Can a consent to reveal be taken back before the other person agrees?** The provisional default was no. ✅ **Decided differently (2026-10-10, product owner):** a user can withdraw their consent at any time until the reveal has happened (`revealed_at` set); after the reveal, withdrawal is impossible. "Передумать" / "Withdraw" in the `/reveal` flow, enforced in the database (a consent row can be removed only while `revealed_at` is null for that match), with safety tests for both cases, including a withdrawal racing with the other user's consent (migration 0012, Phase 4 notes).
+- **Q39. Is the sender told where a message went when several chats are open?** Q24 sends a plain message to the active chat, also when another chat wrote last. ✅ **Decided (2026-10-10, product owner):** the provisional default is accepted: the bot answers with one line ("→ alias") when a message went to another chat than the latest message in the user's bot chat, and stays quiet otherwise.
 
 **Monetization**
 - **Q26. Are purchases allowed in the under-18 pool?** (Raised in the spec.) *Provisional:* off, through a per-band `bands_allowed` on each product. *Needed by:* G4.

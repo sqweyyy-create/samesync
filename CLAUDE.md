@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** Phase 0 (scaffold), Phase 1 (onboarding), Phase 2 (matching engine) and Phase 3 (game) are done. Phase 4 (anonymous chat) is implemented and waiting for the product owner's manual check of the chat and the username reveal in Telegram, and for their sign-off on its safety changes; see the status table. [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phases 0–4 (scaffold, onboarding, matching engine, game, anonymous chat) are done. Phase 5 (safety & admin tooling) is next; see the status table. Two Phase 4 items are deferred live checks on a phone before the public launch (PLAN.md §7). [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -129,6 +129,7 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
   - **No chat in the `u18` band until Phase 5.** `CHAT_BANDS`, the screening hook and the `messages` trigger each refuse it on their own, and none of them looks at `U18_POOL_ENABLED`. Opening it means changing all three, with sign-off.
   - `users.active_match_id` is a routing hint only. Never base anything on it: the relay checks the match behind it for every message.
   - A username appears in exactly one place: the `reveal_done` notification, composed by the outbox sender, which reads it from Telegram at that moment (`services/usernames.ts`). Never store, log or pass on a username anywhere else.
+  - A consent to reveal can be withdrawn until the reveal has happened, never afterwards (Q38, decided): the `reveal_consents` delete trigger (migration 0012) refuses to remove a revealed consent, and the reveal locks both consent rows first.
   - The text of a message never goes into a log or an error. The driver's error for a failed insert quotes its parameters, so `ChatRepository.store` replaces it.
   - Inline button data is built and parsed by `domain/chat/callbacks.ts` (zod). It names an action and a match; the services decide whether the user may do that.
 - **Dev tooling:**
