@@ -1,10 +1,10 @@
 /**
- * SAFETY SUITE — what a u18 chat carries (CLAUDE.md invariants 5, 6 and 10; PLAN.md Phase 4).
- * Under-18 chat is plain text only, and every message has to pass the contact filter first. The
- * filter arrives in Phase 5, so until then nothing at all is relayed in a u18 match: the relay
- * refuses it, the screening hook refuses it, and the database refuses it, none of them looking at
- * U18_POOL_ENABLED. Photos, voice, video, stickers, files, contacts, locations and text with
- * entities are rejected without delivery, and no consent to reveal can exist for a u18 user.
+ * SAFETY SUITE — what a u18 chat carries (CLAUDE.md invariants 5, 6 and 10; PLAN.md Phase 5).
+ * Under-18 chat is plain text only, and every message passes the contact filter before it is
+ * relayed. Photos, voice, video, stickers, files, contacts, locations and text with entities are
+ * rejected without delivery; a text with a contact in it is kept as evidence and never sent;
+ * plain text goes through; without a filter, or with one that fails, nothing goes through at
+ * all; and no consent to reveal can exist for a u18 user. None of it looks at U18_POOL_ENABLED.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { screen } from '../../src/domain/chat/relay';
@@ -109,72 +109,120 @@ describe.each([false, true])('a u18 match (U18_POOL_ENABLED=%s)', (u18PoolEnable
   it.each(WITH_ENTITIES)('rejects text with %s without delivery', async (_name, text, entity) => {
     const world = await u18();
     await world.app.handle(textUpdate(world.fox, text, { entities: [entity] }));
-    expect(await outcome(world)).toEqual(nothing('Чат пока недоступен. Сообщение не доставлено.'));
+    expect(await outcome(world)).toEqual(
+      nothing('Пока можно отправлять только текст. Это сообщение не доставлено.'),
+    );
   });
 
-  it('relays no plain text either: there is no contact filter to pass yet', async () => {
+  it('relays plain text that passes the contact filter, in both directions and from the Mini App', async () => {
     const world = await u18();
     await world.app.handle(textUpdate(world.fox, 'просто привет'));
-    expect(await outcome(world)).toEqual(nothing('Чат пока недоступен. Сообщение не доставлено.'));
-    // In the other direction, too, and through the Mini App.
+    expect(texts(world.app, world.owl.id)).toEqual(['🦊 Лиса\nпросто привет']);
+    expect(texts(world.app, world.fox.id)).toEqual([]);
     world.app.telegram.clear();
     await world.app.handle(textUpdate(world.owl, 'и тебе'));
-    expect(texts(world.app, world.fox.id)).toEqual([]);
-    const response = await world.app
-      .as({ id: world.fox.id, first_name: 'Dev' })
-      .post(`/api/matches/${world.matchId}/messages`, { text: 'из приложения' });
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'forbidden' });
-    expect(texts(world.app, world.owl.id)).toEqual([
-      'Чат пока недоступен. Сообщение не доставлено.',
-    ]);
-    expect(await messageRows(testDb.ownerPool, world.matchId)).toEqual([]);
-    // The match says so itself: the Mini App offers nothing to send.
+    expect(texts(world.app, world.fox.id)).toEqual(['🦉 Сова\nи тебе']);
+    expect((await matchRow(testDb.ownerPool, world.matchId))?.status).toBe('active');
+    // The match says so itself: the Mini App offers the first message.
     const summary = await world.app
       .as({ id: world.fox.id, first_name: 'Dev' })
       .get(`/api/matches/${world.matchId}`);
-    expect(await summary.json()).toMatchObject({ status: 'results_ready', chat: false });
+    expect(await summary.json()).toMatchObject({ status: 'active', chat: true });
+    // A message from the Mini App goes through the same filter.
+    const fresh = await u18();
+    const response = await fresh.app
+      .as({ id: fresh.fox.id, first_name: 'Dev' })
+      .post(`/api/matches/${fresh.matchId}/messages`, { text: 'из приложения' });
+    expect(response.status).toBe(200);
+    expect(texts(fresh.app, fresh.owl.id)).toEqual(['🦊 Лиса\nиз приложения']);
   });
 
-  it('stays closed when a contact filter is plugged into the relay: the band itself is closed', async () => {
-    let asked = 0;
-    const world = await pair(16, {
-      u18PoolEnabled,
-      contactFilter: () => {
-        asked++;
-        return Promise.resolve({ hit: false });
-      },
-    });
-    await world.app.handle(textUpdate(world.fox, 'фильтр меня пропустит'));
-    expect(await outcome(world)).toEqual(nothing('Чат пока недоступен. Сообщение не доставлено.'));
-    expect(asked).toBe(0);
-  });
-
-  it('is closed in the database too, whatever the app does', async () => {
-    const { matchId, a, b } = await u18();
-    const refused = { code: 'SS030', message: 'message rejected: u18_chat_closed' };
-    for (const senderId of [a, b]) {
-      await expect(
-        insertMessage(testDb.appPool, { matchId, senderId, body: 'мимо приложения' }),
-      ).rejects.toMatchObject(refused);
-      await expect(
-        insertMessage(testDb.appPool, {
-          matchId,
-          senderId,
+  it('keeps a message with a contact in it as evidence and never sends it, from the bot and from the Mini App', async () => {
+    const world = await u18();
+    await world.app.handle(textUpdate(world.fox, 'мой тг @fox_08, пиши'));
+    expect(await outcome(world)).toEqual({
+      toTheOther: [],
+      stored: [
+        expect.objectContaining({
           verdict: 'blocked_by_filter',
-          reason: 'url',
+          reason: 'handle',
+          body: 'мой тг @fox_08, пиши',
+          delivered: false,
         }),
-      ).rejects.toMatchObject(refused);
-    }
-    expect(await messageRows(testDb.ownerPool, matchId)).toEqual([]);
-    // So a chat can't be started there either.
-    await expect(
-      testDb.appPool.query(
-        `UPDATE matches SET status = 'active', first_message_at = now(), chat_deadline_at = NULL
-         WHERE id = $1`,
-        [matchId],
-      ),
-    ).rejects.toMatchObject({ code: 'SS012', message: 'match status rejected: no_message' });
+      ],
+      toTheSender: [
+        'Сообщение не доставлено: в этом чате нельзя делиться контактами, ссылками и никами.',
+      ],
+      calls: ['sendMessage'],
+      match: 'results_ready',
+    });
+    const response = await world.app
+      .as({ id: world.fox.id, first_name: 'Dev' })
+      .post(`/api/matches/${world.matchId}/messages`, { text: 'номер 8 926 123 45 67' });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden', details: ['contact_blocked'] });
+    expect(texts(world.app, world.owl.id)).toEqual([]);
+    expect((await messageRows(testDb.ownerPool, world.matchId)).map((r) => r.verdict)).toEqual([
+      'blocked_by_filter',
+      'blocked_by_filter',
+    ]);
+    // The hits are counted: each one is a filter event.
+    const { rows } = await testDb.ownerPool.query<{ kind: string }>(
+      'SELECT kind::text AS kind FROM filter_events WHERE match_id = $1 ORDER BY created_at',
+      [world.matchId],
+    );
+    expect(rows.map((r) => r.kind)).toEqual(['handle', 'phone']);
+  });
+
+  it('catches a contact split across messages: the filter reads the recent ones together', async () => {
+    const world = await u18();
+    await world.app.handle(textUpdate(world.fox, 'запиши мой номер'));
+    await world.app.handle(textUpdate(world.fox, '8 926'));
+    await world.app.handle(textUpdate(world.fox, '123 45 67'));
+    expect(texts(world.app, world.owl.id)).toEqual(['🦊 Лиса\nзапиши мой номер', '🦊 Лиса\n8 926']);
+    expect(texts(world.app, world.fox.id)).toEqual([
+      'Сообщение не доставлено: в этом чате нельзя делиться контактами, ссылками и никами.',
+    ]);
+    expect((await messageRows(testDb.ownerPool, world.matchId)).map((r) => r.verdict)).toEqual([
+      'delivered',
+      'delivered',
+      'blocked_by_filter',
+    ]);
+  });
+
+  it('relays nothing without a contact filter, and nothing when the filter fails (fail closed)', async () => {
+    const without = await pair(16, { u18PoolEnabled, contactFilter: null });
+    await without.app.handle(textUpdate(without.fox, 'просто привет'));
+    expect(await outcome(without)).toEqual(
+      nothing('Не получилось доставить сообщение. Попробуй ещё раз чуть позже.'),
+    );
+    const broken = await pair(16, {
+      u18PoolEnabled,
+      contactFilter: () => Promise.reject(new Error('filter down')),
+    });
+    await broken.app.handle(textUpdate(broken.fox, 'просто привет'));
+    expect(await outcome(broken)).toEqual(
+      nothing('Не получилось доставить сообщение. Попробуй ещё раз чуть позже.'),
+    );
+    // In the adult band the filter is not asked, so a filter that is down changes nothing there.
+    const adult = await pair(25, { contactFilter: () => Promise.reject(new Error('filter down')) });
+    await adult.app.handle(textUpdate(adult.fox, 'просто привет'));
+    expect(texts(adult.app, adult.owl.id)).toEqual(['🦊 Лиса\nпросто привет']);
+  });
+
+  it('is open in the database too: a message, and one the filter stopped, can be stored', async () => {
+    const { matchId, a, b } = await u18();
+    await insertMessage(testDb.appPool, { matchId, senderId: a, body: 'мимо приложения' });
+    await insertMessage(testDb.appPool, {
+      matchId,
+      senderId: b,
+      verdict: 'blocked_by_filter',
+      reason: 'url',
+    });
+    expect((await messageRows(testDb.ownerPool, matchId)).map((r) => r.verdict)).toEqual([
+      'delivered',
+      'blocked_by_filter',
+    ]);
   });
 
   it('has no consent to reveal usernames: the database refuses the row', async () => {
@@ -189,8 +237,8 @@ describe.each([false, true])('a u18 match (U18_POOL_ENABLED=%s)', (u18PoolEnable
   });
 });
 
-describe('the screening hook, once the contact filter exists', () => {
-  const clean = () => Promise.resolve({ hit: false });
+describe('the screening hook', () => {
+  const clean = () => Promise.resolve({ hit: false as const });
   const u18 = (text: string | null, hasEntities = false) =>
     screen(
       { band: 'u18', content: { text, hasEntities }, matchId: 'm', senderId: 's' },

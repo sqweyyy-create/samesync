@@ -60,10 +60,10 @@ describe('the chat parameters', () => {
     });
   });
 
-  it('open the chat for adults only: u18 waits for the contact filter', () => {
-    expect(CHAT_BANDS).toEqual(['adult']);
+  it('open the chat in both bands: the u18 one behind the contact filter (Phase 5)', () => {
+    expect(CHAT_BANDS).toEqual(['u18', 'adult']);
     expect(chatOpenIn('adult')).toBe(true);
-    expect(chatOpenIn('u18')).toBe(false);
+    expect(chatOpenIn('u18')).toBe(true);
   });
 
   it('never allow a reveal in the u18 band', () => {
@@ -103,9 +103,9 @@ describe('refusal', () => {
     ).toBe('band_mismatch');
   });
 
-  it('refuses every u18 chat, even between two u18 users who are both fine', () => {
-    expect(check({ band: 'u18' })).toBe('u18_chat_closed');
-    expect(check({ band: 'u18', status: 'results_ready' })).toBe('u18_chat_closed');
+  it('lets a u18 chat through like an adult one: the contact filter decides in the screening hook', () => {
+    expect(check({ band: 'u18' })).toBeNull();
+    expect(check({ band: 'u18', status: 'results_ready' })).toBeNull();
   });
 
   it('refuses a blocked pair', () => {
@@ -187,7 +187,7 @@ describe('screen', () => {
     let asked = 0;
     const contactFilter = () => {
       asked++;
-      return Promise.resolve({ hit: false });
+      return Promise.resolve({ hit: false as const });
     };
     expect(await screen(input('u18', 'привет', true), { contactFilter })).toEqual({
       pass: false,
@@ -201,12 +201,12 @@ describe('screen', () => {
     const seen: unknown[] = [];
     const clean = (message: unknown) => {
       seen.push(message);
-      return Promise.resolve({ hit: false });
+      return Promise.resolve({ hit: false as const });
     };
     expect(await screen(input('u18', 'привет'), { contactFilter: clean })).toEqual({ pass: true });
     expect(seen).toEqual([{ text: 'привет', matchId: 'm1', senderId: A }]);
 
-    const hit = () => Promise.resolve({ hit: true, kind: 'handle' });
+    const hit = () => Promise.resolve({ hit: true as const, kind: 'handle' as const });
     expect(await screen(input('u18', 'мой ник…'), { contactFilter: hit })).toEqual({
       pass: false,
       verdict: 'blocked_by_filter',

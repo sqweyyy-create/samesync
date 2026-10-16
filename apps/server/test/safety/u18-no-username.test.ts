@@ -1,10 +1,11 @@
 /**
- * SAFETY SUITE — usernames in the u18 band (CLAUDE.md invariants 1 and 6; PLAN.md Phase 4).
+ * SAFETY SUITE — usernames in the u18 band (CLAUDE.md invariants 1, 5 and 6; PLAN.md Phase 5).
  * A leak scanner: it drives everything two matched u18 users can do with the bot, the API and the
- * jobs, `/reveal` attempts and forged buttons included, records every outgoing Bot API call and
- * every API response, and then looks for either side's username, first name, last name and
- * Telegram ID in what the other side was sent. A username must not appear anywhere at all, must
- * not be stored, and Telegram must not even be asked for one.
+ * jobs, a conversation through the contact filter, `/reveal` attempts, reports, a block and
+ * forged buttons included, records every outgoing Bot API call and every API response, and then
+ * looks for either side's username, first name, last name and Telegram ID in what the other side
+ * was sent. A username must not appear anywhere at all (a message that carries one is stopped
+ * by the filter and never sent), must not be stored, and Telegram must not even be asked for one.
  * The last test turns the scanner on an adult reveal, where it has to find the username: a
  * scanner that can't find a leak proves nothing.
  */
@@ -141,6 +142,7 @@ describe('a u18 conversation', () => {
         await app.handle(textUpdate(me, 'привет!'));
         const sent = lastIncomingId();
         await app.handle(textUpdate(me, `пиши мне: @${me.username}, я ${me.first_name}`));
+        await app.handle(textUpdate(me, `мой номер 8926${String(me.id).slice(-7)}`));
         await app.handle(textUpdate(me, 'ответ', { replyTo: 5001 }));
         await app.handle(editUpdate(me, sent, 'привет ещё раз'));
         await app.handle(mediaUpdate(me, { photo: [{ file_id: 'p' }], caption: me.username }));
@@ -149,16 +151,7 @@ describe('a u18 conversation', () => {
             contact: { phone_number: '+70000000000', first_name: me.first_name, user_id: me.id },
           }),
         );
-        // Every button there is, pressed for their own match: forged, since none was ever shown.
-        for (const action of CHAT_ACTIONS) {
-          await app.handle(
-            callbackUpdate(me, encodeCallback(action, matchId), {
-              messageId: 7000,
-              original: { messageId: sent, text: 'привет!' },
-            }),
-          );
-        }
-        // The services behind the buttons, asked directly.
+        // The services behind the reveal buttons, asked directly.
         const meId = me.id === ANNA.id ? chat.first.id : chat.second.id;
         expect(await app.reveal.state(meId, matchId)).toEqual({ status: 'unavailable' });
         expect(await app.reveal.consent(meId, matchId)).toEqual({ status: 'unavailable' });
@@ -171,13 +164,36 @@ describe('a u18 conversation', () => {
         expect(await record.api(me, 'get', `/api/matches/${matchId}/results`)).toBe(200);
         expect(await record.api(me, 'get', `/api/matches/${matchId}/game`)).toBe(409);
         expect(
-          await record.api(me, 'post', `/api/matches/${matchId}/messages`, { text: 'привет' }),
+          await record.api(me, 'post', `/api/matches/${matchId}/messages`, {
+            text: `найди меня: @${me.username}`,
+          }),
         ).toBe(403);
+        expect(
+          await record.api(me, 'post', `/api/matches/${matchId}/messages`, { text: 'привет' }),
+        ).toBe(200);
         // There is no reveal in the API at all.
         expect(await record.api(me, 'post', `/api/matches/${matchId}/reveal`, {})).toBe(404);
         expect(await record.api(me, 'get', `/api/matches/${matchId}/reveal`)).toBe(404);
         expect(await record.api(me, 'get', `/api/users/${them.id}`)).toBe(404);
       }
+
+      // What the other person got: the plain messages, by alias, and nothing with a contact.
+      for (const [me, them] of [people, [BORIS, ANNA]] as Array<[Identity, Identity]>) {
+        const got = app.telegram.sentTo(them.id).map((m) => m.text);
+        const relayed = got.filter((t) => /^(🦊 Лиса|🦉 Сова)\n/.test(t));
+        expect(relayed.filter((t) => t.endsWith('\nпривет!'))).toHaveLength(1);
+        expect(relayed.filter((t) => t.endsWith('\nпривет'))).toHaveLength(1);
+        expect(got.some((t) => t.includes(me.username))).toBe(false);
+      }
+      const stored = await messageRows(testDb.ownerPool, matchId);
+      // A message with a contact is kept as evidence, marked as stopped, and never delivered.
+      expect(stored.filter((r) => r.verdict === 'blocked_by_filter')).toHaveLength(6);
+      // Three delivered per person: the greeting, the reply and the one from the Mini App.
+      expect(stored.filter((r) => r.verdict === 'delivered' && r.delivered)).toHaveLength(6);
+      for (const row of stored.filter((r) => r.verdict === 'delivered')) {
+        expect(found(row.body ?? '', [ANNA.username, BORIS.username])).toEqual([]);
+      }
+      expect((await matchRow(testDb.ownerPool, matchId))?.status).toBe('active');
 
       // The database refuses a consent for each of them, whoever asks.
       for (const userId of [chat.first.id, chat.second.id]) {
@@ -211,22 +227,33 @@ describe('a u18 conversation', () => {
         });
       }
 
-      // The jobs: no reminder, then the chat nobody could write in expires, and both are told.
-      const deadline = (
-        await testDb.ownerPool.query<{ at: Date }>(
-          'SELECT chat_deadline_at AS at FROM matches WHERE id = $1',
-          [matchId],
-        )
-      ).rows[0]!.at.getTime();
-      clock.set(new Date(deadline - 3_600_000));
+      // Every button there is, pressed by each of them for their own match: forged, since none
+      // was ever shown. Among them the report reasons and the block, which ends the chat.
+      for (const me of people) {
+        const sent = lastIncomingId();
+        for (const action of CHAT_ACTIONS) {
+          await app.handle(
+            callbackUpdate(me, encodeCallback(action, matchId), {
+              messageId: 7000,
+              original: { messageId: sent, text: 'привет!' },
+            }),
+          );
+        }
+      }
+      // The "leave" button came first in the list, so the chat was left before it was blocked;
+      // the blocks are there all the same.
+      expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({ status: 'closed' });
+      const { rows: blocked } = await testDb.ownerPool.query(
+        'SELECT 1 FROM blocks WHERE match_id = $1',
+        [matchId],
+      );
+      expect(blocked).toHaveLength(2);
+      // The neutral notice of the block, and nothing else, goes out; the jobs find nothing.
+      await app.sender.tick();
       await app.deadlines.run();
       await app.sender.tick();
-      clock.set(new Date(deadline + 1));
-      expect(await app.deadlines.run()).toMatchObject({ expired: 1 });
-      expect(await app.sender.tick()).toMatchObject({ sent: 2 });
 
-      // Nothing was relayed, nothing was consented to by them, nothing was stored.
-      expect(await messageRows(testDb.ownerPool, matchId)).toEqual([]);
+      // Nothing was consented to by them, nothing of a username was stored.
       expect(await storedUsernames([chat.first.id, chat.second.id])).toEqual([null, null]);
       // Telegram was never asked who they are.
       expect(app.telegram.of('getChat')).toEqual([]);
@@ -239,13 +266,13 @@ describe('a u18 conversation', () => {
 
       // And the scan itself.
       const records = record.all();
-      expect(records.length).toBeGreaterThan(60);
+      expect(records.length).toBeGreaterThan(80);
       expect(leaks(records, people)).toEqual([]);
-      // Each of them did hear from the bot, by alias only.
+      // Each of them did hear from the bot, by alias only, and was told what the filter stopped.
       for (const person of people) {
         const mine = records.filter((r) => r.to?.id === person.id).map((r) => r.text);
         expect(mine.join('\n')).toContain('Обмен никами недоступен.');
-        expect(mine.join('\n')).toContain('Чат пока недоступен.');
+        expect(mine.join('\n')).toContain('нельзя делиться контактами');
         expect(mine.join('\n')).toMatch(/Сова|Лиса/);
       }
     },
@@ -261,6 +288,7 @@ describe('a u18 conversation', () => {
     for (const me of [ANNA, BORIS]) {
       await app.handle(textUpdate(me, '/reveal'));
       await app.handle(textUpdate(me, `мой ник @${me.username}`));
+      await app.handle(textUpdate(me, 'привет'));
       await app.as(me).get('/api/me');
     }
     const logs = app.logLines().join('\n');

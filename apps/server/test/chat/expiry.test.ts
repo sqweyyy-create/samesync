@@ -128,17 +128,19 @@ describe('a chat nobody wrote in', () => {
     expect((await matchRow(testDb.ownerPool, matchId))?.status).toBe('expired');
   });
 
-  it('expires in a u18 match like in any other, without a reminder nobody could act on', async () => {
+  it('reminds and expires in a u18 match like in any other, now that the chat is open there (Phase 5)', async () => {
     const { app, matchId, deadline, at, fox, owl } = await silent({ years: 16 });
     at(deadline - 12 * HOUR + 1000);
-    expect(await app.deadlines.run()).toEqual({ started: 0, expired: 0, reminded: 0 });
+    expect(await app.deadlines.run()).toEqual({ started: 0, expired: 0, reminded: 2 });
+    expect(await app.sender.tick()).toMatchObject({ sent: 2 });
     at(deadline);
     expect(await app.deadlines.run()).toMatchObject({ expired: 1 });
     expect(await app.sender.tick()).toMatchObject({ sent: 2 });
     expect(app.telegram.sentTo(fox.id).map((m) => m.text)).toEqual([
+      'Осталось 12 часов, чтобы написать первое сообщение (🦉 Сова). Потом это знакомство закроется.',
       'Чат не начался, и это знакомство закрылось (🦉 Сова). Скоро будут новые.',
     ]);
-    expect(app.telegram.sentTo(owl.id)).toHaveLength(1);
+    expect(app.telegram.sentTo(owl.id)).toHaveLength(2);
     expect((await matchRow(testDb.ownerPool, matchId))?.status).toBe('expired');
   });
 });
@@ -277,15 +279,15 @@ describe('retention', () => {
     await app.handle(textUpdate(owl, 'а это ещё нет'));
 
     at(sentAt + 30 * DAY - 1000);
-    expect(await app.retention.run()).toEqual({ purged: 0 });
+    expect(await app.retention.run()).toEqual({ purged: 0, evidencePurged: 0 });
     at(sentAt + 30 * DAY + 1000);
-    expect(await app.retention.run()).toEqual({ purged: 1 });
+    expect(await app.retention.run()).toEqual({ purged: 1, evidencePurged: 0 });
     const rows = await messageRows(testDb.ownerPool, matchId);
     expect(rows.map((r) => r.body)).toEqual([null, 'а это ещё нет']);
     // Who sent it, that it arrived and where a reply to it goes are all still there.
     expect(rows[0]).toMatchObject({ verdict: 'delivered', delivered: true });
     expect(rows[0]?.recipient_tg_message_id).not.toBeNull();
-    expect(await app.retention.run()).toEqual({ purged: 0 });
+    expect(await app.retention.run()).toEqual({ purged: 0, evidencePurged: 0 });
 
     app.telegram.clear();
     await app.handle(
@@ -314,7 +316,7 @@ describe('retention', () => {
       logger: memoryLogger().logger,
       batchSize: 3,
     });
-    expect(await retention.run()).toEqual({ purged: 7 });
+    expect(await retention.run()).toEqual({ purged: 7, evidencePurged: 0 });
     expect((await messageRows(testDb.ownerPool, matchId)).every((r) => r.body === null)).toBe(true);
   });
 });

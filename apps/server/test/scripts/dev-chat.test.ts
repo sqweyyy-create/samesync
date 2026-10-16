@@ -122,7 +122,13 @@ describe('the synthetic counterpart writes', () => {
         chat_id: me.telegramId,
         text: '🦊 Лиса\nпривет от синтетики',
         reply_markup: {
-          inline_keyboard: [[{ text: 'Ответить', callback_data: `c:to:${matchId}` }]],
+          inline_keyboard: [
+            [{ text: 'Ответить', callback_data: `c:to:${matchId}` }],
+            [
+              { text: 'Пожаловаться', callback_data: `c:report:${matchId}` },
+              { text: 'Заблокировать', callback_data: `c:block:${matchId}` },
+            ],
+          ],
         },
         link_preview_options: { is_disabled: true },
       },
@@ -237,17 +243,21 @@ describe('the synthetic counterpart consents to a reveal', () => {
     });
   });
 
-  it('is refused by the database for a u18 chat, like for anyone', async () => {
+  it('is refused for a u18 chat, like for anyone, while a message goes through the contact filter there', async () => {
     const app = await buildChatApp(testDb, { syntheticUsername: 'synthetic_user' });
     const u18 = await insertChat(testDb.appPool, { years: 16, second: { synthetic: true } });
     const chat = (await devChats(testDb.appPool)).find((c) => c.matchId === u18.matchId);
     expect(chat).toBeDefined();
     expect(await consentAsCounterpart(app, chat as DevChat)).toEqual({ status: 'unavailable' });
-    expect(await sayAsCounterpart(app, chat as DevChat, 'привет')).toEqual({
+    expect(await sayAsCounterpart(app, chat as DevChat, 'мой тг @synthetic_user')).toEqual({
       status: 'refused',
-      reason: 'u18_chat_closed',
+      reason: 'contact_blocked',
     });
     expect(app.telegram.calls).toEqual([]);
+    expect(await sayAsCounterpart(app, chat as DevChat, 'привет')).toMatchObject({
+      status: 'delivered',
+    });
+    expect(app.telegram.sentTo(u18.telegramA).map((m) => m.text)).toEqual(['🦉 Сова\nпривет']);
   });
 });
 

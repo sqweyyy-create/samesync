@@ -29,12 +29,13 @@ export const DEFAULT_CHAT_PARAMS: ChatParams = {
 };
 
 /**
- * The bands whose matches can chat. A u18 message must pass the contact filter before it is
- * relayed (CLAUDE.md invariant 5), and the filter arrives in Phase 5: until then no u18 match
- * chats. This is a constant on purpose: it does not follow U18_POOL_ENABLED, and the database
- * refuses a u18 message on its own (migration 0010).
+ * The bands whose matches can chat. Every u18 message passes the contact filter before it is
+ * relayed (CLAUDE.md invariant 5): the screening hook in relay.ts refuses a u18 message without a
+ * filter, and on any error of it, so the band is open only where the filter is plugged in. This
+ * is a constant on purpose: it does not follow U18_POOL_ENABLED (while the pool is off, u18 users
+ * are waitlisted and can't chat anyway), and the database decides on its own (migration 0014).
  */
-export const CHAT_BANDS: readonly Band[] = ['adult'];
+export const CHAT_BANDS: readonly Band[] = ['u18', 'adult'];
 
 export const chatOpenIn = (band: Band): boolean => CHAT_BANDS.includes(band);
 

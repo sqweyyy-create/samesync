@@ -49,7 +49,8 @@ const API_ERROR: Record<RelayRefusedReason, ServiceError['code']> = {
   sender_not_active: 'forbidden',
   u18_chat_closed: 'forbidden',
   locale_mismatch: 'conflict',
-  screened: 'forbidden',
+  screened: 'unavailable',
+  contact_blocked: 'forbidden',
   not_delivered: 'unavailable',
 };
 
@@ -108,7 +109,12 @@ export function createChatService(deps: {
         // A match that isn't readable for the caller (closed for a band change, or never
         // theirs) answers like the other endpoints of a match do: it does not exist.
         const readable = await matches.getForParticipant(user.id, matchId);
-        throw new ServiceError(readable ? API_ERROR[result.reason] : 'not_found');
+        if (!readable) throw new ServiceError('not_found');
+        // The one refusal the Mini App explains: a contact in a u18 chat.
+        throw new ServiceError(
+          API_ERROR[result.reason],
+          result.reason === 'contact_blocked' ? ['contact_blocked'] : undefined,
+        );
       }
       // With an explicit match the relay never asks and never finds a duplicate.
       if (result.status !== 'delivered') throw new ServiceError('conflict');

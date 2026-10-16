@@ -466,21 +466,32 @@ describe('the chat notifications are re-checked like every other', () => {
     });
   });
 
-  it('nobody in a u18 match is reminded to write: they cannot yet', async () => {
+  it('reminds both people of a u18 match to write, like in any other, now that the chat is open there', async () => {
     const { a, b, rows } = await queuedChat('chat_reminder', 'u18');
     const { sentTo } = await sendChat();
-    expect(sentTo).not.toContain(a.telegramId);
-    expect(sentTo).not.toContain(b.telegramId);
+    expect(sentTo).toEqual(expect.arrayContaining([a.telegramId, b.telegramId]));
     for (const row of rows) {
-      expect(await outboxRow(testDb.ownerPool, row.id)).toMatchObject({
-        status: 'cancelled',
-        cancel_reason: 'outdated',
-      });
+      expect(await outboxRow(testDb.ownerPool, row.id)).toMatchObject({ status: 'sent' });
     }
   });
 
-  it('"this chat has ended" is only said about a chat the other person left', async () => {
-    for (const reason of ['admin', 'blocked', 'reported']) {
+  it('"this chat has ended" is said about a chat the other person left or blocked, or an admin acted on, and no other', async () => {
+    for (const reason of ['blocked', 'reported']) {
+      const { b, match } = await queuedChat('chat_reminder');
+      await raw(
+        "UPDATE matches SET status = 'closed', close_reason = $2, closed_at = now() WHERE id = $1",
+        [match.id, reason],
+      );
+      const ended = await insertOutbox(testDb.appPool, {
+        userId: b.id,
+        matchId: match.id,
+        kind: 'chat_ended',
+      });
+      const { sentTo } = await sendChat();
+      expect(sentTo).toContain(b.telegramId);
+      expect(await outboxRow(testDb.ownerPool, ended.id)).toMatchObject({ status: 'sent' });
+    }
+    for (const reason of ['admin', 'band_change', 'frozen', 'deleted']) {
       const { a, b, match, rows } = await queuedChat('chat_reminder');
       await raw(
         "UPDATE matches SET status = 'closed', close_reason = $2, closed_at = now() WHERE id = $1",

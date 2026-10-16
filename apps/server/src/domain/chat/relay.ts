@@ -6,6 +6,7 @@
  */
 import type { Band, Locale, MatchStatus } from '@samesync/shared';
 import type { UserStatus } from '@samesync/shared/api';
+import type { ContactKind } from '../safety/contact-filter';
 import { chatOpenIn, type ChatParams } from './params';
 
 /** One side of a chat as the relay sees it. Bands come from `birth_date`, never from the cache. */
@@ -109,15 +110,22 @@ export type ContactFilter = (input: {
   text: string;
   matchId: string;
   senderId: string;
-}) => Promise<{ hit: boolean; kind?: string }>;
+}) => Promise<{ hit: false } | { hit: true; kind: ContactKind }>;
 
 export type Screening =
-  { pass: true } | { pass: false; verdict: 'rejected' | 'blocked_by_filter'; reason: string };
+  | { pass: true }
+  /** The contact filter found something; `reason` is what. The message is kept as evidence. */
+  | { pass: false; verdict: 'blocked_by_filter'; reason: ContactKind }
+  | {
+      pass: false;
+      verdict: 'rejected';
+      reason: 'not_text' | 'entities' | 'no_contact_filter' | 'filter_error';
+    };
 
 /**
- * The screening hook: the last look at a message before it is stored and sent. In Phase 4 it
- * enforces plain text. For the u18 band it also demands the contact filter, and there is none
- * yet, so nothing passes: Phase 5 plugs the filter in here.
+ * The screening hook: the last look at a message before it is stored and sent. It enforces
+ * plain text, and for the u18 band it runs the contact filter (CLAUDE.md invariant 5). Without a
+ * filter, or when the filter throws, nothing passes in that band: fail closed (invariant 10).
  */
 export async function screen(
   input: { band: Band; content: IncomingContent; matchId: string; senderId: string },
@@ -139,9 +147,7 @@ export async function screen(
       matchId: input.matchId,
       senderId: input.senderId,
     });
-    if (result.hit) {
-      return { pass: false, verdict: 'blocked_by_filter', reason: result.kind ?? 'contact' };
-    }
+    if (result.hit) return { pass: false, verdict: 'blocked_by_filter', reason: result.kind };
   } catch {
     // A filter that fails is a filter that said no.
     return { pass: false, verdict: 'rejected', reason: 'filter_error' };

@@ -22,6 +22,8 @@ import { notificationKey } from './outbox';
 /** The sender of a message: the caller's own row, with what routing needs. */
 export interface ChatUser {
   id: string;
+  /** The support code: what /support shows the admins instead of a name. */
+  publicId: string;
   locale: Locale;
   status: UserStatus;
   /** From `birth_date` right now. */
@@ -67,7 +69,11 @@ export interface ChatRepository {
   context(senderId: string, matchId: string): Promise<ChatContext | null>;
   /** How many messages the sender has had accepted since `since`. */
   acceptedSince(senderId: string, since: Date): Promise<number>;
-  /** Stores an accepted message. The insert trigger decides once more. */
+  /**
+   * Stores a message: accepted for delivery, or stopped by the contact filter (kept, with the
+   * kind of contact as the reason, as evidence for a report; Q20). The insert trigger decides
+   * once more.
+   */
   store(input: {
     id: string;
     matchId: string;
@@ -76,7 +82,14 @@ export interface ChatRepository {
     senderTgMessageId: number | null;
     now: Date;
     purgeAfter: Date;
+    stopped?: { reason: string };
   }): Promise<StoreOutcome>;
+  /**
+   * The texts of the sender's latest delivered messages in a chat, oldest first: what the contact
+   * filter reads together with a new message (Phase 5). What the filter stopped never reached
+   * the other person, so it can't be a piece of a contact they are putting together.
+   */
+  recentTexts(senderId: string, matchId: string, limit: number): Promise<string[]>;
   markDelivered(id: string, at: Date, recipientTgMessageId: number | null): Promise<void>;
   markRejected(id: string, reason: string): Promise<void>;
   /** Records the bot's copy of a message that was sent from the Mini App. */
@@ -142,6 +155,7 @@ const CONSISTENT = sql`(
 
 interface UserRow extends Record<string, unknown> {
   id: string;
+  public_id: string;
   locale: Locale;
   status: UserStatus;
   live_band: Band | null;
@@ -171,12 +185,14 @@ interface ContextRow extends Record<string, unknown> {
 export function createChatRepository(db: Db): ChatRepository {
   const selectUser = async (where: ReturnType<typeof sql>): Promise<ChatUser | null> => {
     const result = await db.execute<UserRow>(sql`
-      SELECT id, locale, status, active_match_id, vc_band(birth_date, vc_today()) AS live_band
+      SELECT id, public_id, locale, status, active_match_id,
+        vc_band(birth_date, vc_today()) AS live_band
       FROM users WHERE ${where}`);
     const row = result.rows[0];
     if (!row) return null;
     return {
       id: row.id,
+      publicId: row.public_id,
       locale: row.locale,
       status: row.status,
       liveBand: row.live_band,
@@ -330,14 +346,15 @@ export function createChatRepository(db: Db): ChatRepository {
       return result.rows[0]?.n ?? 0;
     },
 
-    async store({ id, matchId, senderId, body, senderTgMessageId, now, purgeAfter }) {
+    async store({ id, matchId, senderId, body, senderTgMessageId, now, purgeAfter, stopped }) {
       try {
         await db.insert(messages).values({
           id,
           matchId,
           senderId,
           body,
-          verdict: 'delivered',
+          verdict: stopped ? 'blocked_by_filter' : 'delivered',
+          reason: stopped?.reason ?? null,
           senderTgMessageId,
           createdAt: now,
           purgeAfter,
@@ -360,6 +377,19 @@ export function createChatRepository(db: Db): ChatRepository {
           })`,
         );
       }
+    },
+
+    async recentTexts(senderId, matchId, limit) {
+      const result = await db.execute<{ body: string }>(sql`
+        SELECT body FROM (
+          SELECT body, created_at, id FROM messages
+          WHERE match_id = ${matchId}::uuid AND sender_id = ${senderId}::uuid
+            AND verdict = 'delivered' AND body IS NOT NULL
+          ORDER BY created_at DESC, id DESC
+          LIMIT ${limit}
+        ) latest
+        ORDER BY created_at, id`);
+      return result.rows.map((r) => r.body);
     },
 
     async markDelivered(id, at, recipientTgMessageId) {

@@ -40,8 +40,15 @@ const chatFields = async (matchId: string) =>
     )
   ).rows[0];
 
-const replyButton = (matchId: string, text = 'Ответить') => ({
-  inline_keyboard: [[{ text, callback_data: `c:to:${matchId}` }]],
+/** The buttons under a relayed message: reply, and the report and block of Phase 5. */
+const replyButton = (matchId: string, locale: 'ru' | 'en' = 'ru') => ({
+  inline_keyboard: [
+    [{ text: locale === 'ru' ? 'Ответить' : 'Reply', callback_data: `c:to:${matchId}` }],
+    [
+      { text: locale === 'ru' ? 'Пожаловаться' : 'Report', callback_data: `c:report:${matchId}` },
+      { text: locale === 'ru' ? 'Заблокировать' : 'Block', callback_data: `c:block:${matchId}` },
+    ],
+  ],
 });
 
 describe('relaying a message', () => {
@@ -177,7 +184,7 @@ describe('relaying a message', () => {
     await app.handle(textUpdate(fox, 'привет'));
     expect(app.telegram.sentTo(owl.id)[0]?.payload).toMatchObject({
       text: '🦊 Fox\nпривет',
-      reply_markup: replyButton(matchId, 'Reply'),
+      reply_markup: replyButton(matchId, 'en'),
     });
     // And the sender, too, can switch and go on.
     await testDb.appPool.query("UPDATE users SET locale = 'en' WHERE id = $1", [a]);

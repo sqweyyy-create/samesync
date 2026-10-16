@@ -12,15 +12,14 @@
  *   both active, both live bands equal to the band of the match, the chat still open, no block
  *   (invariant 3). A retry is checked again like a first try.
  * - Any refusal and any error means the message is not delivered (invariant 10).
- * - Nothing is relayed in a u18 match: twice here (the chat is not open for the band, and the
- *   screening hook has no contact filter to ask) and once more in the database.
+ * - A u18 message passes the contact filter before anything else happens to it (invariant 5):
+ *   the screening hook refuses without a filter and on any error of it. A message the filter
+ *   stops is kept, marked as such, as the evidence a report shows to an admin (Q20), and never
+ *   sent; the hit is counted and escalated by the safety service.
  * - A user who is not active can't send, whatever their matches look like (invariant 9).
  *
  * The pipeline follows PLAN.md, with the text check moved to the front (a photo needs no routing):
  * text, sender, target, validation and rate limit, screening, store, send, start of the chat.
- *
- * Phase 5 plugs in here: the contact filter goes into `contactFilter`, the block is already
- * checked (`blocks`, which nothing writes yet), and the report button joins `keyboard`.
  */
 import type { Locale } from '@samesync/shared';
 import { translatorFor } from '@samesync/shared/i18n/static';
@@ -29,6 +28,7 @@ import type { Clock } from '../clock';
 import { aliasText, type ContentStore } from '../content/store';
 import type { ChatRepository, ChatUser } from '../db/repositories/chat';
 import type { UsersRepository } from '../db/repositories/users';
+import type { FilterEventKind } from '../db/schema/safety';
 import { encodeCallback } from '../domain/chat/callbacks';
 import { chatOpenIn, type ChatParams } from '../domain/chat/params';
 import {
@@ -92,6 +92,8 @@ export type RelayRefusedReason =
   | 'not_found'
   /** The screening hook said no. */
   | 'screened'
+  /** The u18 contact filter found a contact: the message is kept as evidence, never sent. */
+  | 'contact_blocked'
   /** Telegram did not take the message, or the recipient can't be reached. */
   | 'not_delivered';
 
@@ -124,8 +126,17 @@ export interface RelayService {
   send(input: RelayInput): Promise<RelayResult>;
   /** The user's open chats, after closing any whose live bands no longer fit (invariant 4). */
   chatsOf(user: ChatUser): Promise<ChatRef[]>;
-  /** The reply button under a relayed message, in the recipient's language. */
+  /** The buttons under a relayed message (reply, report, block), in the recipient's language. */
   keyboard(matchId: string, locale: Locale): CallbackButton[][];
+}
+
+/** What the relay tells the safety service: a hit of the u18 filter, to count and escalate. */
+export interface FilterHits {
+  filterHit(input: {
+    userId: string;
+    matchId: string | null;
+    kind: FilterEventKind;
+  }): Promise<void>;
 }
 
 export interface RelayDeps {
@@ -136,8 +147,10 @@ export interface RelayDeps {
   clock: Clock;
   logger: Logger;
   params: ChatParams;
-  /** Phase 5. Without it nothing passes the screening in the u18 band. */
+  /** The u18 contact filter. Without it nothing passes the screening in the u18 band. */
   contactFilter?: ContactFilter;
+  /** Counts the filter's hits (and what isn't text) per user; optional for tooling and tests. */
+  safety?: FilterHits;
   /** Tests replace the wait before a retry. */
   sleep?: (ms: number) => Promise<void>;
 }
@@ -163,8 +176,22 @@ export function createRelayService(deps: RelayDeps): RelayService {
 
   function keyboard(matchId: string, locale: Locale): CallbackButton[][] {
     const { t } = translatorFor(locale);
-    // Phase 5 adds the report and block buttons as a second row.
-    return [[{ text: t('bot.chat.reply'), callback_data: encodeCallback('to', matchId) }]];
+    return [
+      [{ text: t('bot.chat.reply'), callback_data: encodeCallback('to', matchId) }],
+      [
+        { text: t('bot.chat.report'), callback_data: encodeCallback('report', matchId) },
+        { text: t('bot.chat.block'), callback_data: encodeCallback('block', matchId) },
+      ],
+    ];
+  }
+
+  /** A hit of the filter is counted even when the count itself fails: the refusal stands. */
+  async function countHit(userId: string, matchId: string | null, kind: FilterEventKind) {
+    try {
+      await deps.safety?.filterHit({ userId, matchId, kind });
+    } catch (error) {
+      logger.warn({ userId, matchId, kind, err: error }, 'filter hit not counted');
+    }
   }
 
   /**
@@ -285,7 +312,14 @@ export function createRelayService(deps: RelayDeps): RelayService {
 
     // 1. Plain text only, within the limit: decided before anything is read or routed.
     const problem = textProblem(input.content, params);
-    if (problem || input.content.text === null) return refused(problem ?? 'not_text');
+    if (problem || input.content.text === null) {
+      if (problem === 'not_text') {
+        // In the u18 band, something that isn't text is counted like a hit of the filter.
+        const sender = await chat.userById(input.senderId);
+        if (sender?.liveBand === 'u18') await countHit(sender.id, null, 'non_text');
+      }
+      return refused(problem ?? 'not_text');
+    }
     const body = input.content.text;
 
     // 2. The sender. Anyone who is not active sends nothing, whatever their matches look like.
@@ -335,17 +369,37 @@ export function createRelayService(deps: RelayDeps): RelayService {
     const recent = await chat.acceptedSince(user.id, new Date(clock.now().getTime() - MINUTE));
     if (recent >= params.ratePerMinute) return refused('rate_limited', matchId);
 
-    // 5. The screening hook: text only now, the contact filter from Phase 5.
+    // 5. The screening hook: plain text, and in the u18 band the contact filter.
     const screening = await screen(
       { band: context.band, content: input.content, matchId, senderId: user.id },
       deps.contactFilter ? { contactFilter: deps.contactFilter } : {},
     );
-    if (!screening.pass) return refused('screened', matchId);
+    const messageId = uuidv7();
+    const now = clock.now();
+    const purgeAfter = new Date(now.getTime() + params.retentionDays * DAY);
+    if (!screening.pass) {
+      if (screening.verdict === 'blocked_by_filter') {
+        // Kept as evidence, marked as stopped by the filter, and never sent (Q20). The insert
+        // trigger checks the match like for any message; a refusal changes nothing here.
+        const kept = await chat.store({
+          id: messageId,
+          matchId,
+          senderId: user.id,
+          body,
+          senderTgMessageId: input.tgMessageId,
+          now,
+          purgeAfter,
+          stopped: { reason: screening.reason },
+        });
+        if (kept.status === 'duplicate') return { status: 'duplicate' };
+        await countHit(user.id, matchId, screening.reason);
+        return refused('contact_blocked', matchId);
+      }
+      return refused(screening.reason === 'entities' ? 'not_text' : 'screened', matchId);
+    }
 
     // 6. Store. The insert trigger re-derives both bands and checks the match once more.
     const lastChatMatch = await chat.lastChatMatch(user.id);
-    const messageId = uuidv7();
-    const now = clock.now();
     const stored = await chat.store({
       id: messageId,
       matchId,
@@ -353,7 +407,7 @@ export function createRelayService(deps: RelayDeps): RelayService {
       body,
       senderTgMessageId: input.tgMessageId,
       now,
-      purgeAfter: new Date(now.getTime() + params.retentionDays * DAY),
+      purgeAfter,
     });
     if (stored.status === 'duplicate') return { status: 'duplicate' };
     if (stored.status === 'refused') {
