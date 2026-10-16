@@ -10,11 +10,13 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { devChats } from '../../scripts/lib/dev-chat';
 import {
   ScenarioError,
   SCENARIOS,
   SCENARIO_NAMES,
   findDeveloper,
+  reportAsDeveloper,
   reset,
   type Developer,
   type ScenarioDeps,
@@ -63,7 +65,7 @@ async function realPerson(over: PersonInput = {}, scopeOver: Parameters<typeof r
   return { ...person, publicId: rows[0]!.public_id };
 }
 
-async function setup(options: { username?: string | null } = {}) {
+async function setup(options: { username?: string | null; admin?: boolean } = {}) {
   const person = await realPerson();
   const telegram = fakeTelegram();
   if (options.username !== null) {
@@ -77,6 +79,8 @@ async function setup(options: { username?: string | null } = {}) {
     fallbackTimeZone: { ru: 'Europe/Moscow', en: 'UTC' },
     u18PoolEnabled: false,
     syntheticUsername: 'synthetic_user',
+    adminTelegramIds: options.admin ? [person.telegramId] : [],
+    botTelegramId: 1234567890,
     logger: memoryLogger().logger,
     sleep: () => Promise.resolve(),
     poolSize: 20,
@@ -410,6 +414,72 @@ describe('phase4', () => {
     await expect(SCENARIOS.phase4({ ...deps, u18PoolEnabled: true }, dev)).rejects.toThrow(
       /phase4 needs an adult account/,
     );
+  });
+});
+
+describe('phase5', () => {
+  it('prepares chats to report and block from, a counterpart two others reported, and the admin items', async () => {
+    const { telegram, deps, dev } = await setup({ admin: true });
+    const run = await SCENARIOS.phase5(deps, dev);
+
+    const mine = await matchesOf(dev.id);
+    expect(open(mine)).toHaveLength(6);
+    const [a, b, c] = mine.map((m) => m.id) as [string, string, string];
+    const { rows: messages } = await testDb.ownerPool.query<{ match_id: string; mine: boolean }>(
+      `SELECT match_id, sender_id = $1 AS mine FROM messages ORDER BY created_at`,
+      [dev.id],
+    );
+    expect(messages).toEqual([
+      { match_id: a, mine: false },
+      { match_id: b, mine: false },
+      { match_id: c, mine: false },
+    ]);
+    // Two other people reported the counterpart of C, nobody else is reported yet.
+    const { rows: reports } = await testDb.ownerPool.query<{ reporter_synthetic: boolean }>(
+      `SELECT reporter.synthetic AS reporter_synthetic FROM reports r
+       JOIN users reporter ON reporter.id = r.reporter_id
+       JOIN matches m ON m.id = $1
+       WHERE r.reported_id IN (m.user_a_id, m.user_b_id) AND r.reported_id <> $2`,
+      [c, dev.id],
+    );
+    expect(reports).toEqual([{ reporter_synthetic: true }, { reporter_synthetic: true }]);
+    const texts = sent(telegram, dev);
+    // Three relayed messages, and the results of F. Nothing to the synthetic reporters.
+    expect(count(texts, /^\S+ \S+\n.+/s)).toBe(3);
+    expect(count(texts, /^Результаты готовы! /)).toBe(1);
+    expect(texts).toHaveLength(4);
+    expect(run.summary.join('\n')).toContain('You are an admin');
+    expect(run.summary.join('\n')).not.toContain('ADMIN_TELEGRAM_IDS=');
+    expect(run.checklist).toHaveLength(11);
+    expect(run.checklist[0]).toContain('«Пожаловаться»');
+    expect(run.checklist[2]).toContain('заморожен автоматически');
+    expect(run.checklist[6]).toContain('/setbirthdate');
+    expect(run.later).toBeUndefined();
+
+    // Your report on C is the third: the counterpart is frozen, C closes, you are told as admin.
+    telegram.clear();
+    expect((await devChats(pool)).some((chat) => chat.matchId === c)).toBe(true);
+    expect(await reportAsDeveloper(deps, dev, c)).toMatchObject({ status: 'stored', frozen: true });
+    expect((await matchesOf(dev.id)).find((m) => m.id === c)).toMatchObject({
+      status: 'closed',
+      close_reason: 'frozen',
+    });
+    expect(sent(telegram, dev)).toEqual([
+      expect.stringMatching(/^Аккаунт [0-9A-HJKMNP-TV-Z]{10} заморожен автоматически: 3 жалобы/),
+    ]);
+
+    // Running it again leaves one set of matches, not two.
+    telegram.clear();
+    await SCENARIOS.phase5(deps, dev);
+    expect(open(await matchesOf(dev.id))).toHaveLength(6);
+    expect(sent(telegram, dev)).toHaveLength(4);
+  });
+
+  it('prints the .env line when the developer is not an admin, and never writes it', async () => {
+    const { deps, dev } = await setup();
+    const run = await SCENARIOS.phase5(deps, dev);
+    expect(run.summary.join('\n')).toContain(`ADMIN_TELEGRAM_IDS=${dev.telegramId}`);
+    expect(run.checklist[2]).toContain('the admin alert goes to ADMIN_TELEGRAM_IDS');
   });
 });
 

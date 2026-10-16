@@ -23,34 +23,40 @@ import type pg from 'pg';
 import { systemClock } from '../../src/clock';
 import { aliasText, type ContentStore } from '../../src/content/store';
 import { createDb } from '../../src/db/client';
+import { createAdminRepository } from '../../src/db/repositories/admin';
 import { createChatRepository } from '../../src/db/repositories/chat';
 import { createGamesRepository } from '../../src/db/repositories/games';
 import { createMatchesRepository } from '../../src/db/repositories/matches';
 import { createMatchingRepository } from '../../src/db/repositories/matching';
 import { createOutboxRepository } from '../../src/db/repositories/outbox';
 import { createRevealRepository } from '../../src/db/repositories/reveal';
+import { createSafetyRepository } from '../../src/db/repositories/safety';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { DEFAULT_CHAT_PARAMS } from '../../src/domain/chat/params';
 import { renderOpener } from '../../src/domain/game/opener';
 import { DEFAULT_GAME_PARAMS } from '../../src/domain/game/params';
 import { DEFAULT_MATCHING_PARAMS } from '../../src/domain/matching/params';
 import type { Stance } from '../../src/domain/matching/types';
+import { DEFAULT_SAFETY_PARAMS } from '../../src/domain/safety/params';
 import type { NotificationKind } from '../../src/domain/notifications';
 import { LOCK, withAdvisoryLock } from '../../src/jobs/advisory-lock';
 import { createGameDeadlines } from '../../src/jobs/game-deadlines';
 import { inProcessPlanner } from '../../src/jobs/matching-planner';
 import type { Logger } from '../../src/logger';
+import { createAdminNotifier } from '../../src/services/admin-alerts';
 import { createChatService } from '../../src/services/chat';
+import { createContactFilter } from '../../src/services/contact-filter';
 import { createGamePlay } from '../../src/services/game';
 import { createMatchingService } from '../../src/services/matching';
 import { createOutboxSender, type TelegramSender } from '../../src/services/outbox-sender';
 import { createRelayService, type RelayTelegram } from '../../src/services/relay';
 import { createRevealService, type ConsentOutcome } from '../../src/services/reveal';
+import { createSafetyService } from '../../src/services/safety';
 import { createUsernames } from '../../src/services/usernames';
 import { consentAsCounterpart, devChats, sayAsCounterpart, type DevChat } from './dev-chat';
 import { INELIGIBLE_HINT, matchMe } from './match-me';
 
-export const SCENARIO_NAMES = ['phase2', 'phase3', 'phase4', 'reset'] as const;
+export const SCENARIO_NAMES = ['phase2', 'phase3', 'phase4', 'phase5', 'reset'] as const;
 export type ScenarioName = (typeof SCENARIO_NAMES)[number];
 
 /** A refusal or a failure the developer can act on; the CLI prints its message. */
@@ -69,6 +75,10 @@ export interface ScenarioDeps {
   u18PoolEnabled: boolean;
   /** The username a synthetic user "has" (DEV_SYNTHETIC_USERNAME). */
   syntheticUsername: string;
+  /** ADMIN_TELEGRAM_IDS: who gets the admin alerts, and whether the developer is one of them. */
+  adminTelegramIds: readonly number[];
+  /** The bot's own Telegram ID: what the audit names for an automatic freeze. */
+  botTelegramId: number;
   logger: Logger;
   /** Waits between tries, and before the delayed step of phase4; tests make it instant. */
   sleep: (ms: number) => Promise<void>;
@@ -228,6 +238,28 @@ function services(deps: ScenarioDeps) {
     getChat: (chatId) => deps.api.getChat(chatId),
     syntheticUsername: deps.syntheticUsername,
   });
+  const safetyRepo = createSafetyRepository(drizzle);
+  const adminRepo = createAdminRepository(drizzle);
+  const notifier = createAdminNotifier({
+    adminTelegramIds: deps.adminTelegramIds,
+    users,
+    telegram: {
+      sendMessage: (chatId, text, options) => deps.api.sendMessage(chatId, text, options),
+    },
+    logger,
+  });
+  const safety = createSafetyService({
+    safety: safetyRepo,
+    admin: adminRepo,
+    users,
+    matches,
+    content,
+    notifier,
+    clock,
+    logger,
+    params: DEFAULT_SAFETY_PARAMS,
+    systemActorId: () => deps.botTelegramId,
+  });
   const relay = createRelayService({
     chat,
     users,
@@ -236,6 +268,8 @@ function services(deps: ScenarioDeps) {
     clock,
     logger,
     params: DEFAULT_CHAT_PARAMS,
+    contactFilter: createContactFilter({ chat, params: DEFAULT_SAFETY_PARAMS }),
+    safety,
   });
   return {
     games,
@@ -243,6 +277,8 @@ function services(deps: ScenarioDeps) {
     outbox,
     repo,
     relay,
+    safety,
+    adminRepo,
     chats: createChatService({
       users,
       matches,
@@ -737,9 +773,173 @@ async function phase4(deps: ScenarioDeps, user: Developer): Promise<ScenarioRun>
   };
 }
 
+/** The developer reports the other person of one of their matches (tests of the scenario). */
+export function reportAsDeveloper(
+  deps: ScenarioDeps,
+  user: Pick<Developer, 'id'>,
+  matchId: string,
+) {
+  return services(deps).safety.report({ reporterId: user.id, matchId, reason: 'spam' });
+}
+
+/** A synthetic user matched with `userId`, in any run, with the match between them. */
+interface SyntheticMatch {
+  userId: string;
+  matchId: string;
+}
+
+/** Synthetic users who have a match with `userId`, newest first. */
+async function syntheticMatchesOf(deps: ScenarioDeps, userId: string): Promise<SyntheticMatch[]> {
+  const { rows } = await deps.db.query<{ user_id: string; match_id: string }>(
+    `SELECT c.id AS user_id, m.id AS match_id
+     FROM matches m
+     JOIN users c ON c.id = CASE WHEN m.user_a_id = $1 THEN m.user_b_id ELSE m.user_a_id END
+     WHERE (m.user_a_id = $1 OR m.user_b_id = $1) AND c.synthetic AND c.status = 'active'
+     ORDER BY m.created_at DESC, m.id DESC`,
+    [userId],
+  );
+  return rows.map((r) => ({ userId: r.user_id, matchId: r.match_id }));
+}
+
+/**
+ * phase5: chats A and B with a message from each counterpart (report and block from the message),
+ * a chat C whose counterpart two other people have reported already (your report freezes it),
+ * chats D and E for the admin commands (/freeze, /setbirthdate), and F for the Mini App. The
+ * line to add to .env to be an admin is printed when you are not one yet.
+ */
+async function phase5(deps: ScenarioDeps, user: Developer): Promise<ScenarioRun> {
+  await ready(deps, user);
+  const s = services(deps);
+  const cleared = await reset(deps.db, user);
+  const setup = await locked(deps, LOCK.outbox, 'the outbox', async () => {
+    const made: Made[] = [];
+    for (let i = 0; i < 6; i++) {
+      const match = await newMatch(deps, s, user, true);
+      await playSide(deps, s, match.id, user.id);
+      made.push(match);
+    }
+    const [a, b, c, d, e, f] = made as [Made, Made, Made, Made, Made, Made];
+    // The game messages of the setup are not what this phase checks. F keeps its "results are
+    // ready": it is the way into the Mini App.
+    await leaveOut(
+      deps,
+      s,
+      user.id,
+      made.slice(0, 5).map((m) => m.id),
+      ['match_created', 'game_turn', 'game_results'],
+    );
+    await leaveOut(deps, s, user.id, [f.id], ['match_created', 'game_turn']);
+    // One message from each counterpart of A, B and C, through the real relay.
+    const texts = new Map<string, string>();
+    for (const match of [a, b, c]) {
+      const text = await openerOf(deps, s, match.id, match.counterpartId);
+      const said = await sayAsCounterpart(s, await devChatOf(deps, match.id), text);
+      if (said.status !== 'delivered') {
+        throw new ScenarioError(
+          `the relay did not deliver the counterpart's message (${said.status === 'refused' ? said.reason : said.status})`,
+        );
+      }
+      texts.set(match.id, text);
+    }
+    // Two other people reported the counterpart of C before: synthetic users matched with it in
+    // the runs above, reporting through the real service. Your report will be the third.
+    let others = (await syntheticMatchesOf(deps, c.counterpartId)).slice(0, 2);
+    for (let extra = 0; others.length < 2 && extra < 4; extra++) {
+      const outcome = await s.matching.run({
+        pool: { band: user.band!, locale: user.locale },
+        mode: user.mode!,
+        slot: new Date(systemClock.now().getTime() + extra + 1),
+        params: {
+          tier2AfterHours: 0,
+          tier3AfterHours: 0,
+          dailyLimit: 1_000_000,
+          openLimit: 1_000_000,
+        },
+      });
+      if (outcome.status !== 'done') break;
+      // A run of the whole pool may give you another match too: not one of this scenario.
+      await deps.db.query(
+        `UPDATE matches SET status = 'closed', close_reason = 'admin', closed_at = now()
+         WHERE (user_a_id = $1 OR user_b_id = $1) AND status IN ('pending_game', 'results_ready', 'active')
+           AND id <> ALL($2::uuid[])`,
+        [user.id, made.map((m) => m.id)],
+      );
+      others = (await syntheticMatchesOf(deps, c.counterpartId)).slice(0, 2);
+    }
+    if (others.length < 2) {
+      throw new ScenarioError(
+        'could not find two synthetic users matched with the counterpart of C',
+      );
+    }
+    for (const other of others) {
+      const reported = await s.safety.report({
+        reporterId: other.userId,
+        matchId: other.matchId,
+        reason: 'spam',
+      });
+      if (reported.status !== 'stored') {
+        throw new ScenarioError(
+          `a synthetic user could not report the counterpart of C (${reported.status})`,
+        );
+      }
+    }
+    const codes = await deps.db.query<{ id: string; public_id: string; birth_date: string }>(
+      'SELECT id, public_id, birth_date::text AS birth_date FROM users WHERE id = ANY($1::uuid[])',
+      [[a, b, c, d, e, f].map((m) => m.counterpartId)],
+    );
+    const codeOf = (m: Made) => codes.rows.find((r) => r.id === m.counterpartId)!;
+    const delivery = await deliver(
+      deps,
+      s,
+      user.id,
+      made.map((m) => m.id),
+    );
+    return { a, b, c, d, e, f, texts, codeOf, delivery };
+  });
+
+  const { a, b, c, d, e, f, texts, codeOf } = setup;
+  const { t } = translatorFor(user.locale);
+  const name = (m: Made) => aliasText(deps.content, m.alias, user.locale);
+  const [A, B, C, D, E, F] = [name(a), name(b), name(c), name(d), name(e), name(f)];
+  const said = (m: Made) => `«${name(m)} / ${texts.get(m.id) ?? ''}»`;
+  const isAdmin = deps.adminTelegramIds.includes(user.telegramId);
+  const you = user.publicId;
+  const u18Date = new Date(systemClock.now());
+  u18Date.setUTCFullYear(u18Date.getUTCFullYear() - 16);
+  const sixteen = u18Date.toISOString().slice(0, 10);
+  const reasonSpam = t('report.reason.spam');
+  const adminLine = isAdmin
+    ? 'You are an admin (your Telegram ID is in ADMIN_TELEGRAM_IDS): the admin items below work.'
+    : `You are not an admin yet. Add this line to .env and restart pnpm dev:up, then run this scenario again:\n  ADMIN_TELEGRAM_IDS=${user.telegramId}`;
+
+  return {
+    summary: [
+      resetLine(cleared),
+      `Chats: ${A}, ${B} and ${C} (a message from each; the counterpart of ${C} was reported by two other people already), ${D} and ${E} (for the admin commands), ${F} (a finished game, for the Mini App).`,
+      `Support codes of the counterparts: ${A} ${codeOf(a).public_id}, ${B} ${codeOf(b).public_id}, ${C} ${codeOf(c).public_id}, ${D} ${codeOf(d).public_id}, ${E} ${codeOf(e).public_id}, ${F} ${codeOf(f).public_id}. Yours: ${you}.`,
+      adminLine,
+      'The u18 contact filter is not part of this check: it runs only in the u18 pool and is covered by the automated tests.',
+      ...deliveryLines(setup.delivery),
+    ],
+    checklist: [
+      `Report from a message: under ${said(a)} tap «${t('bot.chat.report')}»: «${t('bot.report.reason', { alias: A })}» with the six reasons. Tap «${reasonSpam}»: «${t('bot.report.done', { alias: A })}». Tap «${t('bot.chat.report')}» under the same message and a reason again: «${t('bot.report.duplicate', { alias: A })}».`,
+      `Block from a message: under ${said(b)} tap «${t('bot.chat.block')}»: «${t('bot.block.confirm', { alias: B })}». Tap «${t('bot.block.yes')}»: «${t('bot.block.done', { alias: B })}». /chats no longer lists ${B}, and a reply to ${said(b)} gets «${t('bot.chat.ended')}».`,
+      `Auto-freeze: send /report: «${t('bot.report.pick')}» with your chats. Tap ${C}, then «${reasonSpam}»: «${t('bot.report.done', { alias: C })}». Two other people had reported this person already, so the account is frozen now: ${C} is gone from /chats${isAdmin ? `, and you (as admin) get «Аккаунт ${codeOf(c).public_id} заморожен автоматически: 3 жалобы от разных пользователей за 30 дн. Открыть: /user ${codeOf(c).public_id}»` : ' (the admin alert goes to ADMIN_TELEGRAM_IDS)'}.`,
+      `Admin, reports: /reports lists the three reports (yours on ${A} and ${C}, and the two on ${C}'s counterpart); /report_view <number of your report on ${A}> shows it with the last messages of that chat, by «${t('admin.report.party.reporter')}» and «${t('admin.report.party.reported')}»; /resolve <that number> dismiss: «${t('admin.resolve.done', { seq: '<number>', status: t('admin.report_status.dismissed') })}».`,
+      `Admin, a user: /user ${codeOf(d).public_id}: the view with «Код: ${codeOf(d).public_id}», «Статус: active», «Возраст: 18+», the report counts and the open matches. No name, no username.`,
+      `Admin, freeze: /freeze ${codeOf(d).public_id} test: «${t('admin.freeze.confirm', { code: codeOf(d).public_id, reason: 'test' })}» with «${t('admin.confirm.yes')}» and «${t('bot.cancel')}». Tap «${t('admin.confirm.yes')}»: «${t('admin.freeze.done', { code: codeOf(d).public_id })}», and ${D} is gone from /chats. /unfreeze ${codeOf(d).public_id} checked: «${t('admin.unfreeze.done', { code: codeOf(d).public_id })}», and ${D} stays gone.`,
+      `Admin, a birth date: /setbirthdate ${codeOf(e).public_id} ${sixteen} test: the question with «${codeOf(e).birth_date} → ${sixteen} (возраст: 18+ → до 18)». Tap «${t('admin.confirm.yes')}»: «${t('admin.setbirthdate.done', { code: codeOf(e).public_id, from: codeOf(e).birth_date, to: sixteen, band: t('admin.band.u18') })}», and ${E} is gone from /chats at once (closed for the band change).`,
+      `Admin, pools: /stats: «${t('admin.stats.header')}» and one line per pool × mode, with your pool's last run.`,
+      `Support: send «/support привет»: «${t('bot.support.sent')}»${isAdmin ? `, and you (as admin) get «Поддержка · ${you} (${user.locale}):» with your text` : ''}. ${isAdmin ? `Answer with /reply ${you} ответ: «${t('admin.reply.done', { code: you })}», then «${t('bot.support.reply', { text: 'ответ' })}» arrives.` : 'The request goes to ADMIN_TELEGRAM_IDS.'}`,
+      `The Mini App: under «${t('bot.game.results', { alias: F })}» tap «${t('bot.game.see_results')}»: at the bottom «${t('miniapp.safety.report')}» and «${t('miniapp.safety.block')}». Tap «${t('miniapp.safety.report')}», pick «${reasonSpam}», tap «${t('miniapp.report.send')}»: «${t('miniapp.report.sent')}». Tap «${t('miniapp.safety.block')}», then «${t('miniapp.block.yes')}»: «${t('miniapp.block.done')}», and ${F} is gone from the home screen.`,
+      `Optional, destructive: /delete asks «${t('bot.delete.confirm')}»; «${t('bot.cancel')}» changes nothing. «${t('bot.delete.yes')}» deletes your account for good (you would onboard again from /start): skip it unless you mean it.`,
+    ],
+  };
+}
+
 export const SCENARIOS: Readonly<
   Record<
     Exclude<ScenarioName, 'reset'>,
     (deps: ScenarioDeps, user: Developer) => Promise<ScenarioRun>
   >
-> = { phase2, phase3, phase4 };
+> = { phase2, phase3, phase4, phase5 };

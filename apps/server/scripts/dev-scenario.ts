@@ -10,6 +10,10 @@
  *   phase4  the chat: two chats with a message each, a reveal asked by a counterpart, your consent
  *           with the counterpart's a few seconds later, a chat its counterpart ended, and a fresh
  *           finished game for the Mini App's "Написать"
+ *   phase5  safety and admin: chats to report and block from, a counterpart two others reported
+ *           already (your report freezes it), chats for /freeze and /setbirthdate, one for the
+ *           Mini App, and the .env line that makes your account an admin (it is printed, never
+ *           written)
  *   reset   closes your open matches and retires the synthetic users (your profile stays as it is)
  *
  * Every phase scenario starts with a reset. It acts only through the dev tools and the real
@@ -61,11 +65,12 @@ try {
       if (!(error instanceof ConfigError)) throw error;
       fail(error.message);
     }
+    const api = new Api(config.botToken);
     const run = await SCENARIOS[name](
       {
         db,
         content,
-        api: new Api(config.botToken),
+        api,
         miniAppUrl: config.miniAppUrl,
         fallbackTimeZone: {
           ru: config.matching.drops.ru.timeZone,
@@ -73,6 +78,8 @@ try {
         },
         u18PoolEnabled: config.u18PoolEnabled,
         syntheticUsername: DEV_SYNTHETIC_USERNAME,
+        adminTelegramIds: config.adminTelegramIds,
+        botTelegramId: (await api.getMe()).id,
         logger: createLogger('error'),
         sleep: (ms) => sleep(ms),
       },
