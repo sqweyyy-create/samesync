@@ -41,8 +41,18 @@ type T = Translator['t'];
 type ChatContext = ChatTypeContext<Context & { t: T; locale: Locale }, 'private'>;
 type Keyboard = InlineKeyboardButton[][];
 
-/** The commands of the bot's menu, in the order they are listed. */
-export const COMMANDS = ['start', 'chats', 'leave', 'reveal', 'help'] as const;
+/** The commands of the bot's menu, in the order they are listed. Admin commands are not in it. */
+export const COMMANDS = [
+  'start',
+  'chats',
+  'leave',
+  'reveal',
+  'report',
+  'block',
+  'support',
+  'delete',
+  'help',
+] as const;
 
 /**
  * Registers the command menu for every locale. Telegram shows it by the language of the client,
@@ -123,9 +133,11 @@ function refusalText(t: T, reason: RelayRefusedReason, maxLength: number): strin
     case 'sender_not_active':
       return t('bot.chat.unavailable');
     case 'u18_chat_closed':
-    case 'screened':
       return t('bot.chat.u18_closed');
+    case 'contact_blocked':
+      return t('bot.chat.contact_blocked');
     case 'locale_mismatch':
+    case 'screened':
     case 'not_delivered':
       return t('bot.chat.not_delivered');
   }

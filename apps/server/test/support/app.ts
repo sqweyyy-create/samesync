@@ -11,6 +11,7 @@ import { createUsersRepository } from '../../src/db/repositories/users';
 import { createHttpApp } from '../../src/http/app';
 import type { Logger } from '../../src/logger';
 import type { ChatService } from '../../src/services/chat';
+import type { SafetyService } from '../../src/services/safety';
 import { createGameService } from '../../src/services/game';
 import { createMatchesService } from '../../src/services/matches';
 import { createProfileService } from '../../src/services/profile';
@@ -70,8 +71,8 @@ export async function buildTestApp(
     logger?: Logger;
     content?: ContentStore;
     clock?: Clock;
-    /** A chat service that exists already, with the fake Bot API it talks to (support/chat-app.ts). */
-    chat?: { chats: ChatService; telegram: FakeTelegram<BotContext> };
+    /** Services that exist already, with the fake Bot API they talk to (support/chat-app.ts). */
+    chat?: { chats: ChatService; telegram: FakeTelegram<BotContext>; safety: SafetyService };
   } = {},
 ): Promise<TestApp> {
   const content = options.content ?? (await realContent());
@@ -80,6 +81,7 @@ export async function buildTestApp(
   const matches = createMatchesRepository(testDb.db);
   const logger = options.logger ?? memoryLogger().logger;
   const telegram = options.chat?.telegram ?? fakeTelegram<BotContext>();
+  const services = options.chat ?? chatServices(testDb, { content, clock, logger, telegram });
   const app = createHttpApp({
     botToken: TEST_BOT_TOKEN,
     initData: { maxAgeSec: MAX_AGE_SEC, clockSkewSec: CLOCK_SKEW_SEC },
@@ -100,7 +102,8 @@ export async function buildTestApp(
       content,
       clock,
     }),
-    chat: options.chat?.chats ?? chatServices(testDb, { content, clock, logger, telegram }).chats,
+    chat: services.chats,
+    safety: services.safety,
   });
   return {
     app,

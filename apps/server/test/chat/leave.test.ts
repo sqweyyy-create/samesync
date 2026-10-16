@@ -209,7 +209,17 @@ describe('the command menu', () => {
     expect(calls).toHaveLength(3);
     const scope = { type: 'all_private_chats' };
     const names = COMMANDS.map((command) => command);
-    expect(names).toEqual(['start', 'chats', 'leave', 'reveal', 'help']);
+    expect(names).toEqual([
+      'start',
+      'chats',
+      'leave',
+      'reveal',
+      'report',
+      'block',
+      'support',
+      'delete',
+      'help',
+    ]);
     const byLanguage = new Map(calls.map((c) => [c['language_code'], c]));
     expect(byLanguage.get('ru')).toEqual({
       scope,
@@ -219,6 +229,10 @@ describe('the command menu', () => {
         { command: 'chats', description: 'Мои чаты' },
         { command: 'leave', description: 'Завершить чат' },
         { command: 'reveal', description: 'Обменяться никами' },
+        { command: 'report', description: 'Пожаловаться' },
+        { command: 'block', description: 'Заблокировать' },
+        { command: 'support', description: 'Написать в поддержку' },
+        { command: 'delete', description: 'Удалить аккаунт' },
         { command: 'help', description: 'Что умеет бот' },
       ],
     });
@@ -227,6 +241,10 @@ describe('the command menu', () => {
       { command: 'chats', description: 'My chats' },
       { command: 'leave', description: 'End a chat' },
       { command: 'reveal', description: 'Exchange usernames' },
+      { command: 'report', description: 'Report someone' },
+      { command: 'block', description: 'Block someone' },
+      { command: 'support', description: 'Contact support' },
+      { command: 'delete', description: 'Delete account' },
       { command: 'help', description: 'What the bot can do' },
     ];
     expect(byLanguage.get('en')).toEqual({ scope, language_code: 'en', commands: english });

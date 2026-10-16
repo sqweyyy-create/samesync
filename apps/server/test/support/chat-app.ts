@@ -6,20 +6,29 @@ import type { Update } from 'grammy/types';
 import { createBot, type BotContext } from '../../src/bot/bot';
 import { fixedClock, type Clock } from '../../src/clock';
 import type { ContentStore } from '../../src/content/store';
+import { createAdminRepository } from '../../src/db/repositories/admin';
 import { createChatRepository } from '../../src/db/repositories/chat';
 import { createMatchesRepository } from '../../src/db/repositories/matches';
 import { createOutboxRepository } from '../../src/db/repositories/outbox';
 import { createRevealRepository } from '../../src/db/repositories/reveal';
+import { createSafetyRepository } from '../../src/db/repositories/safety';
 import { createUsersRepository } from '../../src/db/repositories/users';
 import { DEFAULT_CHAT_PARAMS, type ChatParams } from '../../src/domain/chat/params';
 import type { ContactFilter } from '../../src/domain/chat/relay';
+import { DEFAULT_SAFETY_PARAMS, type SafetyParams } from '../../src/domain/safety/params';
 import { createChatDeadlines } from '../../src/jobs/chat-deadlines';
 import { createRetention } from '../../src/jobs/retention';
 import type { Logger } from '../../src/logger';
+import { createAccountService } from '../../src/services/account';
+import { createAdminService } from '../../src/services/admin';
+import { createAdminNotifier } from '../../src/services/admin-alerts';
 import { createChatService } from '../../src/services/chat';
+import { createContactFilter } from '../../src/services/contact-filter';
 import { createOutboxSender } from '../../src/services/outbox-sender';
 import { createRelayService, type RelayTelegram } from '../../src/services/relay';
 import { createRevealService } from '../../src/services/reveal';
+import { createSafetyService } from '../../src/services/safety';
+import { createSupportService } from '../../src/services/support';
 import { createUsernames } from '../../src/services/usernames';
 import type { TestDatabase } from './db';
 import {
@@ -37,7 +46,11 @@ export interface ChatServicesOptions {
   logger: Logger;
   telegram: FakeTelegram<BotContext>;
   params?: Partial<ChatParams>;
-  contactFilter?: ContactFilter;
+  /** The u18 contact filter: the real one unless a test passes its own (or `null` for none). */
+  contactFilter?: ContactFilter | null;
+  safetyParams?: Partial<SafetyParams>;
+  /** The admins (ADMIN_TELEGRAM_IDS); none by default. */
+  adminTelegramIds?: readonly number[];
   /** The username a synthetic user has in this test; none by default, like in production. */
   syntheticUsername?: string;
   /** Runs instead of the relay's wait before it tries a delivery again. */
@@ -48,9 +61,12 @@ export interface ChatServicesOptions {
 export function chatServices(testDb: TestDatabase, options: ChatServicesOptions) {
   const { content, clock, logger, telegram } = options;
   const params = { ...DEFAULT_CHAT_PARAMS, ...options.params };
+  const safetyParams = { ...DEFAULT_SAFETY_PARAMS, ...options.safetyParams };
   const users = createUsersRepository(testDb.db);
   const matches = createMatchesRepository(testDb.db);
   const chat = createChatRepository(testDb.db);
+  const safetyRepo = createSafetyRepository(testDb.db);
+  const adminRepo = createAdminRepository(testDb.db);
   const relayTelegram: RelayTelegram = {
     sendMessage: (chatId, text, other) => telegram.bot.api.sendMessage(chatId, text, other),
   };
@@ -58,6 +74,30 @@ export function chatServices(testDb: TestDatabase, options: ChatServicesOptions)
     getChat: (chatId) => telegram.bot.api.getChat(chatId),
     syntheticUsername: options.syntheticUsername,
   });
+  const notifier = createAdminNotifier({
+    adminTelegramIds: options.adminTelegramIds ?? [],
+    users,
+    telegram: {
+      sendMessage: (chatId, text, other) => telegram.bot.api.sendMessage(chatId, text, other),
+    },
+    logger,
+  });
+  const safety = createSafetyService({
+    safety: safetyRepo,
+    admin: adminRepo,
+    users,
+    matches,
+    content,
+    notifier,
+    clock,
+    logger,
+    params: safetyParams,
+    systemActorId: () => TEST_BOT_INFO.id,
+  });
+  const contactFilter =
+    options.contactFilter === undefined
+      ? createContactFilter({ chat, params: safetyParams })
+      : options.contactFilter;
   const relay = createRelayService({
     chat,
     users,
@@ -66,7 +106,8 @@ export function chatServices(testDb: TestDatabase, options: ChatServicesOptions)
     clock,
     logger,
     params,
-    ...(options.contactFilter ? { contactFilter: options.contactFilter } : {}),
+    ...(contactFilter ? { contactFilter } : {}),
+    safety,
     sleep: () => options.onRetryWait?.() ?? Promise.resolve(),
   });
   const chats = createChatService({
@@ -85,14 +126,36 @@ export function chatServices(testDb: TestDatabase, options: ChatServicesOptions)
     clock,
     logger,
   });
-  return { params, users, matches, chat, relay, chats, reveal, usernames };
+  const admin = createAdminService({ admin: adminRepo, safety, clock, logger });
+  const support = createSupportService({ notifier, clock, logger, params: safetyParams });
+  const account = createAccountService({ admin: adminRepo, logger });
+  return {
+    params,
+    safetyParams,
+    users,
+    matches,
+    chat,
+    relay,
+    chats,
+    reveal,
+    usernames,
+    safety,
+    safetyRepo,
+    adminRepo,
+    admin,
+    support,
+    account,
+    notifier,
+  };
 }
 
 export interface ChatAppOptions {
   /** The real current time by default: the database's age checks use the real date. */
   clock?: Clock & { set(next: Date): void };
   params?: Partial<ChatParams>;
-  contactFilter?: ContactFilter;
+  contactFilter?: ContactFilter | null;
+  safetyParams?: Partial<SafetyParams>;
+  adminTelegramIds?: readonly number[];
   syntheticUsername?: string;
   onRetryWait?: () => Promise<void>;
   /** `U18_POOL_ENABLED`, for the parts of the API that look at it. The chat never does. */
@@ -107,7 +170,8 @@ export async function buildChatApp(testDb: TestDatabase, options: ChatAppOptions
   const { logger, lines } = memoryLogger();
   const telegram = fakeTelegram<BotContext>();
   const services = chatServices(testDb, { ...options, content, clock, logger, telegram });
-  const { users, chat, relay, chats, reveal, usernames, params } = services;
+  const { users, chat, relay, chats, reveal, usernames, params, safety, admin, support, account } =
+    services;
 
   const bot = telegram.attach(
     createBot({
@@ -125,6 +189,8 @@ export async function buildChatApp(testDb: TestDatabase, options: ChatAppOptions
         miniAppUrl: TEST_MINIAPP_URL,
         maxLength: params.maxLength,
       },
+      safety: { chat, chats, safety, support, account, content },
+      admin: { adminTelegramIds: options.adminTelegramIds ?? [], admin, clock },
     }),
   );
   const sender = createOutboxSender({
@@ -149,7 +215,7 @@ export async function buildChatApp(testDb: TestDatabase, options: ChatAppOptions
     content,
     clock,
     logger,
-    chat: { chats, telegram },
+    chat: { chats, telegram, safety },
     ...(options.u18PoolEnabled === undefined ? {} : { u18PoolEnabled: options.u18PoolEnabled }),
   });
 
@@ -167,7 +233,13 @@ export async function buildChatApp(testDb: TestDatabase, options: ChatAppOptions
     /** Requests to the HTTP API as a Telegram user, with signed initData. */
     as: (user: TestUser) => http.as(user),
     deadlines: createChatDeadlines({ chat, clock, logger, params }),
-    retention: createRetention({ chat, clock, logger }),
+    retention: createRetention({
+      chat,
+      clock,
+      logger,
+      admin: services.adminRepo,
+      params: services.safetyParams,
+    }),
     logLines: lines,
     /** Feeds one update to the bot, and fails if a handler threw. */
     async handle(update: Update): Promise<void> {

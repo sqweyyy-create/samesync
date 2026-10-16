@@ -5,7 +5,9 @@ import { Bot, InlineKeyboard, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import type { UsersRepository } from '../db/repositories/users';
 import type { Logger } from '../logger';
+import { registerAdmin, type AdminBotDeps } from './admin';
 import { registerChat, type ChatBotDeps } from './chat';
+import { registerSafety, type SafetyBotDeps } from './safety';
 
 export type BotContext = Context & { t: Translator['t']; locale: Locale };
 
@@ -16,6 +18,10 @@ export interface BotDeps {
   users: Pick<UsersRepository, 'localeOf' | 'storeUsernameIfAdult' | 'setBotReachable'>;
   /** The chat: relaying messages, /chats, /leave and /reveal (PLAN.md Phase 4). */
   chat?: ChatBotDeps;
+  /** Report, block, /support and /delete (PLAN.md Phase 5). */
+  safety?: SafetyBotDeps;
+  /** The admin commands, for ADMIN_TELEGRAM_IDS only (PLAN.md Phase 5). */
+  admin?: AdminBotDeps;
   /** Skips the getMe call; used by tests. */
   botInfo?: UserFromGetMe;
 }
@@ -52,7 +58,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     await ctx.reply(ctx.t('bot.help'));
   });
 
-  // After the commands above: its last handler takes every other message of a private chat.
+  // Before the chat: its last handler takes every other message of a private chat, and its
+  // button handler every button it does not know.
+  if (deps.admin) registerAdmin(dm, deps.admin);
+  if (deps.safety) registerSafety(dm, deps.safety);
   if (deps.chat) registerChat(dm, deps.chat);
 
   // Blocking the bot arrives as "kicked", unblocking as "member". Unreachable users are not

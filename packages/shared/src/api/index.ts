@@ -206,6 +206,30 @@ export const SendMessageRequest = z.object({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
+/** Why someone reports the other person of a match (PLAN.md Phase 5). */
+export const ReportReason = z.enum([
+  'spam',
+  'harassment',
+  'sexual',
+  'age_misrepresentation',
+  'contact_sharing',
+  'other',
+]);
+export type ReportReason = z.infer<typeof ReportReason>;
+
+export const REPORT_NOTE_MAX_LENGTH = 500;
+
+/** `POST /api/matches/:id/report`: a report about the other person of the match. */
+export const ReportRequest = z.object({
+  reason: ReportReason,
+  note: z.optional(z.string().check(z.maxLength(REPORT_NOTE_MAX_LENGTH))),
+});
+export type ReportRequest = z.infer<typeof ReportRequest>;
+
+/** `duplicate`: the caller reported this match before; nothing new is counted. */
+export const ReportResponse = z.object({ status: z.enum(['stored', 'duplicate']) });
+export type ReportResponse = z.infer<typeof ReportResponse>;
+
 /** The results of a finished game. They exist only once both players have submitted. */
 export const ResultsResponse = z.object({
   total: z.number(),

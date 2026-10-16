@@ -11,6 +11,7 @@
  */
 import type { Locale } from '@samesync/shared';
 import { translatorFor } from '@samesync/shared/i18n/static';
+import { z } from 'zod';
 import type { Clock } from '../clock';
 import { aliasText, type ContentStore } from '../content/store';
 import type { ClaimedMessage, OutboxRepository } from '../db/repositories/outbox';
@@ -18,6 +19,7 @@ import type { UsersRepository } from '../db/repositories/users';
 import { encodeCallback } from '../domain/chat/callbacks';
 import { parseTeaser, renderTeaser } from '../domain/matching/teaser';
 import {
+  ACCOUNT_KINDS,
   MAX_SEND_ATTEMPTS,
   dropReason,
   hoursLeft,
@@ -82,6 +84,9 @@ type Outcome = keyof TickResult | 'rate_limited';
 /** How long a claimed row stays invisible to other senders. */
 const LEASE_MS = 60_000;
 
+/** The payload of a support reply: the admin's text, sent as plain text. */
+const SupportReplyPayload = z.object({ text: z.string().min(1).max(4000) });
+
 /** The Mini App URL that opens one match (read by the Mini App from `?match=`). */
 export function matchUrl(miniAppUrl: string, matchId: string): string {
   const url = new URL(miniAppUrl);
@@ -97,8 +102,26 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
   const lastSentTo = new Map<number, number>();
 
   /**
-   * The text and the buttons of one message, in the recipient's language. `username` is only
-   * there for `reveal_done`, the one message that carries one (CLAUDE.md invariant 6).
+   * The text and the buttons of a message about the recipient's account (no match): the notice
+   * that the account is frozen, and an admin's answer to a support request. Null for a payload
+   * that isn't what the kind needs.
+   */
+  function composeAccount(
+    kind: NotificationKind,
+    recipient: NonNullable<SendContext['recipient']>,
+    payload: unknown,
+  ): { text: string; buttons: NotificationButton[] } | null {
+    const { t } = translatorFor(recipient.locale);
+    if (kind === 'account_frozen') return { text: t('bot.account.frozen'), buttons: [] };
+    const reply = SupportReplyPayload.safeParse(payload);
+    if (!reply.success) return null;
+    return { text: t('bot.support.reply', { text: reply.data.text }), buttons: [] };
+  }
+
+  /**
+   * The text and the buttons of one message about a match, in the recipient's language.
+   * `username` is only there for `reveal_done`, the one message that carries one (CLAUDE.md
+   * invariant 6).
    */
   function compose(
     kind: NotificationKind,
@@ -172,38 +195,44 @@ export function createOutboxSender(deps: OutboxSenderDeps): OutboxSender {
         };
       case 'reveal_done':
         return { text: t('bot.reveal.done', { alias, username: username ?? '' }), buttons: [] };
+      case 'account_frozen':
+      case 'support_reply':
+        // Composed by composeAccount: these are about no match.
+        return { text: '', buttons: [] };
     }
   }
 
   async function deliver(message: ClaimedMessage): Promise<Outcome> {
-    // Re-read everything now, not when the message was queued.
-    const context = await outbox.sendContext(message);
-    const drop = dropReason(message.kind, context);
-    if (drop || !context.recipient || !context.match) {
-      const reason = drop ?? 'match_missing';
+    const dropped = async (reason: string): Promise<Outcome> => {
       await outbox.cancel(message.id, reason);
       logger.info({ outboxId: message.id, userId: message.userId, reason }, 'notification dropped');
       return 'cancelled';
-    }
-
+    };
+    // Re-read everything now, not when the message was queued.
+    const context = await outbox.sendContext(message);
+    const drop = dropReason(message.kind, context);
+    if (drop || !context.recipient) return dropped(drop ?? 'recipient_missing');
     const { recipient, match } = context;
-    // The one message that carries a username: adults only, after both consented (dropReason has
-    // just checked both against the database). The username is read from Telegram now.
-    let username: string | null = null;
-    if (message.kind === 'reveal_done') {
-      username = match.counterpart ? await deps.usernames.current(match.counterpart) : null;
-      if (username === null) {
-        await outbox.cancel(message.id, 'username_missing');
-        logger.info(
-          { outboxId: message.id, userId: message.userId, reason: 'username_missing' },
-          'notification dropped',
-        );
-        return 'cancelled';
+
+    let composed: { text: string; buttons: NotificationButton[] };
+    if (ACCOUNT_KINDS.has(message.kind)) {
+      const account = composeAccount(message.kind, recipient, message.payload);
+      if (!account) return dropped('bad_payload');
+      composed = account;
+    } else {
+      if (!match) return dropped('match_missing');
+      // The one message that carries a username: adults only, after both consented (dropReason
+      // has just checked both against the database). The username is read from Telegram now.
+      let username: string | null = null;
+      if (message.kind === 'reveal_done') {
+        username = match.counterpart ? await deps.usernames.current(match.counterpart) : null;
+        if (username === null) return dropped('username_missing');
       }
+      composed = compose(message.kind, recipient, match, username);
     }
 
     const chatId = recipient.telegramId;
-    const { text, buttons } = compose(message.kind, recipient, match, username);
+    const { text, buttons } = composed;
     const silent = isQuietHour(
       clock.now(),
       recipient.timezone,

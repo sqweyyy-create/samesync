@@ -11,6 +11,7 @@ import { ConfigError, loadConfig, type Config } from './config';
 import { assertContentSeeded } from './content/seed';
 import { createContentStore, type ContentStore } from './content/store';
 import { createDb, createPool } from './db/client';
+import { createAdminRepository } from './db/repositories/admin';
 import { createChatRepository } from './db/repositories/chat';
 import { createGamesRepository } from './db/repositories/games';
 import { createMatchesRepository } from './db/repositories/matches';
@@ -18,10 +19,12 @@ import { createMatchingRepository } from './db/repositories/matching';
 import { createOutboxRepository } from './db/repositories/outbox';
 import { createProfileRepository } from './db/repositories/profile';
 import { createRevealRepository } from './db/repositories/reveal';
+import { createSafetyRepository } from './db/repositories/safety';
 import { createUsersRepository } from './db/repositories/users';
 import { DEFAULT_CHAT_PARAMS } from './domain/chat/params';
 import { DEFAULT_GAME_PARAMS } from './domain/game/params';
 import { DEFAULT_MATCHING_PARAMS } from './domain/matching/params';
+import { DEFAULT_SAFETY_PARAMS } from './domain/safety/params';
 import { createHttpApp } from './http/app';
 import { createAgeTransition } from './jobs/age-transition';
 import { createChatDeadlines } from './jobs/chat-deadlines';
@@ -38,7 +41,11 @@ import { workerPlanner } from './jobs/matching-planner';
 import { createRetention } from './jobs/retention';
 import { createScheduler } from './jobs/scheduler';
 import { createLogger } from './logger';
+import { createAccountService } from './services/account';
+import { createAdminService } from './services/admin';
+import { createAdminNotifier } from './services/admin-alerts';
 import { createChatService } from './services/chat';
+import { createContactFilter } from './services/contact-filter';
 import { createGameService } from './services/game';
 import { createMatchesService } from './services/matches';
 import { createMatchingService } from './services/matching';
@@ -46,6 +53,8 @@ import { createOutboxSender } from './services/outbox-sender';
 import { createProfileService } from './services/profile';
 import { createRelayService, type RelayTelegram } from './services/relay';
 import { createRevealService } from './services/reveal';
+import { createSafetyService } from './services/safety';
+import { createSupportService } from './services/support';
 import { DEV_SYNTHETIC_USERNAME, createUsernames } from './services/usernames';
 
 let config: Config;
@@ -76,6 +85,8 @@ const users = createUsersRepository(db);
 const matches = createMatchesRepository(db);
 const games = createGamesRepository(db);
 const chat = createChatRepository(db);
+const safetyRepo = createSafetyRepository(db);
+const adminRepo = createAdminRepository(db);
 
 const profile = createProfileService({
   users,
@@ -96,6 +107,26 @@ const usernames = createUsernames({
   // Synthetic users only exist on development databases; production ignores them regardless.
   syntheticUsername: config.nodeEnv === 'production' ? undefined : DEV_SYNTHETIC_USERNAME,
 });
+// Safety (Phase 5): admins are told straight away (they need not be users), reports and blocks
+// go through one service, and the u18 relay runs the contact filter on every message.
+const notifier = createAdminNotifier({
+  adminTelegramIds: config.adminTelegramIds,
+  users,
+  telegram: { sendMessage: (chatId, text, options) => bot.api.sendMessage(chatId, text, options) },
+  logger,
+});
+const safety = createSafetyService({
+  safety: safetyRepo,
+  admin: adminRepo,
+  users,
+  matches,
+  content,
+  notifier,
+  clock,
+  logger,
+  params: DEFAULT_SAFETY_PARAMS,
+  systemActorId: () => bot.botInfo.id,
+});
 const relay = createRelayService({
   chat,
   users,
@@ -104,6 +135,8 @@ const relay = createRelayService({
   clock,
   logger,
   params: DEFAULT_CHAT_PARAMS,
+  contactFilter: createContactFilter({ chat, params: DEFAULT_SAFETY_PARAMS }),
+  safety,
 });
 const chats = createChatService({
   users,
@@ -122,6 +155,10 @@ const reveal = createRevealService({
   logger,
 });
 
+const admin = createAdminService({ admin: adminRepo, safety, clock, logger });
+const support = createSupportService({ notifier, clock, logger, params: DEFAULT_SAFETY_PARAMS });
+const account = createAccountService({ admin: adminRepo, logger });
+
 const app = createHttpApp({
   botToken: config.botToken,
   initData: config.initData,
@@ -131,6 +168,7 @@ const app = createHttpApp({
   matches: createMatchesService({ users, matches, content, clock }),
   game: createGameService({ users, matches, games, content, clock }),
   chat: chats,
+  safety,
 });
 const bot = createBot({
   token: config.botToken,
@@ -146,6 +184,8 @@ const bot = createBot({
     miniAppUrl: config.miniAppUrl,
     maxLength: DEFAULT_CHAT_PARAMS.maxLength,
   },
+  safety: { chat, chats, safety, support, account, content },
+  admin: { adminTelegramIds: config.adminTelegramIds, admin, clock },
 });
 
 const matching = createMatchingService({
@@ -199,7 +239,16 @@ const scheduler = createScheduler({
       pool,
       deadlines: createChatDeadlines({ chat, clock, logger, params: DEFAULT_CHAT_PARAMS }),
     }),
-    createRetentionJob({ pool, retention: createRetention({ chat, clock, logger }) }),
+    createRetentionJob({
+      pool,
+      retention: createRetention({
+        chat,
+        clock,
+        logger,
+        admin: adminRepo,
+        params: DEFAULT_SAFETY_PARAMS,
+      }),
+    }),
     createOutboxJob({ pool, sender }),
   ],
 });

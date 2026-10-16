@@ -2,6 +2,7 @@ import {
   CompleteRequest,
   MeResponse,
   PredictionsRequest,
+  ReportRequest,
   SaveAnswersRequest,
   SaveInterestsRequest,
   SendMessageRequest,
@@ -20,6 +21,7 @@ import { ServiceError } from '../services/errors';
 import type { GameService } from '../services/game';
 import type { MatchesService } from '../services/matches';
 import type { ProfileService } from '../services/profile';
+import type { SafetyService } from '../services/safety';
 import { initDataAuth, type AuthVariables } from './auth/middleware';
 
 export interface HttpAppDeps {
@@ -31,6 +33,7 @@ export interface HttpAppDeps {
   matches: MatchesService;
   game: GameService;
   chat: Pick<ChatService, 'sendFromApp'>;
+  safety: Pick<SafetyService, 'reportFromApp' | 'blockFromApp'>;
 }
 
 const NOT_FOUND: ApiErrorBody = { error: 'not_found' };
@@ -57,7 +60,7 @@ async function body<T extends z.ZodMiniType>(c: Context, schema: T): Promise<z.i
 
 export function createHttpApp(deps: HttpAppDeps): Hono {
   const app = new Hono();
-  const { profile, matches, game, chat } = deps;
+  const { profile, matches, game, chat, safety } = deps;
 
   // Request log: method, path without query, status, duration. Never headers or bodies.
   app.use(async (c, next) => {
@@ -156,6 +159,17 @@ export function createHttpApp(deps: HttpAppDeps): Hono {
     const { text } = await body(c, SendMessageRequest);
     return c.json(await chat.sendFromApp(c.get('auth'), c.req.param('id'), text));
   });
+
+  // Report and block the other person of a match (Phase 5). Both answer about the caller's own
+  // match only; a block answers with the match as it is afterwards (closed).
+  api.post('/matches/:id/report', async (c) =>
+    c.json(
+      await safety.reportFromApp(c.get('auth'), c.req.param('id'), await body(c, ReportRequest)),
+    ),
+  );
+  api.post('/matches/:id/block', async (c) =>
+    c.json(await safety.blockFromApp(c.get('auth'), c.req.param('id'))),
+  );
 
   app.route('/api', api);
 
