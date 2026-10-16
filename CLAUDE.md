@@ -2,7 +2,7 @@
 
 SameSync (bot: @samesync_bot; trademark check still pending, see PLAN.md Q31) is a Telegram Mini App plus a Telegram bot that helps Gen Z users meet through shared *specific* interests and opinions. Russian is the main locale and English is second. The visual style is minimalist.
 
-**Status:** Phases 0–4 (scaffold, onboarding, matching engine, game, anonymous chat) are done. Phase 5 (safety & admin tooling) is next; see the status table. Two Phase 4 items are deferred live checks on a phone before the public launch (PLAN.md §7). [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
+**Status:** Phases 0–4 (scaffold, onboarding, matching engine, game, anonymous chat) are done. Phase 5 (safety & admin tooling) is implemented and waits for the manual check and the product owner's sign-off; see the status table. Two Phase 4 items are deferred live checks on a phone before the public launch (PLAN.md §7). [PLAN.md](PLAN.md) holds the phase plan, data model, matching approach, open questions, risks and per-phase implementation notes. Read its status table before you start any work.
 
 ## Product summary
 
@@ -126,12 +126,20 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
 - **Chat (Phase 4):**
   - Everything that is relayed goes through `services/relay.ts` (`send`): a message written in the bot, the first message from the Mini App, the dev tooling. It stores the message first (the `messages` insert trigger decides), reads the match and both users again right before every Telegram call, and sends a new `sendMessage` with the alias and the text, nothing else.
   - `domain/chat/` is pure: `refusal()` says whether a message may go between two users, `chooseRoute()` where it goes (Q24), and `screen()` is the screening hook where Phase 5 plugs in the contact filter.
-  - **No chat in the `u18` band until Phase 5.** `CHAT_BANDS`, the screening hook and the `messages` trigger each refuse it on their own, and none of them looks at `U18_POOL_ENABLED`. Opening it means changing all three, with sign-off.
+  - **The `u18` chat is open only behind the contact filter (Phase 5).** `CHAT_BANDS` lists both bands, `screen()` runs the filter on every `u18` message and refuses without a filter and on any error of it, and the `messages` trigger no longer refuses the band (migration 0014). None of them looks at `U18_POOL_ENABLED`: while the pool is off, `u18` users are waitlisted and can't chat anyway.
   - `users.active_match_id` is a routing hint only. Never base anything on it: the relay checks the match behind it for every message.
   - A username appears in exactly one place: the `reveal_done` notification, composed by the outbox sender, which reads it from Telegram at that moment (`services/usernames.ts`). Never store, log or pass on a username anywhere else.
   - A consent to reveal can be withdrawn until the reveal has happened, never afterwards (Q38, decided): the `reveal_consents` delete trigger (migration 0012) refuses to remove a revealed consent, and the reveal locks both consent rows first.
   - The text of a message never goes into a log or an error. The driver's error for a failed insert quotes its parameters, so `ChatRepository.store` replaces it.
   - Inline button data is built and parsed by `domain/chat/callbacks.ts` (zod). It names an action and a match; the services decide whether the user may do that.
+- **Safety and admin (Phase 5):**
+  - The contact filter is `domain/safety/contact-filter.ts`, pure: `findContact(text)` and `findContactInWindow(recent, text)`. The relay runs it on every `u18` message together with the sender's last delivered messages of that chat (`services/contact-filter.ts`). A hit stores the message as `blocked_by_filter` (evidence for a report, never sent), writes a `filter_events` row and, after the threshold, a system report. Every evasion found in production goes into `apps/server/test/fixtures/contact-filter/{ru,en}.json` first, as a failing test.
+  - Reports and blocks are only ever about the other person of a match the caller is in (`SafetyRepository.participantOf`, the participant scope), and the `reports` and `blocks` triggers check that again. A block closes the pair's open match inside the database (`blocks_90_close_matches`); the app only adds the neutral `chat_ended` notice.
+  - A freeze is `status = 'frozen'` and nothing else: the state-change trigger closes the matches and cancels the notifications; `users.frozen_at` follows the status by trigger. Only `SafetyService.freeze`/`unfreeze` change it, and every change writes `admin_actions` (the bot's own ID is the actor of an automatic freeze). A frozen user still gets `account_frozen` and `support_reply` notifications and can use `/support`; nothing else.
+  - Admin commands live in `bot/admin.ts`, for `ADMIN_TELEGRAM_IDS` only, re-checked on every command and every button. Anyone else gets the unknown-command reply, and the commands are not in the menu. A command that can't be undone asks for a tap on a reply to the admin's own message (`domain/safety/callbacks.ts`); nothing is kept in memory between the two. Admins see support codes, statuses, bands and counts: never a name, a username, or messages outside the evidence a report kept. Viewing evidence is audited too.
+  - `admin_set_birth_date()` and `user_delete_account()` are the only ways to change a birth date or delete an account; both are granted to the app role on purpose (migration 0014) and guarded by the admin check and the confirmation.
+  - Alerts to admins go straight to the Bot API (`services/admin-alerts.ts`): admins need not be users, so the outbox can't carry them. Best effort, logged.
+  - Thresholds and windows are `DEFAULT_SAFETY_PARAMS` (`domain/safety/params.ts`), provisional per Q18 and Q20.
 - **Dev tooling:**
   - Scripts live in `apps/server/scripts/`, their libraries in `scripts/lib/`. They refuse to run with `NODE_ENV=production`, before they touch anything.
   - `pnpm dev:up` reads `.env` only for `BOT_TOKEN` and `DATABASE_URL`, never prints, logs or copies a value (except the one backup in `.dev/`), and doesn't load `.env` into its own environment, so the processes it starts read the updated file themselves.
@@ -162,7 +170,7 @@ pnpm content:seed               # content IDs + release into the DB (owner role)
 pnpm dev                        # server (bot long-polling + API + jobs) and Vite dev server
 pnpm dev:up                     # everything for a check in Telegram: Docker + db, migrate + seed, a cloudflared tunnel, MINIAPP_URL in .env and the bot's menu button, then pnpm dev (Ctrl+C stops it and the tunnel)
 pnpm dev:down                   # stops pnpm dev, the tunnel and the db container (volumes are kept)
-pnpm dev:scenario <phase2|phase3|phase4|reset> [support code]   # a ready-to-look-at state for the manual check of a phase, and its checklist
+pnpm dev:scenario <phase2|phase3|phase4|phase5|reset> [support code]   # a ready-to-look-at state for the manual check of a phase, and its checklist (phase5 also prints the .env line that makes your account an admin)
 pnpm dev:initdata               # signed initData + a URL to open the Mini App in a plain browser
 pnpm dev:population --pool adult:ru --mode friends --n 500   # synthetic users for one pool × mode
 pnpm dev:match-me <public_id>   # match a real dev user with synthetic ones and send them the bot notification
