@@ -1,6 +1,6 @@
 import { MESSAGE_MAX_LENGTH } from '@samesync/shared/api';
 import type { MatchSummary, ResultsResponse, Side } from '@samesync/shared/api';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
 import { Screen } from '../ui/Screen';
@@ -19,10 +19,13 @@ export function Results({
   onStale,
   onOpenChat,
   onBack,
+  safety,
 }: {
   api: ApiClient;
   match: Pick<MatchSummary, 'id' | 'status' | 'chat'>;
   alias: string;
+  /** Report and block, rendered by the match screen. */
+  safety?: ReactNode;
   /** The first message went out: the match as it is now (its chat has started). */
   onSent: (match: MatchSummary) => void;
   /** The results can't be shown (not ready, or the match ended): look at the match again. */
@@ -35,7 +38,7 @@ export function Results({
   const [results, setResults] = useState<ResultsResponse | null>(null);
   const [opener, setOpener] = useState('');
   const [sending, setSending] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<'generic' | 'contact_blocked' | null>(null);
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function Results({
 
   const send = async () => {
     setSending(true);
-    setFailed(false);
+    setFailed(null);
     const result = await api.sendMessage(match.id, opener);
     setSending(false);
     if (result.kind === 'ok') {
@@ -59,8 +62,11 @@ export function Results({
       // The chat is over or was never ours: the match screen says which.
     } else if (result.kind === 'error' && ['conflict', 'not_found'].includes(result.code)) {
       onStale();
+    } else if (result.kind === 'error' && result.details.includes('contact_blocked')) {
+      // The u18 contact filter stopped it: the one refusal that is explained.
+      setFailed('contact_blocked');
     } else {
-      setFailed(true);
+      setFailed('generic');
     }
   };
 
@@ -128,9 +134,18 @@ export function Results({
           >
             {t('miniapp.results.send')}
           </button>
-          {failed && <p className="hint">{t('miniapp.results.send_failed')}</p>}
+          {failed && (
+            <p className="hint">
+              {t(
+                failed === 'contact_blocked'
+                  ? 'miniapp.results.contact_blocked'
+                  : 'miniapp.results.send_failed',
+              )}
+            </p>
+          )}
         </>
       )}
+      {safety}
       <button type="button" className="secondary" onClick={onBack}>
         {t('miniapp.action.back')}
       </button>

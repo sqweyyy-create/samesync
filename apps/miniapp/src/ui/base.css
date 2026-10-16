@@ -181,3 +181,14 @@ textarea {
   padding: 12px 0;
   background: var(--bg);
 }
+
+.safety {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row.safety {
+  flex-direction: row;
+}

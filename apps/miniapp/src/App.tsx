@@ -102,6 +102,9 @@ export function App({
     );
   }
   if (!me) return <Screen hint={t('miniapp.status.loading')} />;
+  // A frozen account can only read this (and write to /support in the bot); a deleted one nothing.
+  if (me.status === 'frozen') return <Screen hint={t('miniapp.account.frozen')} />;
+  if (me.status === 'deleted') return <Screen hint={t('miniapp.account.deleted')} />;
 
   const backToSettings = () => setView('settings');
   if (view === 'settings') {

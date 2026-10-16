@@ -6,6 +6,7 @@ import { useLocale, useT } from '../i18n/I18nProvider';
 import { Screen } from '../ui/Screen';
 import { Game } from './Game';
 import { Results } from './Results';
+import { Safety } from './Safety';
 
 /** Where a match stands for the person looking at it. */
 type Stage = 'play' | 'waiting' | 'results' | 'ended';
@@ -125,6 +126,8 @@ export function Match({
   }
 
   const alias = `${match.alias.emoji} ${match.alias.name}`;
+  // Report and block are reachable from every match the user can see (PLAN.md Phase 5).
+  const safety = <Safety api={api} match={match} alias={alias} onBlocked={setMatch} />;
   if (stage === 'results') {
     return (
       <Results
@@ -135,6 +138,7 @@ export function Match({
         onStale={stale}
         onOpenChat={onOpenChat}
         onBack={onBack}
+        safety={safety}
       />
     );
   }
@@ -167,6 +171,7 @@ export function Match({
         <button type="button" onClick={() => setPlaying(true)}>
           {t('miniapp.game.play')}
         </button>
+        {safety}
         {back}
       </Screen>
     );
@@ -178,6 +183,7 @@ export function Match({
         <button type="button" className="secondary" onClick={reload}>
           {t('miniapp.game.refresh')}
         </button>
+        {safety}
         {back}
       </Screen>
     );
@@ -185,6 +191,7 @@ export function Match({
   return (
     <Screen title={alias} hint={match.teaser}>
       <p>{t('miniapp.match.ended')}</p>
+      {safety}
       {back}
     </Screen>
   );

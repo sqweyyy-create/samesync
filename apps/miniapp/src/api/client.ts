@@ -9,10 +9,12 @@ import {
   MatchSummary,
   MatchesResponse,
   MeResponse,
+  ReportResponse,
   ResultsResponse,
   type AnswerValue,
   type ApiErrorCode,
   type PredictionsRequest,
+  type ReportRequest,
   type SetModeRequest,
 } from '@samesync/shared/api';
 
@@ -58,6 +60,10 @@ export interface ApiClient {
    * message of the chat). Answers with the updated match, never with the message.
    */
   readonly sendMessage: (matchId: string, text: string) => Promise<ApiResult<MatchSummary>>;
+  /** Reports the other person of a match (Phase 5). */
+  readonly report: (matchId: string, request: ReportRequest) => Promise<ApiResult<ReportResponse>>;
+  /** Blocks the other person of a match: the chat ends, the pair is never matched again. */
+  readonly block: (matchId: string) => Promise<ApiResult<MatchSummary>>;
 }
 
 export interface ApiClientDeps {
@@ -139,5 +145,8 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     results: (id) => call(ResultsResponse, 'GET', `/api/matches/${encodeURIComponent(id)}/results`),
     sendMessage: (id, text) =>
       call(MatchSummary, 'POST', `/api/matches/${encodeURIComponent(id)}/messages`, { text }),
+    report: (id, request) =>
+      call(ReportResponse, 'POST', `/api/matches/${encodeURIComponent(id)}/report`, request),
+    block: (id) => call(MatchSummary, 'POST', `/api/matches/${encodeURIComponent(id)}/block`),
   };
 }

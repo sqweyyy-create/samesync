@@ -69,6 +69,8 @@ export function fakeApi(over: Partial<{ [K in keyof ApiClient]: ApiClient[K] }> 
     submitPredictions: vi.fn(unused),
     results: vi.fn(unused),
     sendMessage: vi.fn(unused),
+    report: vi.fn(unused),
+    block: vi.fn(unused),
     ...over,
   };
 }

@@ -340,3 +340,36 @@ describe('<App> matches', () => {
     expect(api.match).not.toHaveBeenCalled();
   });
 });
+
+describe('a frozen or deleted account (Phase 5)', () => {
+  it('shows a frozen account why, with no matches or settings', async () => {
+    renderWithI18n(
+      <App
+        api={fakeApi({
+          getMe: vi.fn(() =>
+            ok(me({ step: 'done', status: 'frozen', band: 'adult', mode: 'friends' })),
+          ),
+        })}
+        platform={fakePlatform()}
+        today="2026-10-02"
+      />,
+    );
+    expect(
+      await screen.findByText(
+        'Аккаунт заморожен: на него поступило несколько жалоб. Знакомства и чаты приостановлены. Если это ошибка, напиши в боте: /support и текст сообщения.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Настройки' })).toBeNull();
+  });
+
+  it('shows a deleted account that it is deleted', async () => {
+    renderWithI18n(
+      <App
+        api={fakeApi({ getMe: vi.fn(() => ok(me({ step: 'done', status: 'deleted' }))) })}
+        platform={fakePlatform()}
+        today="2026-10-02"
+      />,
+    );
+    expect(await screen.findByText('Аккаунт удалён.')).toBeTruthy();
+  });
+});
