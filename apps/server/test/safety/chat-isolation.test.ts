@@ -18,6 +18,7 @@ import {
   activeMatchOf,
   consentRows,
   insertBlock,
+  insertBlockQuietly,
   insertChat,
   insertConsent,
   insertDeliveredMessage,
@@ -170,26 +171,48 @@ describe('storing a message', () => {
     await expect(say(matchId, b)).rejects.toMatchObject(refused('chat_not_open'));
   });
 
-  it('is refused in a u18 match: there is no contact filter yet', async () => {
+  it('is possible in a u18 match like in an adult one: the contact filter decides, not the database (Phase 5)', async () => {
     // A legitimate u18 match: both 16, friends mode, its game finished.
     const { matchId, a, b } = await chat({ years: 16 });
     expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({ status: 'results_ready' });
-    await expect(say(matchId, a)).rejects.toMatchObject(refused('u18_chat_closed'));
-    await expect(say(matchId, b)).rejects.toMatchObject(refused('u18_chat_closed'));
-    // Not as an accepted message, and not as a record of a refused one either.
-    await expect(say(matchId, a, { verdict: 'rejected', reason: 'test' })).rejects.toMatchObject(
-      refused('u18_chat_closed'),
-    );
-    expect(await messageCount(matchId)).toBe(0);
+    await say(matchId, a);
+    await say(matchId, b, { body: 'и тебе привет' });
+    // What the filter stopped is kept as such, as evidence, and never counts as delivered.
+    await say(matchId, a, {
+      body: 'мой номер 89261234567',
+      verdict: 'blocked_by_filter',
+      reason: 'phone',
+    });
+    const rows = await messageRows(testDb.ownerPool, matchId);
+    expect(rows.map((r) => [r.verdict, r.delivered])).toEqual([
+      ['delivered', false],
+      ['delivered', false],
+      ['blocked_by_filter', false],
+    ]);
+    // Every other rule of the trigger holds in the u18 band exactly as in the adult one.
+    await tamper(b, 'status', 'frozen');
+    await expect(say(matchId, a)).rejects.toMatchObject(refused('not_active'));
   });
 
   it('is refused between two users one of whom blocked the other, in either direction', async () => {
     for (const blockerIsA of [true, false]) {
+      // The block is written past its own trigger, so that the match stays open: the message
+      // trigger must refuse the pair on its own.
       const { matchId, a, b } = await chat();
-      await insertBlock(testDb.ownerPool, blockerIsA ? a : b, blockerIsA ? b : a);
+      await insertBlockQuietly(testDb.ownerPool, blockerIsA ? a : b, blockerIsA ? b : a);
+      expect((await matchRow(testDb.ownerPool, matchId))?.status).toBe('results_ready');
       await expect(say(matchId, a)).rejects.toMatchObject(refused('blocked'));
       await expect(say(matchId, b)).rejects.toMatchObject(refused('blocked'));
     }
+    // A block as the app writes it closes the match itself (migration 0014), so there is
+    // nothing left to write into.
+    const { matchId, a, b } = await chat();
+    await insertBlock(testDb.appPool, a, b);
+    expect(await matchRow(testDb.ownerPool, matchId)).toMatchObject({
+      status: 'closed',
+      close_reason: 'blocked',
+    });
+    await expect(say(matchId, b)).rejects.toMatchObject(refused('chat_not_open'));
   });
 
   it('never starts as delivered', async () => {
@@ -502,7 +525,7 @@ describe('consent to reveal usernames', () => {
     );
 
     const blocked = await chat();
-    await insertBlock(testDb.ownerPool, blocked.a, blocked.b);
+    await insertBlockQuietly(testDb.ownerPool, blocked.a, blocked.b);
     await expect(consent(blocked.matchId, blocked.b)).rejects.toMatchObject(
       revealRefused('blocked'),
     );
@@ -566,7 +589,7 @@ describe('consent to reveal usernames', () => {
     await expect(reveal(minor.matchId)).rejects.toMatchObject(revealRefused('band'));
 
     const blocked = await both();
-    await insertBlock(testDb.ownerPool, blocked.b, blocked.a);
+    await insertBlockQuietly(testDb.ownerPool, blocked.b, blocked.a);
     await expect(reveal(blocked.matchId)).rejects.toMatchObject(revealRefused('blocked'));
 
     for (const c of [left, frozen, minor, blocked]) {
@@ -984,7 +1007,7 @@ describe('the relay and other people', () => {
 
   it('relays nothing between two users one of whom blocked the other', async () => {
     const { app, matchId, a, b, fox, owl } = await talking();
-    await insertBlock(testDb.ownerPool, b, a);
+    await insertBlockQuietly(testDb.ownerPool, b, a);
     await app.handle(textUpdate(fox, 'от заблокированного'));
     await app.handle(textUpdate(owl, 'заблокированному'));
     expect(texts(app, owl.id)).toEqual([ENDED]);

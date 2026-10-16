@@ -4,7 +4,7 @@ import type pg from 'pg';
 import { v7 as uuidv7 } from 'uuid';
 import type { TestUser } from './fixtures';
 import { insertGame, insertPredictions, markDone, toResultsReady } from './games';
-import { insertActiveUser, insertMatch } from './matches';
+import { insertActiveUser, insertMatch, withoutTriggers } from './matches';
 import { birthDateYearsAgo, type InsertUser } from './users';
 
 /** A user row and the Telegram account behind it. */
@@ -185,11 +185,21 @@ export async function consentRows(pool: pg.Pool, matchId: string) {
   return rows;
 }
 
-export const insertBlock = (ownerPool: pg.Pool, blockerId: string, blockedId: string) =>
-  ownerPool.query('INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2)', [
-    blockerId,
-    blockedId,
-  ]);
+/** A block as the app writes it: the trigger of migration 0014 closes the pair's open match. */
+export const insertBlock = (pool: pg.Pool, blockerId: string, blockedId: string) =>
+  pool.query('INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2)', [blockerId, blockedId]);
+
+/**
+ * A block written past the triggers, so that the pair's match stays open: the state the other
+ * triggers (messages, consents) must refuse on their own.
+ */
+export const insertBlockQuietly = (ownerPool: pg.Pool, blockerId: string, blockedId: string) =>
+  withoutTriggers(ownerPool, (client) =>
+    client.query('INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2)', [
+      blockerId,
+      blockedId,
+    ]),
+  );
 
 export async function activeMatchOf(pool: pg.Pool, userId: string): Promise<string | null> {
   const { rows } = await pool.query<{ active_match_id: string | null }>(

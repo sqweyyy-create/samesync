@@ -99,6 +99,13 @@
       "when": 1792186770111,
       "tag": "0013_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792186783900,
+      "tag": "0014_safety_triggers",
+      "breakpoints": true
     }
   ]
 }

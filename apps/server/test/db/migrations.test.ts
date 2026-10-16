@@ -280,6 +280,7 @@ describe('migrations', () => {
       'content_releases',
       'dating_options',
       'feature_stats',
+      'filter_events',
       'game_predictions',
       'games',
       'interest_categories',
@@ -289,6 +290,7 @@ describe('migrations', () => {
       'messages',
       'outbox',
       'questions',
+      'reports',
       'reveal_consents',
       'user_interests',
       'users',
@@ -460,12 +462,55 @@ describe('migrations', () => {
       );
     });
 
-    it('can only read blocks (they are written from Phase 5)', async () => {
+    it('can read and write blocks, and never remove or change one', async () => {
       await app.query('SELECT 1 FROM blocks');
-      await expectDenied(
-        'INSERT INTO blocks (blocker_id, blocked_id) VALUES (gen_random_uuid(), gen_random_uuid())',
+      await app.query(
+        'INSERT INTO blocks (blocker_id, blocked_id) SELECT gen_random_uuid(), gen_random_uuid() WHERE false',
       );
       await expectDenied('DELETE FROM blocks');
+      await expectDenied('UPDATE blocks SET match_id = NULL');
+      await expectDenied('ALTER TABLE blocks DISABLE TRIGGER blocks_10_guard_insert');
+      await expectDenied('ALTER TABLE blocks DISABLE TRIGGER blocks_90_close_matches');
+    });
+
+    it('can file and resolve reports, strip their evidence, and never rewrite or delete one', async () => {
+      await app.query('SELECT 1 FROM reports');
+      await app.query(
+        "INSERT INTO reports (id, reported_id, match_id, reason) SELECT gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'spam' WHERE false",
+      );
+      await app.query(
+        "UPDATE reports SET status = 'dismissed', resolved_by = 1, resolved_at = now(), evidence = NULL WHERE false",
+      );
+      await expectDenied("UPDATE reports SET reason = 'spam'");
+      await expectDenied("UPDATE reports SET note = 'x'");
+      await expectDenied('UPDATE reports SET reporter_id = reporter_id');
+      await expectDenied('DELETE FROM reports');
+      await expectDenied('ALTER TABLE reports DISABLE TRIGGER reports_10_guard_insert');
+      await expectDenied('ALTER TABLE reports DISABLE TRIGGER reports_10_guard_update');
+    });
+
+    it('can count filter events and never change or delete one', async () => {
+      await app.query('SELECT 1 FROM filter_events');
+      await app.query(
+        "INSERT INTO filter_events (id, user_id, kind) SELECT gen_random_uuid(), gen_random_uuid(), 'url' WHERE false",
+      );
+      await expectDenied("UPDATE filter_events SET kind = 'url'");
+      await expectDenied('DELETE FROM filter_events');
+    });
+
+    it('can correct a birth date and delete an account only through the two functions (Phase 5)', async () => {
+      // Granted on purpose: the functions check the rest (an admin and a reason; the row).
+      await expect(
+        app.query("SELECT admin_set_birth_date(gen_random_uuid(), '2000-01-01', 1, 'r')"),
+      ).rejects.toMatchObject({ code: 'SS003' });
+      expect(
+        (
+          await app.query<{ deleted: boolean }>(
+            'SELECT user_delete_account(gen_random_uuid()) AS deleted',
+          )
+        ).rows[0]?.deleted,
+      ).toBe(false);
+      await expectDenied('ALTER TABLE users DISABLE TRIGGER users_25_track_frozen_at');
     });
 
     it('can replace the derived feature statistics', async () => {
@@ -488,6 +533,11 @@ describe('migrations', () => {
       await expectDenied('SELECT reveal_consents_guard_update()');
       await expectDenied('SELECT reveal_consents_guard_delete()');
       await expectDenied('SELECT matches_guard_chat_status()');
+      await expectDenied('SELECT reports_guard_insert()');
+      await expectDenied('SELECT reports_guard_update()');
+      await expectDenied('SELECT blocks_guard_insert()');
+      await expectDenied('SELECT blocks_close_matches()');
+      await expectDenied('SELECT users_track_frozen_at()');
     });
 
     it('cannot read the migrations journal', async () => {

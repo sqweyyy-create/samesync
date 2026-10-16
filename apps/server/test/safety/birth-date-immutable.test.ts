@@ -64,14 +64,27 @@ describe('as the app role', () => {
     expect(await birthDateOf(id)).toBe(date);
   });
 
-  it('cannot call admin_set_birth_date()', async () => {
+  it('can call admin_set_birth_date() (the deliberate grant of Phase 5), which still needs an admin and a reason and audits', async () => {
     const { id } = await insertUser(testDb.appPool, { birthDate: birthDateYearsAgo(20) });
+    const date = birthDateYearsAgo(25);
+    // The bot checks the admin allowlist before it gets here; the function checks the rest.
     await expect(
-      testDb.appPool.query("SELECT admin_set_birth_date($1, $2::date, 1, 'reason')", [
-        id,
-        birthDateYearsAgo(25),
-      ]),
-    ).rejects.toMatchObject({ code: '42501' });
+      testDb.appPool.query('SELECT admin_set_birth_date($1, $2::date, 1, $3)', [id, date, '']),
+    ).rejects.toMatchObject({ code: 'SS002' });
+    await expect(
+      testDb.appPool.query('SELECT admin_set_birth_date($1, $2::date, 0, $3)', [id, date, 'r']),
+    ).rejects.toMatchObject({ code: 'SS002' });
+    await testDb.appPool.query('SELECT admin_set_birth_date($1, $2::date, 1, $3)', [
+      id,
+      date,
+      'checked by an admin',
+    ]);
+    expect(await birthDateOf(id)).toBe(date);
+    const { rows } = await testDb.ownerPool.query(
+      'SELECT action, admin_telegram_id::int AS admin, reason FROM admin_actions WHERE target_user_id = $1',
+      [id],
+    );
+    expect(rows).toEqual([{ action: 'set_birth_date', admin: 1, reason: 'checked by an admin' }]);
   });
 
   it('cannot disable the trigger', async () => {
