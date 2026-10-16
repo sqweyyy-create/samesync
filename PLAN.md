@@ -1,6 +1,6 @@
 # SameSync — Implementation Plan
 
-Last updated: 2026-10-10. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
+Last updated: 2026-10-17. Project context and the non-negotiable safety rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
@@ -745,6 +745,12 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
 - **Tests beyond the planned list:** test/chat/leave.test.ts (leaving, the command menu), test/scripts/dev-chat.test.ts, a block of chat kinds in test/safety/outbox-recheck.test.ts, the upgrade and grants tests in test/db/migrations.test.ts, and the Mini App tests of the results screen.
 - **Open questions:** Q1, Q20 and Q25 are implemented as their provisional defaults. Q36–Q39 were raised in this phase; on 2026-10-10 the product owner decided Q36, Q37 and Q39 as their provisional defaults and Q38 differently (withdrawal, above).
 - **Manual check (2026-10-10).** The product owner ran `pnpm dev:scenario phase4` in Telegram Web: items 1–4 and 7–9 pass. Items 5 and 6 (the reveal with a real username) and "Перейти в чат" closing the Mini App could not be verified there and are covered by automated tests; they are the deferred live checks of §7.
+- **Safety sign-off for Q38 (2026-10-17, product owner; CLAUDE.md invariant 11).** It covers every safety change of the Q38 commits (`fe7d5f9`…`bf6af5f`, 2026-10-10), as listed in the Q38 report and taken from `git diff 506b48c..bf6af5f`:
+  - Migration 0012: the new trigger function `reveal_consents_guard_delete()` with its trigger `reveal_consents_10_guard_delete` (a consent row can be deleted only while no row of its match has `revealed_at`, `SS042`); `reveal_consents_guard_update()` re-created with `CREATE OR REPLACE`, with one change: the reveal locks both consent rows `FOR UPDATE` before it counts them, so a withdrawal and a reveal that cross are serialized and the later one is refused; `REVOKE ALL` on the new function from PUBLIC; and `GRANT DELETE ON reveal_consents TO samesync_app`.
+  - `test/safety/chat-isolation.test.ts`: the test "cannot be rewritten or deleted by the app" became "cannot be rewritten by the app" (a withdrawal is a delete now); four new consent tests (withdrawn until the reveal and given again; withdrawn in a chat that has ended; never withdrawn after the reveal, by the app role or the owner; the later of a withdrawal and a reveal that cross is refused, in both orders, with real concurrent sessions); and the new block "a withdrawal that crosses the other person's consent (Q38)", which drives the services and the sender and finds no username anywhere.
+  - `test/safety/outbox-recheck.test.ts`: the new test that a request to consent goes to one person once per match (`already_asked`), whatever was queued after it.
+  - `test/safety/u18-no-username.test.ts`: the leak scanner also calls `reveal.withdraw()` for each u18 user and expects "unavailable"; the forged buttons now include `reveal_withdraw` through `CHAT_ACTIONS`.
+  - No earlier migration was edited, and no trigger was dropped or disabled. Auth, the relay and the filters did not change.
 - **Local setup after pulling Phase 4:** run `pnpm db:migrate` (migrations 0009–0012) before `pnpm dev`; a server that is already running with the new code logs errors from the chat jobs until then. The content did not change. Right after the migration the chat deadlines apply to matches whose results were already ready (their deadline was set in Phase 3): one whose results are older than 48 hours expires at the first run of the job and both users get the expiry notice, and one in its last 12 hours gets the reminder at once.
 
 ---
