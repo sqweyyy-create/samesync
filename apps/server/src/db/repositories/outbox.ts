@@ -20,6 +20,8 @@ export interface ClaimedMessage {
   kind: NotificationKind;
   matchId: string | null;
   attempts: number;
+  /** Parameters of the message (never rendered text), e.g. the text of a support reply. */
+  payload: unknown;
 }
 
 export interface OutboxRepository {
@@ -77,6 +79,7 @@ export function createOutboxRepository(db: Db): OutboxRepository {
         kind: NotificationKind;
         match_id: string | null;
         attempts: number;
+        payload: unknown;
       }>(sql`
         WITH due AS MATERIALIZED (
           SELECT id FROM outbox
@@ -89,7 +92,7 @@ export function createOutboxRepository(db: Db): OutboxRepository {
         SET attempts = o.attempts + 1, next_attempt_at = ${leaseUntil}::timestamptz
         FROM due
         WHERE o.id = due.id
-        RETURNING o.id, o.user_id, o.kind, o.match_id, o.attempts`);
+        RETURNING o.id, o.user_id, o.kind, o.match_id, o.attempts, o.payload`);
       return result.rows
         .map((r) => ({
           id: r.id,
@@ -97,6 +100,7 @@ export function createOutboxRepository(db: Db): OutboxRepository {
           kind: r.kind,
           matchId: r.match_id,
           attempts: r.attempts,
+          payload: r.payload,
         }))
         .sort((a, b) => (a.id < b.id ? -1 : 1));
     },

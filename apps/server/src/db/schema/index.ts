@@ -6,3 +6,4 @@ export * from './admin';
 export * from './matching';
 export * from './game';
 export * from './chat';
+export * from './safety';

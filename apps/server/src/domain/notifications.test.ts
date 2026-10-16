@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNT_KINDS,
   MAX_SEND_ATTEMPTS,
   NOTIFICATION_KINDS,
   dropReason,
@@ -112,6 +113,9 @@ describe('dropReason for the game notifications', () => {
     chat_reminder: { status: 'results_ready' },
     chat_expired: { status: 'expired', closeReason: 'expired' },
     chat_ended: { status: 'closed', closeReason: 'left' },
+    // About the account, not a match: dropReason decides before the match is looked at.
+    account_frozen: {},
+    support_reply: {},
     reveal_request: {
       status: 'active',
       reveal: {
@@ -160,7 +164,7 @@ describe('dropReason for the game notifications', () => {
     }
   });
 
-  it.each(NOTIFICATION_KINDS)(
+  it.each(NOTIFICATION_KINDS.filter((kind) => !ACCOUNT_KINDS.has(kind)))(
     'never sends %s across bands, to or about a frozen user, or to a synthetic one',
     (kind) => {
       const valid = VALID[kind];
@@ -180,6 +184,30 @@ describe('dropReason for the game notifications', () => {
   );
 });
 
+describe('dropReason for the account notifications (Phase 5)', () => {
+  it('sends the freeze notice to a frozen user, and only while they are frozen, about no match', () => {
+    expect(reason({ status: 'frozen' }, null, 'account_frozen')).toBeNull();
+    expect(reason({ status: 'frozen' }, { status: 'closed' }, 'account_frozen')).toBeNull();
+    expect(reason({ status: 'active' }, null, 'account_frozen')).toBe('outdated');
+    expect(reason({ status: 'frozen', botReachable: false }, null, 'account_frozen')).toBe(
+      'bot_unreachable',
+    );
+    expect(reason({ status: 'frozen', synthetic: true }, null, 'account_frozen')).toBe(
+      'synthetic_user',
+    );
+    expect(reason(null, null, 'account_frozen')).toBe('recipient_missing');
+  });
+
+  it('sends a support reply to anyone whose account exists, frozen or not, never to a deleted one', () => {
+    expect(reason({}, null, 'support_reply')).toBeNull();
+    expect(reason({ status: 'frozen' }, null, 'support_reply')).toBeNull();
+    expect(reason({ status: 'waitlisted' }, null, 'support_reply')).toBeNull();
+    expect(reason({ status: 'deleted' }, null, 'support_reply')).toBe('recipient_not_active');
+    expect(reason({ botReachable: false }, null, 'support_reply')).toBe('bot_unreachable');
+    expect(reason({ synthetic: true }, null, 'support_reply')).toBe('synthetic_user');
+  });
+});
+
 describe('dropReason for the chat notifications', () => {
   it('reminds about the first message only while nobody has written, where a chat is possible', () => {
     expect(reason({}, { status: 'results_ready' }, 'chat_reminder')).toBeNull();
@@ -187,14 +215,14 @@ describe('dropReason for the chat notifications', () => {
     expect(reason({}, { status: 'pending_game' }, 'chat_reminder')).toBe('outdated');
     expect(reason({}, { status: 'expired' }, 'chat_reminder')).toBe('match_closed');
     expect(reason({}, { status: 'closed' }, 'chat_reminder')).toBe('match_closed');
-    // Nobody can write in a u18 chat yet, so nobody is told to.
+    // A u18 chat is open behind the contact filter (Phase 5), so its people are reminded too.
     expect(
       reason(
         { liveBand: 'u18' },
         { status: 'results_ready', band: 'u18', counterpartLiveBand: 'u18' },
         'chat_reminder',
       ),
-    ).toBe('outdated');
+    ).toBeNull();
   });
 
   it('sends the chat expiry notice only for an expired match', () => {
@@ -204,9 +232,11 @@ describe('dropReason for the chat notifications', () => {
     }
   });
 
-  it('says that a chat has ended only when the other person left it', () => {
-    expect(reason({}, { status: 'closed', closeReason: 'left' }, 'chat_ended')).toBeNull();
-    for (const closeReason of ['band_change', 'frozen', 'blocked', 'admin', 'deleted'] as const) {
+  it('says that a chat has ended only when the other person left it, blocked, or an admin acted on a report', () => {
+    for (const closeReason of ['left', 'blocked', 'reported'] as const) {
+      expect(reason({}, { status: 'closed', closeReason }, 'chat_ended')).toBeNull();
+    }
+    for (const closeReason of ['band_change', 'frozen', 'admin', 'deleted'] as const) {
       expect(reason({}, { status: 'closed', closeReason }, 'chat_ended')).toBe('outdated');
     }
     expect(reason({}, { status: 'expired', closeReason: 'expired' }, 'chat_ended')).toBe(

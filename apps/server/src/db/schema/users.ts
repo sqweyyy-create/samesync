@@ -50,6 +50,8 @@ export const users = pgTable(
      */
     activeMatchId: uuid('active_match_id').references((): AnyPgColumn => matches.id),
     onboardedAt: timestamp('onboarded_at', { withTimezone: true }),
+    /** When the account was frozen (Phase 5). Kept in step with `status` by a trigger. */
+    frozenAt: timestamp('frozen_at', { withTimezone: true }),
     /** Created by dev tooling (`pnpm dev:population`). The bot never messages these users. */
     synthetic: boolean('synthetic').notNull().default(false),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull(),

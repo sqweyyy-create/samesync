@@ -29,6 +29,10 @@ export const NOTIFICATION_KINDS = [
   'chat_ended',
   'reveal_request',
   'reveal_done',
+  // Safety (Phase 5): the account was frozen (sent to the frozen user, about no match); an
+  // admin's answer to a /support request.
+  'account_frozen',
+  'support_reply',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -129,8 +133,14 @@ function stateProblem(
     case 'chat_expired':
       return match.status === 'expired' ? null : 'outdated';
     case 'chat_ended':
-      // Only for a chat the other person left. Every other ending has its own notice or none.
-      return match.status === 'closed' && match.closeReason === 'left' ? null : 'outdated';
+      // A chat the other person left, blocked, or that an admin closed on a report: the same
+      // neutral notice, which never says why. Every other ending has its own notice or none.
+      return match.status === 'closed' &&
+        (match.closeReason === 'left' ||
+          match.closeReason === 'blocked' ||
+          match.closeReason === 'reported')
+        ? null
+        : 'outdated';
     case 'reveal_request':
       if (!isOpen(match.status)) return 'match_closed';
       if (match.status === 'pending_game') return 'outdated';
@@ -156,8 +166,18 @@ function stateProblem(
         match.reveal.counterpartConsented
         ? null
         : 'outdated';
+    case 'account_frozen':
+    case 'support_reply':
+      // About the account, not a match: decided in dropReason before this is asked.
+      return 'outdated';
   }
 }
+
+/** The kinds that are about the recipient's account, not about a match. */
+export const ACCOUNT_KINDS: ReadonlySet<NotificationKind> = new Set([
+  'account_frozen',
+  'support_reply',
+]);
 
 /** Null means "send". Anything unknown or missing is a drop: fail closed (invariant 10). */
 export function dropReason(kind: NotificationKind, context: SendContext): DropReason | null {
@@ -165,6 +185,13 @@ export function dropReason(kind: NotificationKind, context: SendContext): DropRe
   if (!recipient) return 'recipient_missing';
   // Dev tooling users have no Telegram account behind them.
   if (recipient.synthetic) return 'synthetic_user';
+  if (ACCOUNT_KINDS.has(kind)) {
+    // The one message a frozen user still gets is the one that says so, and support's answers
+    // reach anyone whose account exists; neither names another person.
+    if (!recipient.botReachable) return 'bot_unreachable';
+    if (kind === 'account_frozen') return recipient.status === 'frozen' ? null : 'outdated';
+    return recipient.status === 'deleted' ? 'recipient_not_active' : null;
+  }
   if (recipient.status === 'frozen') return 'recipient_frozen';
   if (recipient.status !== 'active') return 'recipient_not_active';
   if (!recipient.botReachable) return 'bot_unreachable';
