@@ -1,5 +1,5 @@
 import type { AnswerValue, DeckResponse } from '@samesync/shared/api';
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi, me, ok, renderWithI18n } from '../test-utils';
 import { Deck } from './Deck';
@@ -77,5 +77,16 @@ describe('<Deck>', () => {
     expect(screen.getByText('Take 23')).toBeTruthy();
     await press('Против');
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a swipe to the right as agree', async () => {
+    const { saved } = setup();
+    const card = await screen.findByRole('article');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.pointerDown(card, { clientX: 20, clientY: 40, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(card, { clientX: 160, clientY: 40, pointerId: 1 });
+    await waitFor(() => expect(saved[0]).toEqual({ questionId: 'q.t0', value: 'agree' }));
   });
 });

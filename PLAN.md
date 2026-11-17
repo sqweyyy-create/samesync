@@ -872,6 +872,8 @@ A pair can form at tier *t* only if both users have relaxed to at least *t*. A p
   - copy review in ru and en;
   - checks on iOS, Android and Desktop Telegram;
   - CI: a size-limit bundle budget step (moved from Phase 0): ≤ 150 KB gzip of initial JS (Q33, decided).
+
+**Visual system, landed early (2026-11-17).** The screen pass lives in `apps/miniapp/src/ui/base.css`: an 8px space scale, radii, a warm-paper palette for light and dark, and Telegram `themeParams` (`--tg-theme-*`) overriding those brand colors when the client provides them. MainButton, BackButton, haptics, safe areas and the viewport are wired through `platform/`. The results screen offers low-pressure first-message prompts; report and block stay on every match screen. Payments, limits, the bundle-budget CI step, deployment and the three-client sign-off in this phase are still open. A dev-only gallery is `/?preview=<screen>&theme=light|dark`.
 - Deployment:
   - a multi-stage Dockerfile building one image that serves the API, `/tg/webhook` (checks `X-Telegram-Bot-Api-Secret-Token`) and the static Mini App;
   - `pnpm db:migrate` runs as a release step before start;

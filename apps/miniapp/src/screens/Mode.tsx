@@ -3,6 +3,7 @@ import type { DatingOptionsResponse, MeResponse, SetModeRequest } from '@samesyn
 import { useEffect, useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
+import { PrimaryButton } from '../ui/chrome';
 import { Choice, Screen } from '../ui/Screen';
 
 /** A whole number of years within the allowed partner ages, or null. */
@@ -134,9 +135,9 @@ export function Mode({
           )}
         </>
       )}
-      <button type="button" disabled={!ready || busy} onClick={save}>
+      <PrimaryButton disabled={!ready || busy} loading={busy} onClick={save}>
         {editing ? t('miniapp.action.save') : t('miniapp.action.next')}
-      </button>
+      </PrimaryButton>
     </Screen>
   );
 }

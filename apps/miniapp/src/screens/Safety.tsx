@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
 import { Choice } from '../ui/Screen';
+import { PrimaryButton, useHaptic } from '../ui/chrome';
 
 /**
  * Report and block the other person of a match (PLAN.md Phase 5). Both are reachable from every
@@ -23,6 +24,7 @@ export function Safety({
   onBlocked: (match: MatchSummary) => void;
 }) {
   const t = useT();
+  const haptic = useHaptic();
   const [view, setView] = useState<'buttons' | 'report' | 'block' | 'reported' | 'blocked'>(
     'buttons',
   );
@@ -42,9 +44,11 @@ export function Safety({
     });
     setBusy(false);
     if (result.kind === 'ok') {
+      haptic('success');
       setOutcome(result.data.status);
       setView('reported');
     } else {
+      haptic('error');
       setFailed(true);
     }
   };
@@ -55,9 +59,11 @@ export function Safety({
     const result = await api.block(match.id);
     setBusy(false);
     if (result.kind === 'ok') {
+      haptic('success');
       setView('blocked');
       onBlocked(result.data);
     } else {
+      haptic('error');
       setFailed(true);
     }
   };
@@ -74,7 +80,7 @@ export function Safety({
     return (
       <section className="safety">
         <h2>{t('miniapp.report.title')}</h2>
-        <div className="row">
+        <div className="reasons">
           {ReportReason.options.map((value) => (
             <Choice
               key={value}
@@ -94,13 +100,20 @@ export function Safety({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        <button type="button" disabled={busy || reason === null} onClick={() => void report()}>
-          {t('miniapp.report.send')}
-        </button>
-        {failed && <p className="hint">{t('miniapp.report.failed')}</p>}
-        <button type="button" className="secondary" onClick={() => setView('buttons')}>
-          {t('miniapp.action.cancel')}
-        </button>
+        <div className="action-bar">
+          <PrimaryButton
+            bare
+            disabled={busy || reason === null}
+            loading={busy}
+            onClick={() => void report()}
+          >
+            {t('miniapp.report.send')}
+          </PrimaryButton>
+          {failed && <p className="hint">{t('miniapp.report.failed')}</p>}
+          <button type="button" className="secondary" onClick={() => setView('buttons')}>
+            {t('miniapp.action.cancel')}
+          </button>
+        </div>
       </section>
     );
   }
@@ -108,24 +121,30 @@ export function Safety({
     return (
       <section className="safety">
         <p>{t('miniapp.block.confirm', { alias })}</p>
-        <button type="button" disabled={busy} onClick={() => void block()}>
-          {t('miniapp.block.yes')}
-        </button>
-        {failed && <p className="hint">{t('miniapp.block.failed')}</p>}
-        <button type="button" className="secondary" onClick={() => setView('buttons')}>
-          {t('miniapp.action.cancel')}
-        </button>
+        <div className="action-bar">
+          <button type="button" className="danger" disabled={busy} onClick={() => void block()}>
+            {t('miniapp.block.yes')}
+          </button>
+          {failed && <p className="hint">{t('miniapp.block.failed')}</p>}
+          <button type="button" className="secondary" onClick={() => setView('buttons')}>
+            {t('miniapp.action.cancel')}
+          </button>
+        </div>
       </section>
     );
   }
   return (
-    <div className="row safety">
-      <button type="button" className="secondary" onClick={() => setView('report')}>
-        {t('miniapp.safety.report')}
-      </button>
-      <button type="button" className="secondary" onClick={() => setView('block')}>
-        {t('miniapp.safety.block')}
-      </button>
-    </div>
+    <section className="safety">
+      <h2>{t('miniapp.safety.title')}</h2>
+      <p className="hint">{t('miniapp.safety.note')}</p>
+      <div className="row">
+        <button type="button" className="secondary" onClick={() => setView('report')}>
+          {t('miniapp.safety.report')}
+        </button>
+        <button type="button" className="danger" onClick={() => setView('block')}>
+          {t('miniapp.safety.block')}
+        </button>
+      </div>
+    </section>
   );
 }

@@ -1,6 +1,7 @@
 import { ageOn, birthDateProblem, type BirthDateProblem } from '@samesync/shared';
 import { useState } from 'react';
 import { useT } from '../i18n/I18nProvider';
+import { PrimaryButton } from '../ui/chrome';
 import { Screen } from '../ui/Screen';
 
 /**
@@ -33,12 +34,14 @@ export function BirthDate({
         title={t('miniapp.birth_date.confirm', { count: ageOn(value, today) })}
         hint={t('miniapp.birth_date.confirm_note')}
       >
-        <button type="button" disabled={busy} onClick={() => onConfirm(value)}>
-          {t('miniapp.birth_date.confirm_yes')}
-        </button>
-        <button type="button" className="secondary" onClick={() => setConfirming(false)}>
-          {t('miniapp.birth_date.confirm_no')}
-        </button>
+        <div className="action-bar">
+          <PrimaryButton bare disabled={busy} loading={busy} onClick={() => onConfirm(value)}>
+            {t('miniapp.birth_date.confirm_yes')}
+          </PrimaryButton>
+          <button type="button" className="secondary" onClick={() => setConfirming(false)}>
+            {t('miniapp.birth_date.confirm_no')}
+          </button>
+        </div>
       </Screen>
     );
   }
@@ -62,9 +65,9 @@ export function BirthDate({
           {t(`miniapp.birth_date.error.${problem}`)}
         </p>
       )}
-      <button type="button" disabled={!value} onClick={next}>
+      <PrimaryButton disabled={!value} onClick={next}>
         {t('miniapp.action.next')}
-      </button>
+      </PrimaryButton>
     </Screen>
   );
 }

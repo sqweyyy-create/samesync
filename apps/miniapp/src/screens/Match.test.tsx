@@ -280,6 +280,30 @@ describe('<Match> results', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  it('fills the first message from a low-pressure prompt and sends that text', async () => {
+    const sendMessage = vi.fn(() => ok(ACTIVE));
+    const api = fakeApi({ results: vi.fn(() => ok(RESULTS)), sendMessage });
+    renderWithI18n(
+      <Match api={api} match={READY} matchId={ID} onOpenChat={vi.fn()} onBack={vi.fn()} />,
+    );
+    const opener = await screen.findByLabelText('Первое сообщение');
+    expect((opener as HTMLTextAreaElement).value).toBe('Я за. А ты почему против?');
+    click('Почему?');
+    expect((opener as HTMLTextAreaElement).value).toBe(
+      'Почему ты так думаешь? Мне правда интересно.',
+    );
+    click('Из игры');
+    expect((opener as HTMLTextAreaElement).value).toBe('Я за. А ты почему против?');
+    click('Без спора');
+    click('Написать');
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        ID,
+        'Давай без спора — просто расскажи, как у тебя с этим.',
+      ),
+    );
+  });
+
   it('sends the edited opener as the first message, once, and then points to the bot chat', async () => {
     const sendMessage = vi.fn(() => ok(ACTIVE));
     const api = fakeApi({ results: vi.fn(() => ok(RESULTS)), sendMessage });

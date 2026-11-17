@@ -1,4 +1,15 @@
 /** What the app needs from Telegram. The rest of the app depends on this, never on the SDK. */
+
+export type HapticKind = 'select' | 'light' | 'success' | 'warning' | 'error';
+
+/** The single primary action, mirrored to Telegram's MainButton when it is available. */
+export interface MainButtonState {
+  text: string;
+  disabled: boolean;
+  loading: boolean;
+  onClick: () => void;
+}
+
 export interface Platform {
   /** False when opened outside Telegram (and not in dev browser mode). */
   readonly inTelegram: boolean;
@@ -14,6 +25,17 @@ export interface Platform {
   readonly requestWriteAccess: () => Promise<boolean>;
   /** Closes the Mini App: the user is back in the chat it was opened from, the bot's. */
   readonly close: () => void;
+  /**
+   * True when Telegram is drawing the native MainButton, so the in-page copy stays hidden.
+   * Outside Telegram this is false and the in-page button is the control.
+   */
+  readonly nativeButtons: boolean;
+  /** Shows Telegram's MainButton, or hides it when `null`. No-op outside Telegram. */
+  readonly setMainButton: (state: MainButtonState | null) => void;
+  /** Shows Telegram's BackButton bound to `onClick`, or hides it when `null`. */
+  readonly setBackButton: (onClick: (() => void) | null) => void;
+  /** A short haptic tap. No-op when the client has no haptic feedback. */
+  readonly haptic: (kind: HapticKind) => void;
 }
 
 /** Reads a field of the `user` object in raw initData, without trusting it for anything else. */

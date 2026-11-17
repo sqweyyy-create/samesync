@@ -4,10 +4,12 @@ import {
   type DeckResponse,
   type MeResponse,
 } from '@samesync/shared/api';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
-import { Screen } from '../ui/Screen';
+import { useHaptic } from '../ui/chrome';
+import { Meter, Screen } from '../ui/Screen';
+import { useSwipe, type SwipeSide } from '../ui/swipe';
 
 type Question = DeckResponse['questions'][number];
 
@@ -29,6 +31,7 @@ export function Deck({
   editing?: boolean;
 }) {
   const t = useT();
+  const haptic = useHaptic();
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [answers, setAnswers] = useState<Map<string, AnswerValue>>(new Map());
   const [queue, setQueue] = useState<string[]>([]);
@@ -36,6 +39,11 @@ export function Deck({
   const [history, setHistory] = useState<number[]>([]);
   const [revisiting, setRevisiting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const answerRef = useRef<(value: AnswerValue) => void>(() => undefined);
+  const swipe = useSwipe(
+    (side: SwipeSide) => answerRef.current(side),
+    !saving && questions !== null,
+  );
 
   useEffect(() => {
     void api.deck().then((result) => {
@@ -50,36 +58,47 @@ export function Deck({
     });
   }, [api, editing, onError]);
 
-  if (!questions) return <Screen hint={t('miniapp.status.loading')} />;
-
-  const byId = new Map(questions.map((q) => [q.id, q]));
   const nonSkip = (map: Map<string, AnswerValue>) =>
     [...map.values()].filter((v) => v !== 'skip').length;
 
-  const finishOrRevisit = (map: Map<string, AnswerValue>, me: MeResponse | null) => {
-    if (nonSkip(map) >= ONBOARDING.minAnswers) return onDone(me);
-    const skipped = queue.filter((id) => map.get(id) === 'skip' || !map.has(id));
-    setQueue(skipped.length > 0 ? skipped : queue);
-    setPosition(0);
-    setHistory([]);
-    setRevisiting(true);
-  };
+  const answer = useCallback(
+    async (value: AnswerValue) => {
+      const id = queue[position];
+      if (!id) return;
+      setSaving(true);
+      const result = await api.saveAnswers([{ questionId: id, value }]);
+      setSaving(false);
+      if (result.kind !== 'ok') {
+        haptic('error');
+        return onError();
+      }
+      haptic('light');
+      const next = new Map(answers).set(id, value);
+      const count = [...next.values()].filter((v) => v !== 'skip').length;
+      setAnswers(next);
+      setHistory((h) => [...h, position]);
+      // While revisiting skipped cards, stop as soon as the minimum is reached.
+      if (revisiting && count >= ONBOARDING.minAnswers) onDone(result.data);
+      else if (position + 1 < queue.length) setPosition(position + 1);
+      else if (count >= ONBOARDING.minAnswers) onDone(result.data);
+      else {
+        const skipped = queue.filter((item) => next.get(item) === 'skip' || !next.has(item));
+        setQueue(skipped.length > 0 ? skipped : queue);
+        setPosition(0);
+        setHistory([]);
+        setRevisiting(true);
+      }
+    },
+    [answers, api, haptic, onDone, onError, position, queue, revisiting],
+  );
 
-  const answer = async (value: AnswerValue) => {
-    const id = queue[position]!;
-    setSaving(true);
-    const result = await api.saveAnswers([{ questionId: id, value }]);
-    setSaving(false);
-    if (result.kind !== 'ok') return onError();
-    const next = new Map(answers).set(id, value);
-    setAnswers(next);
-    setHistory((h) => [...h, position]);
-    // While revisiting skipped cards, stop as soon as the minimum is reached.
-    if (revisiting && nonSkip(next) >= ONBOARDING.minAnswers) onDone(result.data);
-    else if (position + 1 < queue.length) setPosition(position + 1);
-    else finishOrRevisit(next, result.data);
-  };
+  useEffect(() => {
+    answerRef.current = (value) => void answer(value);
+  }, [answer]);
 
+  if (!questions) return <Screen hint={t('miniapp.status.loading')} />;
+
+  const byId = new Map(questions.map((q) => [q.id, q]));
   const back = () => {
     const previous = history.at(-1);
     if (previous === undefined) return;
@@ -88,6 +107,7 @@ export function Deck({
   };
 
   const current = byId.get(queue[position] ?? '');
+  const progress = t('miniapp.deck.progress', { current: position + 1, total: queue.length });
   return (
     <Screen title={t('miniapp.deck.title')}>
       <p className="hint">
@@ -95,21 +115,32 @@ export function Deck({
           ? t('miniapp.deck.revisit', { answered: nonSkip(answers), min: ONBOARDING.minAnswers })
           : t('miniapp.deck.min_hint', { count: ONBOARDING.minAnswers })}
       </p>
-      <p className="progress">
-        {t('miniapp.deck.progress', { current: position + 1, total: queue.length })}
-      </p>
-      <article className="card" aria-live="polite">
+      <Meter current={position + 1} total={queue.length} label={progress} />
+      <p className="progress">{progress}</p>
+      <article
+        className="card"
+        aria-live="polite"
+        data-swipe={swipe.direction}
+        style={swipe.style}
+        {...swipe.bind}
+      >
         {current?.text}
       </article>
-      <div className="row">
+      <p className="hint">{t('miniapp.deck.swipe')}</p>
+      <div className="row decide">
         <button type="button" disabled={saving} onClick={() => void answer('agree')}>
           {t('miniapp.deck.agree')}
         </button>
-        <button type="button" disabled={saving} onClick={() => void answer('disagree')}>
+        <button
+          type="button"
+          className="alt"
+          disabled={saving}
+          onClick={() => void answer('disagree')}
+        >
           {t('miniapp.deck.disagree')}
         </button>
       </div>
-      <div className="row">
+      <div className="row minor">
         <button
           type="button"
           className="secondary"

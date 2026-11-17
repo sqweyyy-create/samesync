@@ -3,7 +3,8 @@ import type { MatchSummary, ResultsResponse, Side } from '@samesync/shared/api';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
-import { Screen } from '../ui/Screen';
+import { PrimaryButton, useBackButton, useHaptic } from '../ui/chrome';
+import { Choice, Screen } from '../ui/Screen';
 
 /**
  * The results of a finished game: how well each read the other, every question side by side, and
@@ -35,11 +36,13 @@ export function Results({
   onBack: () => void;
 }) {
   const t = useT();
+  const haptic = useHaptic();
   const [results, setResults] = useState<ResultsResponse | null>(null);
   const [opener, setOpener] = useState('');
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<'generic' | 'contact_blocked' | null>(null);
   const [sent, setSent] = useState(false);
+  useBackButton(onBack);
 
   useEffect(() => {
     void api.results(match.id).then((result) => {
@@ -49,26 +52,30 @@ export function Results({
     });
   }, [api, match.id, onStale]);
 
-  if (!results) return <Screen hint={t('miniapp.status.loading')} />;
-
   const send = async () => {
     setSending(true);
     setFailed(null);
     const result = await api.sendMessage(match.id, opener);
     setSending(false);
     if (result.kind === 'ok') {
+      haptic('success');
       setSent(true);
       onSent(result.data);
       // The chat is over or was never ours: the match screen says which.
     } else if (result.kind === 'error' && ['conflict', 'not_found'].includes(result.code)) {
+      haptic('error');
       onStale();
     } else if (result.kind === 'error' && result.details.includes('contact_blocked')) {
       // The u18 contact filter stopped it: the one refusal that is explained.
+      haptic('warning');
       setFailed('contact_blocked');
     } else {
+      haptic('error');
       setFailed('generic');
     }
   };
+
+  if (!results) return <Screen hint={t('miniapp.status.loading')} />;
 
   const label = (side: Side) =>
     t(side === 'agree' ? 'miniapp.deck.agree' : 'miniapp.deck.disagree');
@@ -86,13 +93,31 @@ export function Results({
     });
   const closing = results.rounds.at(-1);
   const started = sent || match.status === 'active';
+  const prompts = [
+    { id: 'game', label: t('miniapp.results.prompt.game'), text: results.opener },
+    {
+      id: 'why',
+      label: t('miniapp.results.prompt.why_label'),
+      text: t('miniapp.results.prompt.why'),
+    },
+    {
+      id: 'soft',
+      label: t('miniapp.results.prompt.soft_label'),
+      text: t('miniapp.results.prompt.soft'),
+    },
+    { id: 'hi', label: t('miniapp.results.prompt.hi_label'), text: t('miniapp.results.prompt.hi') },
+  ] as const;
 
   return (
     <Screen title={t('miniapp.results.title')}>
-      <p>{t('miniapp.results.you', { count: results.youGuessed, total: results.total })}</p>
-      <p>
-        {t('miniapp.results.they', { alias, count: results.theyGuessed, total: results.total })}
-      </p>
+      <div className="scores">
+        <p className="score">
+          {t('miniapp.results.you', { count: results.youGuessed, total: results.total })}
+        </p>
+        <p className="score">
+          {t('miniapp.results.they', { alias, count: results.theyGuessed, total: results.total })}
+        </p>
+      </div>
       {results.rounds.slice(0, -1).map((round) => (
         <article key={round.questionId} className="round">
           <p>{round.text}</p>
@@ -101,54 +126,76 @@ export function Results({
         </article>
       ))}
       {closing && (
-        <>
+        <section className="split">
           <h2>{t('miniapp.results.closing')}</h2>
           <article className="card">{closing.text}</article>
           <p className="hint">{answers(closing)}</p>
           <p className="hint">{guesses(closing)}</p>
-        </>
+          {!match.chat && <p className="hint">{t('miniapp.results.chat_unavailable')}</p>}
+          {match.chat && started && (
+            <p>{t(sent ? 'miniapp.results.sent' : 'miniapp.results.chat_active')}</p>
+          )}
+          {match.chat && !started && (
+            <>
+              <p className="kicker">{t('miniapp.results.icebreakers')}</p>
+              <div className="chips" role="group" aria-label={t('miniapp.results.icebreakers')}>
+                {prompts.map((prompt) => (
+                  <Choice
+                    key={prompt.id}
+                    selected={opener === prompt.text}
+                    onClick={() => {
+                      setOpener(prompt.text);
+                      setFailed(null);
+                    }}
+                  >
+                    {prompt.label}
+                  </Choice>
+                ))}
+              </div>
+              <p className="hint">{t('miniapp.results.nudge')}</p>
+              <label className="field">
+                {t('miniapp.results.opener')}
+                <textarea
+                  value={opener}
+                  maxLength={MESSAGE_MAX_LENGTH}
+                  onChange={(e) => setOpener(e.target.value)}
+                />
+              </label>
+              <p className="hint">{t('miniapp.results.privacy')}</p>
+              {failed && (
+                <p className="error" role="alert">
+                  {t(
+                    failed === 'contact_blocked'
+                      ? 'miniapp.results.contact_blocked'
+                      : 'miniapp.results.send_failed',
+                  )}
+                </p>
+              )}
+            </>
+          )}
+        </section>
       )}
-      {!match.chat && <p className="hint">{t('miniapp.results.chat_unavailable')}</p>}
-      {match.chat && started && (
-        <>
-          <p>{t(sent ? 'miniapp.results.sent' : 'miniapp.results.chat_active')}</p>
-          <button type="button" onClick={onOpenChat}>
+      {safety}
+      <div className="action-bar">
+        {match.chat && started && (
+          <PrimaryButton bare onClick={onOpenChat}>
             {t('miniapp.results.to_chat')}
-          </button>
-        </>
-      )}
-      {match.chat && !started && closing && (
-        <>
-          <label className="field">
-            {t('miniapp.results.opener')}
-            <textarea
-              value={opener}
-              maxLength={MESSAGE_MAX_LENGTH}
-              onChange={(e) => setOpener(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
+          </PrimaryButton>
+        )}
+        {match.chat && !started && closing && (
+          <PrimaryButton
+            bare
             disabled={sending || opener.trim() === ''}
+            loading={sending}
             onClick={() => void send()}
           >
             {t('miniapp.results.send')}
-          </button>
-          {failed && (
-            <p className="hint">
-              {t(
-                failed === 'contact_blocked'
-                  ? 'miniapp.results.contact_blocked'
-                  : 'miniapp.results.send_failed',
-              )}
-            </p>
-          )}
-        </>
-      )}
-      {safety}
-      <button type="button" className="secondary" onClick={onBack}>
-        {t('miniapp.action.back')}
-      </button>
+          </PrimaryButton>
+        )}
+        <button type="button" className="secondary" onClick={onBack}>
+          {t('miniapp.action.back')}
+        </button>
+      </div>
     </Screen>
   );
 }

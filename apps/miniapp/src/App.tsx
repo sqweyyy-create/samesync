@@ -13,6 +13,7 @@ import { Match } from './screens/Match';
 import { Mode } from './screens/Mode';
 import { Settings, type SettingsTarget } from './screens/Settings';
 import { Screen } from './ui/Screen';
+import { PrimaryButton } from './ui/chrome';
 
 type Failure = 'unauthorized' | 'network' | 'forbidden' | 'generic';
 const FAILURE_TEXT: Record<Failure, MessageKey> = {
@@ -95,9 +96,7 @@ export function App({
   if (failure) {
     return (
       <Screen hint={t(FAILURE_TEXT[failure])}>
-        <button type="button" onClick={load}>
-          {t('miniapp.action.retry')}
-        </button>
+        <PrimaryButton onClick={load}>{t('miniapp.action.retry')}</PrimaryButton>
       </Screen>
     );
   }
