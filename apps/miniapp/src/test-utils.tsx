@@ -84,6 +84,10 @@ export function fakePlatform(over: Partial<Platform> = {}): Platform {
     allowsWriteToPm: () => true,
     requestWriteAccess: vi.fn(() => Promise.resolve(true)),
     close: vi.fn(),
+    nativeButtons: false,
+    setMainButton: vi.fn(),
+    setBackButton: vi.fn(),
+    haptic: vi.fn(),
     ...over,
   };
 }

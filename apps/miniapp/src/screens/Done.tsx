@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
 import type { Platform } from '../platform/types';
+import { PrimaryButton } from '../ui/chrome';
 import { Screen } from '../ui/Screen';
 import { MatchList } from './Match';
 
@@ -63,15 +64,15 @@ export function Done({
       hint={me.status === 'waitlisted' ? t('miniapp.done.waitlisted') : t('miniapp.done.text')}
     >
       {needsAccess && (
-        <>
+        <div className="notice">
           <p>{t('miniapp.done.write_access')}</p>
-          <button
-            type="button"
+          <PrimaryButton
+            bare
             onClick={() => void platform.requestWriteAccess().then((ok) => setNeedsAccess(!ok))}
           >
             {t('miniapp.done.allow')}
-          </button>
-        </>
+          </PrimaryButton>
+        </div>
       )}
       {me.status === 'active' && <MatchList api={api} onOpen={onOpenMatch} />}
       <button type="button" className="secondary" onClick={onSettings}>

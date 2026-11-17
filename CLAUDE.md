@@ -151,7 +151,8 @@ Age bands: `u18` = 14–17, `adult` = 18+. The band always comes from `birth_dat
 - **Logs:** pino JSON. Never log message bodies, birth dates, usernames, initData or payment payloads. Log internal IDs instead.
 - **Mini App:**
   - The Telegram SDK is imported only in `src/platform/`.
-  - No UI kits, no web fonts.
+  - No UI kits, no web fonts. The type stack is Inter when the device has it, then `ui-rounded` and the system UI font; no font files are bundled.
+  - Visual tokens (color, type, space, radius) live in `apps/miniapp/src/ui/base.css`. Telegram `themeParams` override the brand colors. MainButton, BackButton, haptics and the viewport are wired in `platform/` (`ui/chrome.tsx` is the React side).
   - Locale JSON and content are loaded at runtime, not bundled.
   - The size budget (≤ 150 KB gzip initial JS) is enforced in CI from Phase 6 (size-limit).
 - **Tests:** Vitest. DB tests run against real Postgres; safety tests never mock the database. Matching invariants use property-based tests (fast-check). `.only` and `.skip` are lint errors.

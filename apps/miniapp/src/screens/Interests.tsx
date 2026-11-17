@@ -3,6 +3,7 @@ import type { MessageKey } from '@samesync/shared/i18n';
 import { useEffect, useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { useT } from '../i18n/I18nProvider';
+import { PrimaryButton } from '../ui/chrome';
 import { Choice, Screen } from '../ui/Screen';
 
 type Item = InterestsResponse['items'][number];
@@ -113,20 +114,21 @@ export function Interests({
         ))}
       </div>
       <footer className="sticky">
-        <span>
+        <span className="count">
           {t('miniapp.interests.count', { count: picked.length, max: ONBOARDING.maxInterests })}
         </span>
-        <button
-          type="button"
+        <PrimaryButton
+          bare
           disabled={
             saving ||
             picked.length < ONBOARDING.minInterests ||
             picked.length > ONBOARDING.maxInterests
           }
+          loading={saving}
           onClick={() => void save()}
         >
           {t('miniapp.action.done')}
-        </button>
+        </PrimaryButton>
       </footer>
     </Screen>
   );

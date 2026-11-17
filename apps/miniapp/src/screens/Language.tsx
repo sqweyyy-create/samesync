@@ -1,6 +1,7 @@
 import { LOCALES, type Locale } from '@samesync/shared';
 import { useState } from 'react';
 import { useT } from '../i18n/I18nProvider';
+import { PrimaryButton } from '../ui/chrome';
 import { Choice, Screen } from '../ui/Screen';
 
 /** First screen (Q13): the language is preselected from Telegram and stored once chosen. */
@@ -22,9 +23,9 @@ export function Language({
           {t(`miniapp.language.${l}`)}
         </Choice>
       ))}
-      <button type="button" disabled={busy} onClick={() => onChoose(locale)}>
+      <PrimaryButton disabled={busy} loading={busy} onClick={() => onChoose(locale)}>
         {t('miniapp.action.continue')}
-      </button>
+      </PrimaryButton>
     </Screen>
   );
 }
